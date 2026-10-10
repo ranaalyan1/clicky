@@ -131,11 +131,10 @@ jobs:
             throw "GitHub release creation failed."
           }
 
-      - name: Attach installers to published Windows release
+      - name: Validate published Windows release
         if: ${{ github.event_name == 'release' && startsWith(github.event.release.tag_name, 'windows-v') }}
         shell: pwsh
         env:
-          GH_TOKEN: ${{ github.token }}
           RELEASE_TAG: ${{ github.event.release.tag_name }}
         run: |
           $packageManifest = Get-Content "windows/package.json" | ConvertFrom-Json
@@ -149,12 +148,10 @@ jobs:
             throw "Expected exactly two Windows installers, found $($installerPaths.Count)."
           }
 
-          $uploadArguments = @(
-            "release", "upload", $env:RELEASE_TAG,
-            "--clobber"
-          ) + $installerPaths.FullName
-
-          & gh @uploadArguments
-          if ($LASTEXITCODE -ne 0) {
-            throw "Uploading installers to the GitHub release failed."
-          }
+      - name: Attach installers to published Windows release
+        if: ${{ github.event_name == 'release' && startsWith(github.event.release.tag_name, 'windows-v') }}
+        uses: softprops/action-gh-release@v3
+        with:
+          tag_name: ${{ github.event.release.tag_name }}
+          files: windows/release/Clicky-Setup-*.exe
+          fail_on_unmatched_files: true
