@@ -56,11 +56,19 @@ The NSIS installers are written to `windows/release/`:
 
 The installer is per-user, offers an install location, creates Start Menu and desktop shortcuts, and preserves Clicky's settings on uninstall. The app can register itself to start when the user signs in; this is controllable in the panel.
 
+CI also launches the packaged x64 application for ten seconds before accepting a build. This catches missing native binaries, invalid preload paths, and main-process startup crashes that compilation alone cannot detect.
+
 To create an unpacked application directory while developing:
 
 ```powershell
 npm run package:win:dir
 ```
+
+### Publish a Windows release
+
+Maintainers can publish durable GitHub Release assets from **Actions → Windows client → Run workflow** on the `main` branch. Enter a release tag matching the package version, such as `windows-v1.0.0`. The workflow rebuilds and smoke-tests both installers before creating the release.
+
+The generated open-source installers are not code-signed. Windows SmartScreen may therefore show an unrecognized-app warning until a signing certificate is configured.
 
 ## Test and type-check
 
