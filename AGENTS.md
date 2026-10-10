@@ -36,7 +36,7 @@ The macOS client uses SwiftUI/AppKit. The Windows client lives in `windows/` and
 - **Screen Capture**: Electron `desktopCapturer`, with the pointer display sorted first and all images constrained to 1280 pixels
 - **Element Pointing**: one transparent, click-through, capture-protected `BrowserWindow` per display; Windows uses top-left global desktop coordinates, including negative monitor origins
 - **Text-to-Speech**: ElevenLabs audio plays in the persistent panel renderer; Windows `speechSynthesis` is the fallback
-- **Distribution**: `electron-builder` creates per-user NSIS installers for x64 and ARM64; `.github/workflows/windows.yml` validates and packages on `windows-latest`
+- **Distribution**: `electron-builder` creates per-user NSIS installers for x64 and ARM64; `.github/workflows/windows.yml` validates, launches the packaged x64 app, uploads artifacts, and can publish version-matched Windows releases
 
 ### API Proxy (Cloudflare Worker)
 

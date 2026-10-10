@@ -2,6 +2,11 @@ name: Windows client
 
 on:
   workflow_dispatch:
+    inputs:
+      release_tag:
+        description: "Optional release tag, for example windows-v1.0.0 (main only)"
+        required: false
+        type: string
   push:
     paths:
       - "windows/**"
@@ -12,7 +17,7 @@ on:
       - ".github/workflows/windows.yml"
 
 permissions:
-  contents: read
+  contents: write
 
 jobs:
   test-and-package:
@@ -42,9 +47,83 @@ jobs:
         working-directory: windows
         run: npm run package:win
 
+      - name: Smoke-test packaged x64 application
+        working-directory: windows
+        shell: pwsh
+        env:
+          ELECTRON_ENABLE_LOGGING: "1"
+        run: |
+          $applicationPath = Resolve-Path "release/win-unpacked/Clicky.exe"
+          $standardOutputPath = Join-Path $env:RUNNER_TEMP "clicky-smoke-stdout.log"
+          $standardErrorPath = Join-Path $env:RUNNER_TEMP "clicky-smoke-stderr.log"
+          $clickyProcess = Start-Process `
+            -FilePath $applicationPath `
+            -PassThru `
+            -RedirectStandardOutput $standardOutputPath `
+            -RedirectStandardError $standardErrorPath
+
+          try {
+            Start-Sleep -Seconds 10
+            if ($clickyProcess.HasExited) {
+              Write-Host "Clicky exited with code $($clickyProcess.ExitCode)."
+              if (Test-Path $standardOutputPath) { Get-Content $standardOutputPath }
+              if (Test-Path $standardErrorPath) { Get-Content $standardErrorPath }
+              throw "The packaged x64 application did not stay running."
+            }
+            Write-Host "Packaged x64 application remained healthy for the smoke-test window."
+          }
+          finally {
+            if (-not $clickyProcess.HasExited) {
+              Stop-Process -Id $clickyProcess.Id -Force
+            }
+          }
+
       - name: Upload Windows installers
         uses: actions/upload-artifact@v7
         with:
           name: clicky-windows-installers
           path: windows/release/Clicky-Setup-*.exe
           if-no-files-found: error
+
+      - name: Publish Windows GitHub release
+        if: ${{ github.event_name == 'workflow_dispatch' && inputs.release_tag != '' }}
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_TAG: ${{ inputs.release_tag }}
+        run: |
+          if ($env:GITHUB_REF_NAME -ne "main") {
+            throw "Windows releases must be dispatched from the main branch."
+          }
+
+          $packageManifest = Get-Content "windows/package.json" | ConvertFrom-Json
+          $expectedReleaseTag = "windows-v$($packageManifest.version)"
+          if ($env:RELEASE_TAG -ne $expectedReleaseTag) {
+            throw "Release tag must match package version: $expectedReleaseTag"
+          }
+
+          $installerPaths = Get-ChildItem "windows/release/Clicky-Setup-*.exe"
+          if ($installerPaths.Count -ne 2) {
+            throw "Expected exactly two Windows installers, found $($installerPaths.Count)."
+          }
+
+          $releaseNotesPath = Join-Path $env:RUNNER_TEMP "clicky-windows-release-notes.md"
+          @"
+          Clicky for Windows $($packageManifest.version).
+
+          This release contains per-user NSIS installers for Windows x64 and ARM64. After installation, open Clicky from the notification area, paste your deployed Cloudflare Worker URL, and select **save & test**.
+
+          The installers are currently unsigned, so Windows SmartScreen may display an unrecognized-app warning for this open-source build.
+          "@ | Set-Content $releaseNotesPath
+
+          $releaseArguments = @(
+            "release", "create", $env:RELEASE_TAG,
+            "--target", $env:GITHUB_SHA,
+            "--title", "Clicky for Windows $($packageManifest.version)",
+            "--notes-file", $releaseNotesPath
+          ) + $installerPaths.FullName
+
+          & gh @releaseArguments
+          if ($LASTEXITCODE -ne 0) {
+            throw "GitHub release creation failed."
+          }
