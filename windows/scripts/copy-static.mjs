@@ -1,0 +1,19 @@
+import { cp, mkdir, rm } from "node:fs/promises";
+
+const projectRoot = new URL("../", import.meta.url);
+const rendererSource = new URL("src/renderer/", projectRoot);
+const compiledRendererSource = new URL(".renderer-build/src/renderer/", projectRoot);
+const rendererDestination = new URL("dist/src/renderer/", projectRoot);
+const assetSource = new URL("assets/", projectRoot);
+const assetDestination = new URL("dist/assets/", projectRoot);
+
+await mkdir(rendererDestination, { recursive: true });
+await mkdir(assetDestination, { recursive: true });
+await cp(compiledRendererSource, rendererDestination, { recursive: true });
+
+for (const fileName of ["panel.html", "panel.css", "overlay.html", "overlay.css"]) {
+  await cp(new URL(fileName, rendererSource), new URL(fileName, rendererDestination));
+}
+
+await cp(assetSource, assetDestination, { recursive: true });
+await rm(new URL(".renderer-build/", projectRoot), { recursive: true, force: true });

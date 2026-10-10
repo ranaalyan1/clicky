@@ -1,0 +1,112 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data:; media-src 'self' data: blob:; connect-src 'none'; object-src 'none'; base-uri 'none'; form-action 'none'">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Clicky</title>
+  <link rel="stylesheet" href="./panel.css">
+</head>
+<body>
+  <main class="panel-shell">
+    <header class="titlebar">
+      <div class="brand-lockup">
+        <span class="mini-cursor" aria-hidden="true"></span>
+        <span class="brand-name">clicky</span>
+        <span class="platform-pill">windows</span>
+      </div>
+      <button id="close-button" class="icon-button no-drag" type="button" aria-label="Hide Clicky">×</button>
+    </header>
+
+    <section class="hero-section">
+      <div id="status-orb" class="status-orb" data-state="idle">
+        <span class="hero-cursor"></span>
+        <span class="orb-ring orb-ring-one"></span>
+        <span class="orb-ring orb-ring-two"></span>
+      </div>
+      <div class="status-copy">
+        <h1 id="status-title">ready when you are</h1>
+        <p id="status-description">hold <kbd>Ctrl</kbd> + <kbd>Alt</kbd> anywhere to talk</p>
+      </div>
+    </section>
+
+    <section id="setup-card" class="setup-card">
+      <div class="section-heading-row">
+        <div>
+          <p class="eyebrow">one-time setup</p>
+          <h2>connect your worker</h2>
+        </div>
+        <span id="connection-badge" class="connection-badge">not connected</span>
+      </div>
+      <label class="field-label" for="worker-url">Cloudflare Worker URL</label>
+      <input id="worker-url" class="text-field" type="url" spellcheck="false" autocomplete="off" placeholder="https://clicky-proxy.you.workers.dev">
+      <div class="button-row">
+        <button id="save-worker-button" class="secondary-button" type="button">save</button>
+        <button id="test-worker-button" class="primary-button" type="button">save &amp; test</button>
+      </div>
+      <p id="connection-result" class="connection-result" aria-live="polite"></p>
+    </section>
+
+    <section class="talk-card">
+      <button id="push-to-talk-button" class="push-to-talk-button" type="button">
+        <span class="microphone-icon" aria-hidden="true"></span>
+        <span class="talk-button-copy">
+          <strong>hold to talk</strong>
+          <small>or use Ctrl + Alt from any app</small>
+        </span>
+        <span class="live-wave" aria-hidden="true">
+          <i></i><i></i><i></i><i></i>
+        </span>
+      </button>
+    </section>
+
+    <section id="activity-card" class="activity-card" hidden>
+      <p id="transcript-label" class="activity-label">you said</p>
+      <p id="activity-text" class="activity-text"></p>
+    </section>
+
+    <p id="error-message" class="error-message" role="alert" hidden></p>
+
+    <section class="settings-section">
+      <div class="setting-row">
+        <div>
+          <strong>show clicky</strong>
+          <span>keep the blue cursor beside your pointer</span>
+        </div>
+        <label class="toggle-control">
+          <input id="cursor-toggle" type="checkbox">
+          <span></span>
+        </label>
+      </div>
+
+      <div class="setting-row model-setting-row">
+        <div>
+          <strong>brain</strong>
+          <span>choose speed or depth</span>
+        </div>
+        <div class="segmented-control" role="group" aria-label="Claude model">
+          <button id="sonnet-model-button" type="button" data-model="claude-sonnet-4-6">sonnet</button>
+          <button id="opus-model-button" type="button" data-model="claude-opus-4-6">opus</button>
+        </div>
+      </div>
+
+      <div class="setting-row">
+        <div>
+          <strong>start with windows</strong>
+          <span>stay ready in the system tray</span>
+        </div>
+        <label class="toggle-control">
+          <input id="launch-toggle" type="checkbox">
+          <span></span>
+        </label>
+      </div>
+    </section>
+
+    <footer>
+      <span id="shortcut-status" class="footer-dot-label"><i></i> global shortcut active</span>
+      <span>screen-aware voice companion</span>
+    </footer>
+  </main>
+  <script type="module" src="./panel.js"></script>
+</body>
+</html>

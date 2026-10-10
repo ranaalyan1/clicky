@@ -15,11 +15,32 @@ Download it [here](https://www.clicky.so/) for free.
 
 Here's the [original tweet](https://x.com/FarzaTV/status/2041314633978659092) that kinda blew up for a demo for more context.
 
-![Clicky — an ai buddy that lives on your mac](clicky-demo.gif)
+![Clicky — an AI buddy that lives on your desktop](clicky-demo.gif)
 
 This is the open-source version of Clicky for those that want to hack on it, build their own features, or just see how it works under the hood.
 
-## Get started with Claude Code
+## Platforms
+
+| Platform | Client | Global push-to-talk | Multi-monitor vision | Installer |
+|---|---|---:|---:|---:|
+| Windows 10/11 | Electron + Windows desktop APIs | Ctrl + Alt | Yes | NSIS `.exe` |
+| macOS 14.2+ | SwiftUI + AppKit | Control + Option | Yes | Xcode / DMG |
+
+### Run the Windows client
+
+After deploying the Cloudflare Worker in the manual setup below:
+
+```powershell
+cd windows
+npm install
+npm run dev
+```
+
+Paste the deployed Worker base URL into the panel and select **save & test**. Clicky then lives in the Windows notification area. Hold **Ctrl + Alt** from any app, speak, and release to submit. To build x64 and ARM64 installers, run `npm run package:win` on Windows.
+
+See [`windows/README.md`](windows/README.md) for Windows requirements, architecture, packaging, tests, permission details, and troubleshooting.
+
+## Get started with Claude Code (macOS)
 
 The fastest way to get this running is with [Claude Code](https://docs.anthropic.com/en/docs/claude-code).
 
@@ -43,9 +64,9 @@ If you want to do it yourself, here's the deal.
 
 ### Prerequisites
 
-- macOS 14.2+ (for ScreenCaptureKit)
-- Xcode 15+
-- Node.js 18+ (for the Cloudflare Worker)
+- **Windows client:** Windows 10 22H2 or Windows 11, plus Node.js 22.12+
+- **macOS client:** macOS 14.2+ (for ScreenCaptureKit) and Xcode 15+
+- Node.js 18+ for deploying the Cloudflare Worker
 - A [Cloudflare](https://cloudflare.com) account (free tier works)
 - API keys for: [Anthropic](https://console.anthropic.com), [AssemblyAI](https://www.assemblyai.com), [ElevenLabs](https://elevenlabs.io)
 
@@ -101,9 +122,21 @@ ELEVENLABS_VOICE_ID=...
 
 Then update the proxy URLs in the Swift code to point to `http://localhost:8787` instead of the deployed Worker URL while developing. Grep for `clicky-proxy` to find them all.
 
-### 3. Update the proxy URLs in the app
+### 3. Connect a client to the Worker
 
-The app has the Worker URL hardcoded in a few places. Search for `your-worker-name.your-subdomain.workers.dev` and replace it with your Worker URL:
+#### Windows
+
+Run the Windows client and paste the Worker base URL into its first-launch panel. The URL is validated and stored under the current Windows user's application data; no source edit is needed.
+
+```powershell
+cd windows
+npm install
+npm run dev
+```
+
+#### macOS
+
+The Swift app has the Worker URL hardcoded in a few places. Search for `your-worker-name.your-subdomain.workers.dev` and replace it with your Worker URL:
 
 ```bash
 grep -r "clicky-proxy" leanring-buddy/
@@ -113,7 +146,7 @@ You'll find it in:
 - `CompanionManager.swift` — Claude chat + ElevenLabs TTS
 - `AssemblyAIStreamingTranscriptionProvider.swift` — AssemblyAI token endpoint
 
-### 4. Open in Xcode and run
+### 4. Open the macOS client in Xcode and run
 
 ```bash
 open leanring-buddy.xcodeproj
@@ -126,8 +159,13 @@ In Xcode:
 
 The app will appear in your menu bar (not the dock). Click the icon to open the panel, grant the permissions it asks for, and you're good.
 
-### Permissions the app needs
+### Permissions the apps need
 
+**Windows:**
+- **Microphone** — requested on the first push-to-talk interaction
+- Desktop screenshots and the global shortcut use Windows desktop APIs and do not show separate macOS-style permission prompts
+
+**macOS:**
 - **Microphone** — for push-to-talk voice capture
 - **Accessibility** — for the global keyboard shortcut (Control + Option)
 - **Screen Recording** — for taking screenshots when you use the hotkey
@@ -137,7 +175,11 @@ The app will appear in your menu bar (not the dock). Click the icon to open the 
 
 If you want the full technical breakdown, read `CLAUDE.md`. But here's the short version:
 
-**Menu bar app** (no dock icon) with two `NSPanel` windows — one for the control panel dropdown, one for the full-screen transparent cursor overlay. Push-to-talk streams audio over a websocket to AssemblyAI, sends the transcript + screenshot to Claude via streaming SSE, and plays the response through ElevenLabs TTS. Claude can embed `[POINT:x,y:label:screenN]` tags in its responses to make the cursor fly to specific UI elements across multiple monitors. All three APIs are proxied through a Cloudflare Worker.
+**Windows:** a sandboxed Electron system-tray client with a frameless control panel and one transparent, click-through overlay per monitor. A native global key listener provides press/release semantics for Ctrl + Alt, Chromium captures microphone audio, and Electron captures displays. Provider networking stays in the main process behind a context-isolated preload bridge.
+
+**macOS:** a menu bar app (no dock icon) with `NSPanel` windows for the control panel and transparent cursor overlays. AppKit, AVFoundation, and ScreenCaptureKit provide the native integrations.
+
+On both platforms, push-to-talk streams audio over a websocket to AssemblyAI, sends the transcript plus screenshots to Claude via streaming SSE, and plays the response through ElevenLabs TTS. Claude can embed `[POINT:x,y:label:screenN]` tags in responses to make the cursor fly to a specific UI element across multiple monitors. Long-lived provider keys stay in the Cloudflare Worker; clients use only its proxy routes and short-lived AssemblyAI tokens.
 
 ## Project structure
 
@@ -150,6 +192,10 @@ leanring-buddy/          # Swift source (yes, the typo stays)
   OverlayWindow.swift       # Blue cursor overlay
   AssemblyAI*.swift         # Real-time transcription
   BuddyDictation*.swift     # Push-to-talk pipeline
+windows/                 # Windows system-tray client (Electron + TypeScript)
+  src/main/                 # native integrations, state machine, provider clients
+  src/renderer/             # settings panel, microphone runtime, cursor overlays
+  tests/                    # Windows-client unit tests
 worker/                  # Cloudflare Worker proxy
   src/index.ts              # Three routes: /chat, /tts, /transcribe-token
 CLAUDE.md                # Full architecture doc (agents read this)
