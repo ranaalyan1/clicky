@@ -62,6 +62,7 @@
       "artifactName": "Clicky-Setup-${version}-${arch}.${ext}"
     },
     "nsis": {
+      "buildUniversalInstaller": false,
       "oneClick": false,
       "allowToChangeInstallationDirectory": true,
       "createDesktopShortcut": true,
