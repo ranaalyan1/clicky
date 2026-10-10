@@ -50,6 +50,12 @@ jobs:
         working-directory: windows
         run: npm run package:win
 
+      - name: Validate Windows installers
+        working-directory: windows
+        env:
+          RELEASE_TAG: ${{ github.event.release.tag_name || '' }}
+        run: npm run validate:installers
+
       - name: Smoke-test packaged x64 application
         working-directory: windows
         shell: pwsh
@@ -129,23 +135,6 @@ jobs:
           & gh @releaseArguments
           if ($LASTEXITCODE -ne 0) {
             throw "GitHub release creation failed."
-          }
-
-      - name: Validate published Windows release
-        if: ${{ github.event_name == 'release' && startsWith(github.event.release.tag_name, 'windows-v') }}
-        shell: pwsh
-        env:
-          RELEASE_TAG: ${{ github.event.release.tag_name }}
-        run: |
-          $packageManifest = Get-Content "windows/package.json" | ConvertFrom-Json
-          $expectedReleaseTag = "windows-v$($packageManifest.version)"
-          if ($env:RELEASE_TAG -ne $expectedReleaseTag) {
-            throw "Release tag must match package version: $expectedReleaseTag"
-          }
-
-          $installerPaths = Get-ChildItem "windows/release/Clicky-Setup-*.exe"
-          if ($installerPaths.Count -ne 2) {
-            throw "Expected exactly two Windows installers, found $($installerPaths.Count)."
           }
 
       - name: Attach installers to published Windows release
