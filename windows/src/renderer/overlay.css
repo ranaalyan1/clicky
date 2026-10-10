@@ -1,0 +1,142 @@
+* { box-sizing: border-box; }
+html, body { width: 100%; height: 100%; margin: 0; overflow: hidden; background: transparent; pointer-events: none; }
+
+.buddy {
+  --audio-level: 0;
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: 38px;
+  height: 44px;
+  opacity: 0;
+  will-change: transform, opacity;
+  transition: opacity .16s ease;
+}
+.buddy.visible { opacity: 1; }
+.visual-wrap { position: relative; width: 38px; height: 44px; }
+.cursor-triangle {
+  position: absolute;
+  left: 4px;
+  top: 4px;
+  width: 28px;
+  height: 33px;
+  clip-path: polygon(7% 5%, 94% 46%, 55% 61%, 38% 98%);
+  transform: rotate(-8deg);
+  transform-origin: center;
+  background: linear-gradient(145deg, #7fc0ff 0%, #4398ff 44%, #1777eb 100%);
+  filter: drop-shadow(0 3px 3px rgba(0,0,0,.35)) drop-shadow(0 0 8px rgba(58,151,255,.72));
+  z-index: 3;
+}
+.glow {
+  position: absolute;
+  left: 1px;
+  top: 1px;
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  background: rgba(58,151,255,.22);
+  filter: blur(9px);
+  opacity: .55;
+}
+
+.listening-ring {
+  position: absolute;
+  inset: -5px -3px 3px -5px;
+  border: 2px solid rgba(85,168,255,.55);
+  border-radius: 50%;
+  opacity: 0;
+}
+.buddy[data-state="listening"] .listening-ring { animation: listening-ring 1s ease-out infinite; }
+.buddy[data-state="listening"] .cursor-triangle { animation: listen-float .55s ease-in-out infinite alternate; }
+@keyframes listening-ring { from { transform: scale(.7); opacity: .9; } to { transform: scale(1.45); opacity: 0; } }
+@keyframes listen-float { to { transform: rotate(-4deg) translateY(-2px) scale(1.05); } }
+
+.processing-spinner {
+  position: absolute;
+  left: 2px;
+  top: 2px;
+  width: 34px;
+  height: 34px;
+  border: 2px solid rgba(75,157,255,.18);
+  border-top-color: #68afff;
+  border-radius: 50%;
+  opacity: 0;
+  z-index: 4;
+}
+.buddy[data-state="processing"] .processing-spinner { opacity: 1; animation: spin .72s linear infinite; }
+.buddy[data-state="processing"] .cursor-triangle { opacity: .42; transform: rotate(-8deg) scale(.75); }
+@keyframes spin { to { transform: rotate(360deg); } }
+
+.waveform {
+  position: absolute;
+  left: 34px;
+  top: 17px;
+  height: 18px;
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  padding: 3px 5px;
+  border: 1px solid rgba(255,255,255,.12);
+  border-radius: 8px;
+  background: rgba(10,17,14,.86);
+  opacity: 0;
+  transform: translateX(-3px) scale(.9);
+  transition: opacity .15s, transform .15s;
+}
+.waveform i { width: 2px; height: 4px; border-radius: 3px; background: #75b8ff; animation: wave .48s ease-in-out infinite alternate; }
+.waveform i:nth-child(2) { animation-delay: -.28s; }
+.waveform i:nth-child(3) { animation-delay: -.12s; }
+.waveform i:nth-child(4) { animation-delay: -.36s; }
+.waveform i:nth-child(5) { animation-delay: -.2s; }
+.buddy[data-state="listening"] .waveform { opacity: 1; transform: translateX(0) scale(1); }
+@keyframes wave { to { height: calc(5px + var(--audio-level) * 11px); } }
+
+.buddy[data-state="responding"] .cursor-triangle { animation: talk-bob .5s ease-in-out infinite alternate; }
+@keyframes talk-bob { to { transform: rotate(-4deg) translateY(-3px) scale(1.04); } }
+
+.response-stack {
+  position: absolute;
+  left: 37px;
+  bottom: 24px;
+  width: max-content;
+  max-width: 330px;
+  display: flex;
+  align-items: flex-start;
+  flex-direction: column;
+  gap: 5px;
+  z-index: 7;
+}
+.response-bubble {
+  max-width: 330px;
+  padding: 10px 13px 11px;
+  border: 1px solid rgba(255,255,255,.13);
+  border-radius: 13px 13px 13px 4px;
+  background: rgba(13,20,17,.93);
+  box-shadow: 0 10px 30px rgba(0,0,0,.3), inset 0 1px rgba(255,255,255,.04);
+  color: #eef6f1;
+  font: 12px/1.42 "Segoe UI Variable", "Segoe UI", sans-serif;
+  letter-spacing: -.05px;
+  opacity: 0;
+  transform: translateY(5px) scale(.97);
+  transition: opacity .2s ease, transform .2s ease;
+}
+.response-bubble:not(:empty) { opacity: 1; transform: translateY(0) scale(1); }
+.point-label {
+  margin-left: 4px;
+  padding: 3px 7px 4px;
+  border: 1px solid rgba(85,168,255,.25);
+  border-radius: 50px;
+  background: rgba(28,79,132,.78);
+  color: #cce5ff;
+  font: 600 8.5px/1 "Segoe UI", sans-serif;
+  letter-spacing: .02em;
+  opacity: 0;
+  transform: translateY(3px);
+  transition: .18s;
+}
+.point-label:not(:empty) { opacity: 1; transform: translateY(0); }
+
+/* Keep bubbles readable when Clicky is near the right edge. */
+.buddy.flip-bubble .response-stack { left: auto; right: 31px; align-items: flex-end; }
+.buddy.flip-bubble .response-bubble { border-radius: 13px 13px 4px 13px; }
+.buddy.flip-bubble .point-label { margin-left: 0; margin-right: 4px; }

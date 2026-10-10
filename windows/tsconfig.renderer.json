@@ -1,0 +1,15 @@
+{
+  "extends": "./tsconfig.base.json",
+  "compilerOptions": {
+    "module": "ES2022",
+    "moduleResolution": "Bundler",
+    "types": [],
+    "outDir": ".renderer-build"
+  },
+  "include": [
+    "src/renderer/**/*.ts",
+    "src/renderer/**/*.d.ts",
+    "src/shared/contracts.ts"
+  ],
+  "exclude": ["dist", "release", "node_modules"]
+}

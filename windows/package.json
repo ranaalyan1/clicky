@@ -1,0 +1,73 @@
+{
+  "name": "clicky-windows",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Clicky, the screen-aware voice companion for Windows",
+  "main": "dist/src/main/main.js",
+  "author": "Clicky contributors",
+  "license": "MIT",
+  "engines": {
+    "node": ">=22.12"
+  },
+  "scripts": {
+    "clean": "node scripts/clean.mjs",
+    "build:main": "tsc -p tsconfig.json",
+    "build:renderer": "tsc -p tsconfig.renderer.json",
+    "copy:static": "node scripts/copy-static.mjs",
+    "build": "npm run clean && npm run build:main && npm run build:renderer && npm run copy:static",
+    "typecheck": "tsc -p tsconfig.json --noEmit && tsc -p tsconfig.renderer.json --noEmit",
+    "test": "npm run build && node --test \"dist/tests/*.test.js\"",
+    "dev": "npm run build && electron .",
+    "start": "electron .",
+    "package:win": "npm run build && electron-builder --win nsis",
+    "package:win:dir": "npm run build && electron-builder --win dir"
+  },
+  "dependencies": {
+    "uiohook-napi": "1.5.5",
+    "ws": "8.22.0"
+  },
+  "devDependencies": {
+    "@types/node": "24.7.0",
+    "@types/ws": "8.18.2",
+    "electron": "44.7.0",
+    "electron-builder": "26.15.3",
+    "typescript": "5.9.3"
+  },
+  "build": {
+    "appId": "com.clicky.windows",
+    "productName": "Clicky",
+    "asar": true,
+    "npmRebuild": false,
+    "asarUnpack": [
+      "node_modules/uiohook-napi/**"
+    ],
+    "files": [
+      "dist/**/*",
+      "package.json"
+    ],
+    "directories": {
+      "output": "release"
+    },
+    "win": {
+      "icon": "assets/icon.ico",
+      "target": [
+        {
+          "target": "nsis",
+          "arch": [
+            "x64",
+            "arm64"
+          ]
+        }
+      ],
+      "artifactName": "Clicky-Setup-${version}-${arch}.${ext}"
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true,
+      "shortcutName": "Clicky",
+      "deleteAppDataOnUninstall": false
+    }
+  }
+}

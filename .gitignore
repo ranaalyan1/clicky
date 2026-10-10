@@ -1,5 +1,9 @@
 worker/node_modules/
 worker/.dev.vars
+windows/node_modules/
+windows/dist/
+windows/.renderer-build/
+windows/release/
 .DS_Store
 *.xcuserstate
 build/
