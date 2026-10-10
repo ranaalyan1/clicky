@@ -66,7 +66,7 @@ npm run package:win:dir
 
 ### Publish a Windows release
 
-Maintainers can publish durable GitHub Release assets from **Actions → Windows client → Run workflow** on the `main` branch. Enter a release tag matching the package version, such as `windows-v1.0.0`. The workflow rebuilds and smoke-tests both installers before creating the release.
+Maintainers can publish durable GitHub Release assets from **Actions → Windows client → Run workflow** on the `main` branch. Enter a release tag matching the package version, such as `windows-v1.0.0`. The workflow rebuilds and smoke-tests both installers before creating the release. Publishing a `windows-v*` GitHub Release through the CLI or web UI also triggers the same guarded build and attaches both installers to that release.
 
 The generated open-source installers are not code-signed. Windows SmartScreen may therefore show an unrecognized-app warning until a signing certificate is configured.
 
