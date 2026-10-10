@@ -15,12 +15,15 @@ on:
     paths:
       - "windows/**"
       - ".github/workflows/windows.yml"
+  release:
+    types: [published]
 
 permissions:
   contents: write
 
 jobs:
   test-and-package:
+    if: ${{ github.event_name != 'release' || startsWith(github.event.release.tag_name, 'windows-v') }}
     runs-on: windows-latest
     timeout-minutes: 30
 
@@ -126,4 +129,32 @@ jobs:
           & gh @releaseArguments
           if ($LASTEXITCODE -ne 0) {
             throw "GitHub release creation failed."
+          }
+
+      - name: Attach installers to published Windows release
+        if: ${{ github.event_name == 'release' && startsWith(github.event.release.tag_name, 'windows-v') }}
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_TAG: ${{ github.event.release.tag_name }}
+        run: |
+          $packageManifest = Get-Content "windows/package.json" | ConvertFrom-Json
+          $expectedReleaseTag = "windows-v$($packageManifest.version)"
+          if ($env:RELEASE_TAG -ne $expectedReleaseTag) {
+            throw "Release tag must match package version: $expectedReleaseTag"
+          }
+
+          $installerPaths = Get-ChildItem "windows/release/Clicky-Setup-*.exe"
+          if ($installerPaths.Count -ne 2) {
+            throw "Expected exactly two Windows installers, found $($installerPaths.Count)."
+          }
+
+          $uploadArguments = @(
+            "release", "upload", $env:RELEASE_TAG,
+            "--clobber"
+          ) + $installerPaths.FullName
+
+          & gh @uploadArguments
+          if ($LASTEXITCODE -ne 0) {
+            throw "Uploading installers to the GitHub release failed."
           }
