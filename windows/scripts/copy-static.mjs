@@ -11,7 +11,19 @@ await mkdir(rendererDestination, { recursive: true });
 await mkdir(assetDestination, { recursive: true });
 await cp(compiledRendererSource, rendererDestination, { recursive: true });
 
-for (const fileName of ["panel.html", "panel.css", "overlay.html", "overlay.css"]) {
+// Every renderer window is plain HTML + CSS referenced by the compiled modules.
+const rendererStaticFileNames = [
+  "panel.html",
+  "panel.css",
+  "overlay.html",
+  "overlay.css",
+  "island.html",
+  "island.css",
+  "selection.html",
+  "selection.css",
+];
+
+for (const fileName of rendererStaticFileNames) {
   await cp(new URL(fileName, rendererSource), new URL(fileName, rendererDestination));
 }
 

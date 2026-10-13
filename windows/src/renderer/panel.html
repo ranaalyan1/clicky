@@ -18,94 +18,392 @@
       <button id="close-button" class="icon-button no-drag" type="button" aria-label="Hide Clickaa">×</button>
     </header>
 
-    <section class="hero-section">
-      <div id="status-orb" class="status-orb" data-state="idle">
-        <span class="hero-cursor"></span>
-        <span class="orb-ring orb-ring-one"></span>
-        <span class="orb-ring orb-ring-two"></span>
-      </div>
-      <div class="status-copy">
-        <h1 id="status-title">ready when you are</h1>
-        <p id="status-description">hold <kbd>Ctrl</kbd> + <kbd>Alt</kbd> anywhere to talk</p>
-      </div>
-    </section>
+    <nav class="tab-bar" role="tablist">
+      <button class="tab-button active" type="button" role="tab" data-page="home">home</button>
+      <button class="tab-button" type="button" role="tab" data-page="soul">soul</button>
+      <button class="tab-button" type="button" role="tab" data-page="plans">plans</button>
+      <button class="tab-button" type="button" role="tab" data-page="memory">memory</button>
+      <button class="tab-button" type="button" role="tab" data-page="setup">setup</button>
+    </nav>
 
-    <section id="setup-card" class="setup-card">
-      <div class="section-heading-row">
-        <div>
-          <p class="eyebrow">one-time setup</p>
-          <h2>connect your worker</h2>
-        </div>
-        <span id="connection-badge" class="connection-badge">not connected</span>
-      </div>
-      <label class="field-label" for="worker-url">Cloudflare Worker URL</label>
-      <input id="worker-url" class="text-field" type="url" spellcheck="false" autocomplete="off" placeholder="https://clickaa-proxy.you.workers.dev">
-      <div class="button-row">
-        <button id="save-worker-button" class="secondary-button" type="button">save</button>
-        <button id="test-worker-button" class="primary-button" type="button">save &amp; test</button>
-      </div>
-      <p id="connection-result" class="connection-result" aria-live="polite"></p>
-    </section>
+    <div class="tab-scroll">
+      <!-- ------------------------------------------------------------------ -->
+      <section class="page active" data-page="home">
+        <section class="hero-section">
+          <div id="status-orb" class="status-orb" data-state="idle">
+            <span class="hero-cursor"></span>
+            <span class="orb-ring orb-ring-one"></span>
+            <span class="orb-ring orb-ring-two"></span>
+          </div>
+          <div class="status-copy">
+            <h1 id="status-title">ready when you are</h1>
+            <p id="status-description">hold <kbd>Ctrl</kbd> + <kbd>Alt</kbd> anywhere to talk</p>
+          </div>
+        </section>
 
-    <section class="talk-card">
-      <button id="push-to-talk-button" class="push-to-talk-button" type="button">
-        <span class="microphone-icon" aria-hidden="true"></span>
-        <span class="talk-button-copy">
-          <strong>hold to talk</strong>
-          <small>or use Ctrl + Alt from any app</small>
-        </span>
-        <span class="live-wave" aria-hidden="true">
-          <i></i><i></i><i></i><i></i>
-        </span>
-      </button>
-    </section>
+        <section class="shortcut-card">
+          <div id="shortcut-list" class="shortcut-list"></div>
+        </section>
 
-    <section id="activity-card" class="activity-card" hidden>
-      <p id="transcript-label" class="activity-label">you said</p>
-      <p id="activity-text" class="activity-text"></p>
-    </section>
+        <section class="talk-card">
+          <button id="push-to-talk-button" class="push-to-talk-button" type="button">
+            <span class="microphone-icon" aria-hidden="true"></span>
+            <span class="talk-button-copy">
+              <strong>hold to talk</strong>
+              <small>or use the shortcut from any app</small>
+            </span>
+            <span class="live-wave" aria-hidden="true">
+              <i></i><i></i><i></i><i></i>
+            </span>
+          </button>
+        </section>
 
-    <p id="error-message" class="error-message" role="alert" hidden></p>
+        <section id="activity-card" class="activity-card" hidden>
+          <p id="transcript-label" class="activity-label">you said</p>
+          <p id="activity-text" class="activity-text"></p>
+        </section>
 
-    <section class="settings-section">
-      <div class="setting-row">
-        <div>
-          <strong>show clickaa</strong>
-          <span>keep the blue cursor beside your pointer</span>
-        </div>
-        <label class="toggle-control">
-          <input id="cursor-toggle" type="checkbox">
-          <span></span>
-        </label>
-      </div>
+        <p id="error-message" class="error-message" role="alert" hidden></p>
 
-      <div class="setting-row model-setting-row">
-        <div>
-          <strong>brain</strong>
-          <span>choose speed or depth</span>
-        </div>
-        <div class="segmented-control" role="group" aria-label="Claude model">
-          <button id="sonnet-model-button" type="button" data-model="claude-sonnet-4-6">sonnet</button>
-          <button id="opus-model-button" type="button" data-model="claude-opus-4-6">opus</button>
-        </div>
-      </div>
+        <section class="settings-section">
+          <div class="setting-row">
+            <div>
+              <strong>show the cursor buddy</strong>
+              <span>keep the blue cursor beside your pointer</span>
+            </div>
+            <label class="toggle-control">
+              <input id="cursor-toggle" type="checkbox">
+              <span></span>
+            </label>
+          </div>
 
-      <div class="setting-row">
-        <div>
-          <strong>start with windows</strong>
-          <span>stay ready in the system tray</span>
-        </div>
-        <label class="toggle-control">
-          <input id="launch-toggle" type="checkbox">
-          <span></span>
-        </label>
-      </div>
-    </section>
+          <div class="setting-row">
+            <div>
+              <strong>show the island</strong>
+              <span>the notch at the top of your screen</span>
+            </div>
+            <label class="toggle-control">
+              <input id="island-toggle" type="checkbox">
+              <span></span>
+            </label>
+          </div>
 
-    <footer>
-      <span id="shortcut-status" class="footer-dot-label"><i></i> global shortcut active</span>
-      <span>screen-aware voice companion</span>
-    </footer>
+          <div class="setting-row">
+            <div>
+              <strong>keep clipboard history</strong>
+              <span>recent copies, on this pc only</span>
+            </div>
+            <label class="toggle-control">
+              <input id="clipboard-toggle" type="checkbox">
+              <span></span>
+            </label>
+          </div>
+
+          <div class="setting-row">
+            <div>
+              <strong>pause actions</strong>
+              <span>clickaa describes what it would do instead</span>
+            </div>
+            <label class="toggle-control">
+              <input id="pause-toggle" type="checkbox">
+              <span></span>
+            </label>
+          </div>
+        </section>
+
+        <footer>
+          <span id="shortcut-status" class="footer-dot-label"><i></i> global shortcuts active</span>
+          <span id="brain-label">brain: —</span>
+        </footer>
+      </section>
+
+      <!-- ------------------------------------------------------------------ -->
+      <section class="page" data-page="soul">
+        <section class="card">
+          <div class="section-heading-row">
+            <div>
+              <p class="eyebrow">identity</p>
+              <h2>name &amp; personality</h2>
+            </div>
+          </div>
+          <label class="field-label" for="assistant-name">what it calls itself</label>
+          <input id="assistant-name" class="text-field" type="text" spellcheck="false" autocomplete="off" placeholder="clickaa">
+
+          <div id="personality-chips" class="chip-row"></div>
+          <p id="personality-description" class="field-hint"></p>
+
+          <label class="field-label" for="custom-instructions">extra instructions (optional)</label>
+          <textarea id="custom-instructions" class="text-area" rows="3" spellcheck="false" placeholder="keep answers blunt, never use bullet points, i'm learning rust"></textarea>
+
+          <label class="field-label">how much it says</label>
+          <div class="segmented-control" role="group" aria-label="Response length">
+            <button type="button" data-response-length="short">short</button>
+            <button type="button" data-response-length="balanced">balanced</button>
+            <button type="button" data-response-length="detailed">detailed</button>
+          </div>
+        </section>
+
+        <section class="card">
+          <div class="section-heading-row">
+            <div>
+              <p class="eyebrow">voice</p>
+              <h2>how it sounds</h2>
+            </div>
+          </div>
+          <label class="field-label" for="speech-provider">speech engine</label>
+          <select id="speech-provider" class="select-field">
+            <option value="auto">automatic (best available)</option>
+            <option value="gemini">gemini voice (your key)</option>
+            <option value="elevenlabs">elevenlabs (worker)</option>
+            <option value="windows">windows voice (offline)</option>
+          </select>
+
+          <label class="field-label" for="gemini-voice">gemini voice</label>
+          <select id="gemini-voice" class="select-field"></select>
+
+          <label class="field-label" for="windows-speech-rate">windows voice speed <span id="windows-speech-rate-value">1.04×</span></label>
+          <input id="windows-speech-rate" class="range-field" type="range" min="0.6" max="1.8" step="0.02">
+        </section>
+
+        <section class="card">
+          <div class="section-heading-row">
+            <div>
+              <p class="eyebrow">abilities</p>
+              <h2>what clickaa may do</h2>
+            </div>
+          </div>
+          <div id="ability-list" class="ability-list"></div>
+        </section>
+
+        <section class="card">
+          <div class="section-heading-row">
+            <div>
+              <p class="eyebrow">safety</p>
+              <h2>when to ask first</h2>
+            </div>
+          </div>
+          <div class="segmented-control" role="group" aria-label="Confirmation mode">
+            <button type="button" data-confirmation-mode="risky">ask for risky</button>
+            <button type="button" data-confirmation-mode="all">ask always</button>
+            <button type="button" data-confirmation-mode="never">never ask</button>
+          </div>
+          <p class="field-hint" id="confirmation-hint"></p>
+          <label class="field-label">always allow these without asking</label>
+          <div id="auto-approve-list" class="chip-row"></div>
+        </section>
+      </section>
+
+      <!-- ------------------------------------------------------------------ -->
+      <section class="page" data-page="plans">
+        <section class="card">
+          <div class="section-heading-row">
+            <div>
+              <p class="eyebrow">to-do</p>
+              <h2>your list</h2>
+            </div>
+            <span id="todo-count" class="count-pill">0 open</span>
+          </div>
+          <div class="inline-form">
+            <input id="todo-input" class="text-field" type="text" spellcheck="false" autocomplete="off" placeholder="call mom at 6pm">
+            <button id="todo-add-button" class="primary-button" type="button">add</button>
+          </div>
+          <div id="todo-list" class="list"></div>
+        </section>
+
+        <section class="card">
+          <div class="section-heading-row">
+            <div>
+              <p class="eyebrow">reminders &amp; routines</p>
+              <h2>set once, done for you</h2>
+            </div>
+          </div>
+          <div class="inline-form">
+            <input id="schedule-input" class="text-field" type="text" spellcheck="false" autocomplete="off" placeholder="search amazon for gift wraps tomorrow at 11">
+            <button id="schedule-add-button" class="primary-button" type="button">ask</button>
+          </div>
+          <p id="schedule-hint" class="field-hint">say it out loud instead and clickaa will set it up: "every morning at nine, open unity and spotify".</p>
+          <div id="schedule-list" class="list"></div>
+        </section>
+      </section>
+
+      <!-- ------------------------------------------------------------------ -->
+      <section class="page" data-page="memory">
+        <section class="card">
+          <div class="section-heading-row">
+            <div>
+              <p class="eyebrow">memory</p>
+              <h2>things clickaa remembers</h2>
+            </div>
+            <button id="memory-clear-button" class="ghost-button" type="button">clear all</button>
+          </div>
+          <div class="inline-form">
+            <input id="memory-input" class="text-field" type="text" spellcheck="false" autocomplete="off" placeholder="my brother's birthday is 4 march">
+            <button id="memory-add-button" class="primary-button" type="button">remember</button>
+          </div>
+          <div id="memory-list" class="list"></div>
+        </section>
+
+        <section class="card">
+          <div class="section-heading-row">
+            <div>
+              <p class="eyebrow">clipboard</p>
+              <h2>recent copies</h2>
+            </div>
+            <button id="clipboard-clear-button" class="ghost-button" type="button">clear</button>
+          </div>
+          <p class="field-hint">clickaa keeps your last copies in the island so you can paste them back in one click. nothing leaves this pc.</p>
+          <div id="clipboard-list" class="list"></div>
+        </section>
+      </section>
+
+      <!-- ------------------------------------------------------------------ -->
+      <section class="page" data-page="setup">
+        <section class="card">
+          <div class="section-heading-row">
+            <div>
+              <p class="eyebrow">brain</p>
+              <h2>who does the thinking</h2>
+            </div>
+            <span id="brain-badge" class="count-pill">not connected</span>
+          </div>
+
+          <div id="brain-provider-list" class="provider-list">
+            <button class="provider-card" type="button" data-brain-provider="gemini">
+              <strong>your own gemini key</strong>
+              <span>one key from google ai studio. nothing else to deploy: talking, seeing, dictating and acting all run on it.</span>
+            </button>
+            <button class="provider-card" type="button" data-brain-provider="worker">
+              <strong>cloudflare worker</strong>
+              <span>keeps claude, elevenlabs and assemblyai keys off this pc. paste your deployed worker url below.</span>
+            </button>
+          </div>
+
+          <div id="gemini-setup" class="setup-block">
+            <label class="field-label" for="gemini-key">gemini api key</label>
+            <input id="gemini-key" class="text-field" type="password" spellcheck="false" autocomplete="off" placeholder="AIza…">
+            <label class="field-label" for="gemini-model">model</label>
+            <select id="gemini-model" class="select-field">
+              <option value="gemini-2.5-flash">gemini flash — fastest</option>
+              <option value="gemini-2.5-pro">gemini pro — deepest</option>
+            </select>
+            <p class="field-hint">free to make in google ai studio. stored on this pc only, in your user folder.</p>
+            <div class="button-row">
+              <button id="gemini-save-button" class="secondary-button" type="button">save</button>
+              <button id="gemini-test-button" class="primary-button" type="button">save &amp; test</button>
+            </div>
+          </div>
+
+          <div id="worker-setup" class="setup-block">
+            <label class="field-label" for="worker-url">cloudflare worker url</label>
+            <input id="worker-url" class="text-field" type="url" spellcheck="false" autocomplete="off" placeholder="https://clickaa-proxy.you.workers.dev">
+            <label class="field-label" for="claude-model">claude model</label>
+            <select id="claude-model" class="select-field">
+              <option value="claude-sonnet-4-6">sonnet — fast</option>
+              <option value="claude-opus-4-6">opus — deeper</option>
+            </select>
+            <div class="button-row">
+              <button id="worker-save-button" class="secondary-button" type="button">save</button>
+              <button id="worker-test-button" class="primary-button" type="button">save &amp; test</button>
+            </div>
+          </div>
+
+          <p id="brain-result" class="connection-result" aria-live="polite"></p>
+        </section>
+
+        <section class="card">
+          <div class="section-heading-row">
+            <div>
+              <p class="eyebrow">why talk instead of type</p>
+              <h2>5.4× faster than typing</h2>
+            </div>
+          </div>
+          <p class="field-hint">people type at roughly 35 words per minute and speak at about 190. that gap is the whole point: hold a key, say the thing, and go back to what you were doing. dictation is cleaned up before it lands, so false starts and mid-sentence corrections never make it into your document.</p>
+          <div class="button-row">
+            <button id="setup-video-button" class="secondary-button" type="button">watch the 4-minute setup</button>
+          </div>
+        </section>
+
+        <section class="card">
+          <div class="section-heading-row">
+            <div>
+              <p class="eyebrow">shortcuts &amp; startup</p>
+              <h2>keys</h2>
+            </div>
+          </div>
+          <label class="field-label" for="dictation-shortcut">dictation shortcut</label>
+          <select id="dictation-shortcut" class="select-field">
+            <option value="ctrl+windows">ctrl + windows</option>
+            <option value="ctrl+shift+space">ctrl + shift + space</option>
+            <option value="capslock">caps lock</option>
+          </select>
+          <p class="field-hint">windows may open the start menu when you release ctrl + windows. if that bothers you, pick another shortcut.</p>
+
+          <div class="setting-row">
+            <div>
+              <strong>clean up dictated text</strong>
+              <span>removes false starts and filler words before typing</span>
+            </div>
+            <label class="toggle-control">
+              <input id="dictation-cleanup-toggle" type="checkbox">
+              <span></span>
+            </label>
+          </div>
+
+          <div class="setting-row">
+            <div>
+              <strong>speak scheduled results</strong>
+              <span>say what a routine or reminder did when it runs</span>
+            </div>
+            <label class="toggle-control">
+              <input id="speak-scheduled-toggle" type="checkbox">
+              <span></span>
+            </label>
+          </div>
+
+          <div class="setting-row">
+            <div>
+              <strong>start with windows</strong>
+              <span>stay ready in the system tray</span>
+            </div>
+            <label class="toggle-control">
+              <input id="launch-toggle" type="checkbox">
+              <span></span>
+            </label>
+          </div>
+        </section>
+
+        <section class="card">
+          <div class="section-heading-row">
+            <div>
+              <p class="eyebrow">island</p>
+              <h2>what the notch shows</h2>
+            </div>
+            <button id="refresh-apps-button" class="ghost-button" type="button">rescan apps</button>
+          </div>
+          <div class="setting-row">
+            <div>
+              <strong>now playing</strong>
+              <span>track title and media buttons</span>
+            </div>
+            <label class="toggle-control">
+              <input id="island-music-toggle" type="checkbox">
+              <span></span>
+            </label>
+          </div>
+          <div class="setting-row">
+            <div>
+              <strong>clipboard clips</strong>
+              <span>your recent copies, ready to paste</span>
+            </div>
+            <label class="toggle-control">
+              <input id="island-clipboard-toggle" type="checkbox">
+              <span></span>
+            </label>
+          </div>
+          <p class="field-hint">scroll or hover the island to open it. it stays click-through until your pointer is over it.</p>
+        </section>
+      </section>
+    </div>
   </main>
   <script type="module" src="./panel.js"></script>
 </body>

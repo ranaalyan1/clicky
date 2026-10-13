@@ -1,0 +1,107 @@
+:root {
+  color-scheme: dark;
+  font-family: "Segoe UI Variable", "Segoe UI", system-ui, sans-serif;
+}
+
+* { box-sizing: border-box; }
+
+html, body {
+  margin: 0;
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  background: transparent;
+  cursor: crosshair;
+  user-select: none;
+}
+
+.dim-layer {
+  position: fixed;
+  inset: 0;
+  background: rgba(6, 10, 9, 0.28);
+  animation: dim-in 0.12s ease;
+}
+
+@keyframes dim-in { from { opacity: 0; } to { opacity: 1; } }
+
+.selection-rect {
+  position: fixed;
+  border: 1.5px solid #6fb0ff;
+  border-radius: 6px;
+  background: rgba(111, 176, 255, 0.09);
+  box-shadow:
+    0 0 0 1px rgba(0, 0, 0, 0.35),
+    0 0 22px rgba(111, 176, 255, 0.45);
+  pointer-events: none;
+}
+
+.corner-handle {
+  position: absolute;
+  width: 7px;
+  height: 7px;
+  border-radius: 2px;
+  background: #cfe4ff;
+  box-shadow: 0 0 6px rgba(111, 176, 255, 0.7);
+}
+.corner-top-left { top: -4px; left: -4px; }
+.corner-top-right { top: -4px; right: -4px; }
+.corner-bottom-left { bottom: -4px; left: -4px; }
+.corner-bottom-right { bottom: -4px; right: -4px; }
+
+.selection-size-label {
+  position: absolute;
+  right: 0;
+  bottom: -22px;
+  padding: 2px 6px;
+  border-radius: 5px;
+  background: rgba(9, 14, 12, 0.9);
+  color: #cfe4ff;
+  font-size: 10px;
+  font-variant-numeric: tabular-nums;
+}
+
+.hint-banner {
+  position: fixed;
+  left: 50%;
+  top: 26px;
+  transform: translateX(-50%);
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  padding: 8px 13px;
+  border: 1px solid rgba(255, 255, 255, 0.09);
+  border-radius: 40px;
+  background: rgba(10, 15, 13, 0.92);
+  box-shadow: 0 12px 30px rgba(0, 0, 0, 0.45);
+  color: #e9f1ed;
+  font-size: 11.5px;
+  white-space: nowrap;
+}
+
+.hint-cursor {
+  width: 13px;
+  height: 15px;
+  clip-path: polygon(8% 7%, 93% 47%, 53% 62%, 38% 97%);
+  transform: rotate(-9deg);
+  background: linear-gradient(145deg, #86bfff, #2f83ee);
+  filter: drop-shadow(0 0 6px rgba(90, 162, 255, 0.55));
+}
+
+.hint-text { font-weight: 600; }
+
+.hint-escape {
+  color: #7f8d86;
+  font-size: 10px;
+  padding-left: 8px;
+  border-left: 1px solid rgba(255, 255, 255, 0.09);
+}
+
+kbd {
+  display: inline-block;
+  padding: 1px 5px 2px;
+  border: 1px solid rgba(255, 255, 255, 0.13);
+  border-radius: 4px;
+  background: rgba(255, 255, 255, 0.055);
+  color: #ced8d2;
+  font: 10px "Segoe UI", sans-serif;
+}

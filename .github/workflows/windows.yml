@@ -120,7 +120,7 @@ jobs:
           @"
           Clickaa for Windows $($packageManifest.version).
 
-          This release contains per-user NSIS installers for Windows x64 and ARM64. After installation, open Clickaa from the notification area, paste your deployed Cloudflare Worker URL, and select **save & test**.
+          This release contains per-user NSIS installers for Windows x64 and ARM64. After installation, open Clickaa from the notification area, then paste either your own Gemini API key or a deployed Cloudflare Worker URL and select **save & test**.
 
           The installers are currently unsigned, so Windows SmartScreen may display an unrecognized-app warning for this open-source build.
           "@ | Set-Content $releaseNotesPath

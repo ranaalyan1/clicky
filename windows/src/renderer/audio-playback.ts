@@ -46,12 +46,12 @@ export class CompanionAudioPlayback {
     }
   }
 
-  speakWithWindowsVoice(payload: FallbackSpeechPayload): void {
+  speakWithWindowsVoice(payload: FallbackSpeechPayload, speechRate = 1.04): void {
     this.stop();
     this.activeInteractionId = payload.interactionId;
 
     const speechUtterance = new SpeechSynthesisUtterance(payload.text);
-    speechUtterance.rate = 1.04;
+    speechUtterance.rate = speechRate;
     speechUtterance.pitch = 1.02;
     this.activeSpeechUtterance = speechUtterance;
 

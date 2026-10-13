@@ -1,0 +1,25 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data:; connect-src 'none'; object-src 'none'; base-uri 'none'; form-action 'none'">
+  <title>Circle to ask</title>
+  <link rel="stylesheet" href="./selection.css">
+</head>
+<body>
+  <div class="dim-layer"></div>
+  <div id="selection-rect" class="selection-rect" hidden>
+    <span class="corner-handle corner-top-left"></span>
+    <span class="corner-handle corner-top-right"></span>
+    <span class="corner-handle corner-bottom-left"></span>
+    <span class="corner-handle corner-bottom-right"></span>
+    <span id="selection-size-label" class="selection-size-label"></span>
+  </div>
+  <div id="hint-banner" class="hint-banner">
+    <span class="hint-cursor" aria-hidden="true"></span>
+    <span id="hint-text" class="hint-text">drag around anything, then let go</span>
+    <span class="hint-escape">press <kbd>Esc</kbd> to cancel</span>
+  </div>
+  <script type="module" src="./selection.js"></script>
+</body>
+</html>

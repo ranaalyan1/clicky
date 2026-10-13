@@ -23,7 +23,7 @@ This is the open-source version of Clicky for those that want to hack on it, bui
 
 | Platform | Client | Global push-to-talk | Multi-monitor vision | Installer |
 |---|---|---:|---:|---:|
-| Windows 10/11 | Electron + Windows desktop APIs | Ctrl + Alt | Yes | NSIS `.exe` |
+| Windows 10/11 | Electron + Windows desktop APIs | Ctrl + Alt (talk), Ctrl + Windows (dictate), Ctrl + Shift (circle) | Yes | NSIS `.exe` |
 | macOS 14.2+ | SwiftUI + AppKit | Control + Option | Yes | Xcode / DMG |
 
 ### Run the Windows client
@@ -36,7 +36,7 @@ npm install
 npm run dev
 ```
 
-Paste the deployed Worker base URL into the panel and select **save & test**. Clicky then lives in the Windows notification area. Hold **Ctrl + Alt** from any app, speak, and release to submit. To build x64 and ARM64 installers, run `npm run package:win` on Windows.
+Paste the deployed Worker base URL into the panel and select **save & test**, or paste a [Google AI Studio](https://aistudio.google.com/api-keys) Gemini API key instead and skip the Worker entirely. Clickaa then lives in the Windows notification area. Hold **Ctrl + Alt** from any app, speak, and release to submit; **Ctrl + Windows** dictates clean text into the focused app, and **Ctrl + Shift** lets you circle something on screen and ask about it. To build x64 and ARM64 installers, run `npm run package:win` on Windows.
 
 See [`windows/README.md`](windows/README.md) for Windows requirements, architecture, packaging, tests, permission details, and troubleshooting.
 
@@ -126,7 +126,7 @@ Then update the proxy URLs in the Swift code to point to `http://localhost:8787`
 
 #### Windows
 
-Run the Windows client and paste the Worker base URL into its first-launch panel. The URL is validated and stored under the current Windows user's application data; no source edit is needed.
+Run the Windows client and paste either the Worker base URL or your own Gemini API key into its first-launch panel. Both are validated and stored under the current Windows user's application data; no source edit is needed.
 
 ```powershell
 cd windows
@@ -194,7 +194,7 @@ leanring-buddy/          # Swift source (yes, the typo stays)
   BuddyDictation*.swift     # Push-to-talk pipeline
 windows/                 # Windows system-tray client (Electron + TypeScript)
   src/main/                 # native integrations, state machine, provider clients
-  src/renderer/             # settings panel, microphone runtime, cursor overlays
+  src/renderer/             # settings panel, island, cursor overlays, circle lasso, microphone runtime
   tests/                    # Windows-client unit tests
 worker/                  # Cloudflare Worker proxy
   src/index.ts              # Three routes: /chat, /tts, /transcribe-token

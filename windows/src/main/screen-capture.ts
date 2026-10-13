@@ -1,5 +1,12 @@
 import { desktopCapturer, screen } from "electron";
-import { CapturedDisplayImage } from "../shared/contracts";
+import { CapturedDisplayImage, CapturedImageRegion } from "../shared/contracts";
+
+export interface DesktopRegion {
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+}
 
 /** Captures every monitor at a vision-friendly size and puts the pointer's display first. */
 export async function captureAllWindowsDisplays(): Promise<CapturedDisplayImage[]> {
@@ -76,4 +83,90 @@ export async function captureAllWindowsDisplays(): Promise<CapturedDisplayImage[
   }
 
   return capturedDisplays;
+}
+
+/** The pointer's display, in desktop coordinates. */
+export function getPointerDisplayBounds(): DesktopRegion & { displayId: number } {
+  const cursorPoint = screen.getCursorScreenPoint();
+  const cursorDisplay = screen.getDisplayNearestPoint(cursorPoint);
+  return {
+    displayId: cursorDisplay.id,
+    x: cursorDisplay.bounds.x,
+    y: cursorDisplay.bounds.y,
+    width: cursorDisplay.bounds.width,
+    height: cursorDisplay.bounds.height,
+  };
+}
+
+/**
+ * Captures just the region the user circled and describes it so that pointing
+ * coordinates can be mapped back onto the desktop: the descriptor's
+ * `displayBounds` is the region itself, not the whole screen.
+ */
+export async function captureWindowsDesktopRegion(
+  desktopRegion: DesktopRegion & { displayId: number },
+): Promise<CapturedImageRegion> {
+  const minimumRegionSide = 24;
+  const regionWidth = Math.max(minimumRegionSide, Math.round(desktopRegion.width));
+  const regionHeight = Math.max(minimumRegionSide, Math.round(desktopRegion.height));
+
+  const captureSources = await desktopCapturer.getSources({
+    types: ["screen"],
+    thumbnailSize: { width: 2_560, height: 1_440 },
+    fetchWindowIcons: false,
+  });
+
+  const matchingSource = captureSources.find(
+    (captureSource) => Number.parseInt(captureSource.display_id, 10) === desktopRegion.displayId,
+  ) ?? captureSources[0];
+
+  const electronDisplay = screen.getAllDisplays().find(
+    (display) => display.id === desktopRegion.displayId,
+  ) ?? screen.getDisplayNearestPoint(screen.getCursorScreenPoint());
+
+  if (!matchingSource || matchingSource.thumbnail.isEmpty()) {
+    throw new Error("Clickaa could not capture the screen for that circle.");
+  }
+
+  const fullImageSize = matchingSource.thumbnail.getSize();
+  const horizontalScale = fullImageSize.width / electronDisplay.bounds.width;
+  const verticalScale = fullImageSize.height / electronDisplay.bounds.height;
+
+  const cropRectangle = {
+    x: Math.round((desktopRegion.x - electronDisplay.bounds.x) * horizontalScale),
+    y: Math.round((desktopRegion.y - electronDisplay.bounds.y) * verticalScale),
+    width: Math.round(regionWidth * horizontalScale),
+    height: Math.round(regionHeight * verticalScale),
+  };
+
+  // Clamping keeps nativeImage.crop() from throwing on a lasso that ran off the
+  // edge of the monitor.
+  const clampedRectangle = {
+    x: Math.max(0, Math.min(cropRectangle.x, fullImageSize.width - 1)),
+    y: Math.max(0, Math.min(cropRectangle.y, fullImageSize.height - 1)),
+    width: Math.max(1, Math.min(cropRectangle.width, fullImageSize.width - cropRectangle.x)),
+    height: Math.max(1, Math.min(cropRectangle.height, fullImageSize.height - cropRectangle.y)),
+  };
+
+  const croppedImage = matchingSource.thumbnail.crop(clampedRectangle);
+  const croppedImageSize = croppedImage.getSize();
+
+  return {
+    displayId: desktopRegion.displayId,
+    imageBase64: croppedImage.toJPEG(88).toString("base64"),
+    mediaType: "image/jpeg",
+    label: `the region the user circled (image dimensions: ${croppedImageSize.width}x${croppedImageSize.height} pixels)`,
+    isCursorDisplay: true,
+    imageWidth: croppedImageSize.width,
+    imageHeight: croppedImageSize.height,
+    // The region itself becomes the coordinate space, so a [POINT:x,y] tag from
+    // the model maps back onto the desktop through the normal pointing maths.
+    displayBounds: {
+      x: desktopRegion.x,
+      y: desktopRegion.y,
+      width: regionWidth,
+      height: regionHeight,
+    },
+    isRegion: true,
+  };
 }
