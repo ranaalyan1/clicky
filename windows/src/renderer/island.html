@@ -1,0 +1,153 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data:; media-src 'self' data:; connect-src 'none'; object-src 'none'; base-uri 'none'; form-action 'none'">
+  <title>Clickaa island</title>
+  <link rel="stylesheet" href="./island.css">
+</head>
+<body data-expanded="false" data-voice-state="idle">
+  <div id="island-shell" class="island-shell">
+    <!-- Collapsed notch ------------------------------------------------- -->
+    <div id="notch-row" class="notch-row">
+      <span class="notch-cursor" data-role="notch-cursor" aria-hidden="true"></span>
+      <span id="notch-label" class="notch-label">clickaa</span>
+      <span id="notch-wave" class="notch-wave" aria-hidden="true">
+        <i></i><i></i><i></i><i></i><i></i>
+      </span>
+      <span id="notch-track" class="notch-track"></span>
+      <span id="notch-badge" class="notch-badge" hidden></span>
+    </div>
+
+    <!-- Expanded shell ------------------------------------------------ -->
+    <div id="expanded-body" class="expanded-body">
+      <header class="island-header">
+        <span id="header-status" class="header-status">ready</span>
+        <span id="header-brand" class="header-brand">clickaa</span>
+      </header>
+
+      <div id="confirmation-stack" class="confirmation-stack"></div>
+
+      <nav id="section-tabs" class="section-tabs">
+        <button class="section-tab active" type="button" data-section="now">now</button>
+        <button class="section-tab" type="button" data-section="plans">plans</button>
+        <button class="section-tab" type="button" data-section="clips">clips</button>
+        <button class="section-tab" type="button" data-section="apps">apps</button>
+        <button class="section-tab" type="button" data-section="look">look</button>
+        <button class="section-tab" type="button" data-section="control">control</button>
+      </nav>
+
+      <div class="section-scroll">
+        <section class="island-section active" data-section="now">
+          <article id="music-card" class="island-card music-card" hidden>
+            <div class="music-art" aria-hidden="true"><span></span></div>
+            <div class="music-copy">
+              <p id="music-title" class="music-title">nothing playing</p>
+              <p id="music-artist" class="music-artist"></p>
+            </div>
+            <div class="music-controls">
+              <button class="media-button" type="button" data-media="previous" aria-label="Previous">⏮</button>
+              <button class="media-button primary" type="button" data-media="play_pause" aria-label="Play or pause">▶</button>
+              <button class="media-button" type="button" data-media="next" aria-label="Next">⏭</button>
+            </div>
+          </article>
+
+          <article class="island-card">
+            <div class="card-heading-row">
+              <h3>doing</h3>
+              <button id="open-panel-button" class="text-button" type="button">open clickaa</button>
+            </div>
+            <div id="activity-list" class="island-list"></div>
+          </article>
+
+          <article class="island-card">
+            <div class="card-heading-row">
+              <h3>shortcuts</h3>
+            </div>
+            <div id="shortcut-list" class="island-list"></div>
+          </article>
+        </section>
+
+        <section class="island-section" data-section="plans">
+          <article class="island-card">
+            <div class="card-heading-row">
+              <h3>to-do</h3>
+              <span id="todo-count" class="count-chip">0 open</span>
+            </div>
+            <div id="todo-list" class="island-list"></div>
+          </article>
+
+          <article class="island-card">
+            <div class="card-heading-row">
+              <h3>reminders &amp; routines</h3>
+            </div>
+            <div id="schedule-list" class="island-list"></div>
+          </article>
+
+          <article class="island-card">
+            <div class="card-heading-row">
+              <h3>memory</h3>
+            </div>
+            <div id="memory-list" class="island-list"></div>
+          </article>
+        </section>
+
+        <section class="island-section" data-section="clips">
+          <article class="island-card">
+            <div class="card-heading-row">
+              <h3>recent copies</h3>
+              <button id="clear-clips-button" class="text-button" type="button">clear</button>
+            </div>
+            <div id="clip-list" class="island-list"></div>
+          </article>
+        </section>
+
+        <section class="island-section" data-section="apps">
+          <article class="island-card">
+            <div class="card-heading-row">
+              <h3>launch</h3>
+            </div>
+            <div id="app-grid" class="app-grid"></div>
+          </article>
+        </section>
+
+        <section class="island-section" data-section="look">
+          <article class="island-card">
+            <div class="card-heading-row">
+              <h3>wallpapers</h3>
+            </div>
+            <p class="island-hint">flat colours, applied by windows right away.</p>
+            <div id="wallpaper-grid" class="wallpaper-grid"></div>
+          </article>
+
+          <article class="island-card">
+            <div class="card-heading-row">
+              <h3>voice</h3>
+            </div>
+            <div id="speech-summary" class="island-list"></div>
+            <button id="open-soul-button" class="wide-button" type="button">change voice &amp; personality</button>
+          </article>
+        </section>
+
+        <section class="island-section" data-section="control">
+          <article class="island-card">
+            <div class="card-heading-row">
+              <h3>clicks &amp; switches</h3>
+            </div>
+            <div id="toggle-list" class="island-list"></div>
+          </article>
+
+          <article class="island-card">
+            <div class="card-heading-row">
+              <h3>brain</h3>
+            </div>
+            <p id="brain-summary" class="island-hint"></p>
+            <button id="open-setup-button" class="wide-button" type="button">open setup</button>
+          </article>
+        </section>
+      </div>
+    </div>
+  </div>
+  <script type="module" src="./island.js"></script>
+</body>
+</html>

@@ -1,18 +1,52 @@
 import { UiohookKey, uIOhook } from "uiohook-napi";
-import { ModifierPushToTalkStateMachine } from "./shortcut-state";
+import { DictationShortcutId } from "../shared/contracts";
+import {
+  buildShortcutDefinitions,
+  ModifierKeyCodes,
+  ModifierShortcutStateMachine,
+  ShortcutId,
+  ShortcutTransition,
+} from "./shortcut-registry";
 
-export type PushToTalkTransition = "pressed" | "released";
+const physicalModifierKeyCodes: ModifierKeyCodes = {
+  leftControl: UiohookKey.Ctrl,
+  rightControl: UiohookKey.CtrlRight,
+  leftAlt: UiohookKey.Alt,
+  rightAlt: UiohookKey.AltRight,
+  leftWindows: UiohookKey.Meta,
+  rightWindows: UiohookKey.MetaRight,
+  leftShift: UiohookKey.Shift,
+  rightShift: UiohookKey.ShiftRight,
+};
 
-export class GlobalPushToTalkMonitor {
+/**
+ * System-wide hold-to-act monitor for all three Clickaa shortcuts.
+ *
+ * `uiohook-napi` is required rather than Electron's `globalShortcut`, because
+ * push-to-talk needs real key-up events (something `globalShortcut` does not
+ * report) and because the dictation shortcut must not be swallowed: the user's
+ * own apps still need their keys.
+ */
+export class GlobalShortcutMonitor {
   private isStarted = false;
-  private readonly shortcutStateMachine = new ModifierPushToTalkStateMachine({
-    leftControl: UiohookKey.Ctrl,
-    rightControl: UiohookKey.CtrlRight,
-    leftAlt: UiohookKey.Alt,
-    rightAlt: UiohookKey.AltRight,
-  });
+  private shortcutStateMachine: ModifierShortcutStateMachine;
 
-  constructor(private readonly onTransition: (transition: PushToTalkTransition) => void) {}
+  constructor(
+    dictationShortcut: DictationShortcutId,
+    private readonly onTransition: (transition: ShortcutTransition) => void,
+    /** Esc cancels a circling session, exactly like it closes a dialog. */
+    private readonly onEscapeKeyPressed: () => void = () => undefined,
+  ) {
+    this.shortcutStateMachine = this.createStateMachine(dictationShortcut);
+  }
+
+  setDictationShortcut(dictationShortcut: DictationShortcutId): void {
+    const releasedTransitions = this.shortcutStateMachine.reset();
+    this.shortcutStateMachine = this.createStateMachine(dictationShortcut);
+    for (const releasedTransition of releasedTransitions) {
+      this.onTransition(releasedTransition);
+    }
+  }
 
   start(): boolean {
     if (this.isStarted) {
@@ -26,7 +60,7 @@ export class GlobalPushToTalkMonitor {
       this.isStarted = true;
       return true;
     } catch (error) {
-      console.error("Clicky could not start the global Ctrl + Alt monitor:", error);
+      console.error("Clickaa could not start the global shortcut monitor:", error);
       return false;
     }
   }
@@ -41,22 +75,33 @@ export class GlobalPushToTalkMonitor {
     uIOhook.stop();
     this.isStarted = false;
 
-    if (this.shortcutStateMachine.reset() === "released") {
-      this.onTransition("released");
+    for (const releasedTransition of this.shortcutStateMachine.reset()) {
+      this.onTransition(releasedTransition);
     }
   }
 
+  private createStateMachine(dictationShortcut: DictationShortcutId): ModifierShortcutStateMachine {
+    return new ModifierShortcutStateMachine(
+      buildShortcutDefinitions(dictationShortcut),
+      physicalModifierKeyCodes,
+    );
+  }
+
   private readonly handleKeyDown = (keyboardEvent: { keycode: number }): void => {
-    const transition = this.shortcutStateMachine.handleKeyDown(keyboardEvent.keycode);
-    if (transition) {
+    if (keyboardEvent.keycode === UiohookKey.Escape) {
+      this.onEscapeKeyPressed();
+    }
+
+    for (const transition of this.shortcutStateMachine.handleKeyDown(keyboardEvent.keycode)) {
       this.onTransition(transition);
     }
   };
 
   private readonly handleKeyUp = (keyboardEvent: { keycode: number }): void => {
-    const transition = this.shortcutStateMachine.handleKeyUp(keyboardEvent.keycode);
-    if (transition) {
+    for (const transition of this.shortcutStateMachine.handleKeyUp(keyboardEvent.keycode)) {
       this.onTransition(transition);
     }
   };
 }
+
+export type { ShortcutId, ShortcutTransition };

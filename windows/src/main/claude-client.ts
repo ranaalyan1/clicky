@@ -1,46 +1,17 @@
-import { CapturedDisplayImage, SupportedClaudeModel } from "../shared/contracts";
+import { SupportedClaudeModel } from "../shared/contracts";
+import { BrainStreamRequest, SynthesizedSpeech } from "./brain-types";
 import { extractTextDelta, ServerSentEventTextParser } from "./sse-parser";
 
-export interface ConversationExchange {
-  userTranscript: string;
-  assistantResponse: string;
-}
-
-export interface ClaudeVisionRequest {
-  workerBaseUrl: string;
-  model: SupportedClaudeModel;
-  capturedDisplays: CapturedDisplayImage[];
-  conversationHistory: ConversationExchange[];
-  userPrompt: string;
-  signal: AbortSignal;
-  onTextUpdate?: (accumulatedText: string) => void;
-}
-
-export const companionVoiceResponseSystemPrompt = `
-you're clicky, a friendly always-on companion that lives in the user's windows system tray. the user just spoke to you via push-to-talk and you can see their screen or screens. your reply will be spoken aloud via text-to-speech, so write the way you'd actually talk. this is an ongoing conversation, and you remember the recent exchanges.
-
-rules:
-- default to one or two sentences. be direct and dense. if the user asks you to explain more, go deeper, or elaborate, give a thorough explanation.
-- all lowercase, casual, and warm. no emojis.
-- write for the ear, not the eye. use short sentences and no lists, bullets, markdown, or visual formatting.
-- don't use abbreviations or symbols that sound strange read aloud. write "for example" instead of "e.g."
-- if the question relates to the screen, reference specific things you see. otherwise answer it directly.
-- you can help with coding, writing, general knowledge, brainstorming, and navigation.
-- never say "simply" or "just".
-- don't read code verbatim. explain what it does or what should change conversationally.
-- don't finish with a shallow yes-or-no question. when useful, mention a worthwhile next step instead.
-- with multiple images, prioritize the screen labeled "primary focus," where the pointer currently is.
-
-element pointing:
-you have a small blue cursor buddy that can fly to a useful element. point when the user is looking for a menu, button, field, setting, or other specific screen location. don't point for unrelated general knowledge.
-
-when pointing, append one coordinate tag at the very end after the spoken text. each screenshot label gives its pixel dimensions. coordinates use the screenshot's top-left as zero, with x increasing right and y increasing down.
-
-format: [POINT:x,y:label]. if the target is on a screen other than the primary-focus screen, append :screenN using the screen number in its label, for example [POINT:400,300:terminal:screen2]. if pointing would not help, append [POINT:none].
-`.trim();
-
+/**
+ * The Cloudflare Worker brain: Claude for chat and vision, ElevenLabs for
+ * speech. All long-lived keys stay on the Worker, never on the user's PC.
+ */
 export class ClaudeClient {
-  async streamVisionResponse(request: ClaudeVisionRequest): Promise<string> {
+  async streamVisionResponse(
+    request: BrainStreamRequest,
+    workerBaseUrl: string,
+    model: SupportedClaudeModel,
+  ): Promise<string> {
     const messages: Array<Record<string, unknown>> = [];
 
     for (const previousExchange of request.conversationHistory) {
@@ -49,16 +20,16 @@ export class ClaudeClient {
     }
 
     const currentContent: Array<Record<string, unknown>> = [];
-    for (const capturedDisplay of request.capturedDisplays) {
+    for (const image of request.images) {
       currentContent.push({
         type: "image",
         source: {
           type: "base64",
-          media_type: capturedDisplay.mediaType,
-          data: capturedDisplay.imageBase64,
+          media_type: image.mediaType,
+          data: image.base64Data,
         },
       });
-      currentContent.push({ type: "text", text: capturedDisplay.label });
+      currentContent.push({ type: "text", text: image.label });
     }
     currentContent.push({ type: "text", text: request.userPrompt });
     messages.push({ role: "user", content: currentContent });
@@ -67,14 +38,14 @@ export class ClaudeClient {
       request.signal,
       AbortSignal.timeout(120_000),
     ]);
-    const chatResponse = await fetch(`${request.workerBaseUrl}/chat`, {
+    const chatResponse = await fetch(`${workerBaseUrl}/chat`, {
       method: "POST",
       headers: { "content-type": "application/json" },
       body: JSON.stringify({
-        model: request.model,
+        model,
         max_tokens: 1024,
         stream: true,
-        system: companionVoiceResponseSystemPrompt,
+        system: request.systemPrompt,
         messages,
       }),
       signal: chatRequestSignal,
@@ -123,11 +94,46 @@ export class ClaudeClient {
     return accumulatedResponseText;
   }
 
+  /** Runs a small, image-free request through the Worker (dictation cleanup). */
+  async completeText(
+    workerBaseUrl: string,
+    model: SupportedClaudeModel,
+    systemInstruction: string,
+    userPrompt: string,
+    signal: AbortSignal,
+  ): Promise<string> {
+    const completionResponse = await fetch(`${workerBaseUrl}/chat`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        model,
+        max_tokens: 1024,
+        stream: false,
+        system: systemInstruction,
+        messages: [{ role: "user", content: userPrompt }],
+      }),
+      signal: AbortSignal.any([signal, AbortSignal.timeout(45_000)]),
+    });
+
+    if (!completionResponse.ok) {
+      const errorBody = await completionResponse.text();
+      throw new Error(`Cleanup request failed (${completionResponse.status}): ${errorBody.slice(0, 300)}`);
+    }
+
+    const completionPayload = await completionResponse.json() as {
+      content?: Array<{ type?: string; text?: string }>;
+    };
+    return (completionPayload.content ?? [])
+      .map((contentBlock) => (contentBlock.type === "text" ? contentBlock.text ?? "" : ""))
+      .join("")
+      .trim();
+  }
+
   async synthesizeSpeech(
     workerBaseUrl: string,
     text: string,
     signal: AbortSignal,
-  ): Promise<{ audioData: Buffer; contentType: string }> {
+  ): Promise<SynthesizedSpeech> {
     const speechRequestSignal = AbortSignal.any([
       signal,
       AbortSignal.timeout(60_000),

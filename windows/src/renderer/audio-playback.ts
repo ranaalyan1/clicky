@@ -16,20 +16,20 @@ export class CompanionAudioPlayback {
 
     audioElement.addEventListener("playing", () => {
       if (this.activeInteractionId === payload.interactionId) {
-        window.clicky.sendAudioPlaybackStarted(payload.interactionId);
+        window.clickaa.sendAudioPlaybackStarted(payload.interactionId);
       }
     }, { once: true });
     audioElement.addEventListener("ended", () => {
       if (this.activeInteractionId === payload.interactionId) {
         this.clearActivePlayback();
-        window.clicky.sendAudioPlaybackEnded(payload.interactionId);
+        window.clickaa.sendAudioPlaybackEnded(payload.interactionId);
       }
     }, { once: true });
     audioElement.addEventListener("error", () => {
       if (this.activeInteractionId === payload.interactionId) {
         const mediaErrorMessage = audioElement.error?.message || "Windows could not decode the speech audio.";
         this.clearActivePlayback();
-        window.clicky.sendAudioPlaybackError(payload.interactionId, mediaErrorMessage);
+        window.clickaa.sendAudioPlaybackError(payload.interactionId, mediaErrorMessage);
       }
     }, { once: true });
 
@@ -38,7 +38,7 @@ export class CompanionAudioPlayback {
     } catch (error) {
       if (this.activeInteractionId === payload.interactionId) {
         this.clearActivePlayback();
-        window.clicky.sendAudioPlaybackError(
+        window.clickaa.sendAudioPlaybackError(
           payload.interactionId,
           error instanceof Error ? error.message : String(error),
         );
@@ -46,30 +46,30 @@ export class CompanionAudioPlayback {
     }
   }
 
-  speakWithWindowsVoice(payload: FallbackSpeechPayload): void {
+  speakWithWindowsVoice(payload: FallbackSpeechPayload, speechRate = 1.04): void {
     this.stop();
     this.activeInteractionId = payload.interactionId;
 
     const speechUtterance = new SpeechSynthesisUtterance(payload.text);
-    speechUtterance.rate = 1.04;
+    speechUtterance.rate = speechRate;
     speechUtterance.pitch = 1.02;
     this.activeSpeechUtterance = speechUtterance;
 
     speechUtterance.onstart = () => {
       if (this.activeInteractionId === payload.interactionId) {
-        window.clicky.sendAudioPlaybackStarted(payload.interactionId);
+        window.clickaa.sendAudioPlaybackStarted(payload.interactionId);
       }
     };
     speechUtterance.onend = () => {
       if (this.activeInteractionId === payload.interactionId) {
         this.clearActivePlayback();
-        window.clicky.sendAudioPlaybackEnded(payload.interactionId);
+        window.clickaa.sendAudioPlaybackEnded(payload.interactionId);
       }
     };
     speechUtterance.onerror = (speechErrorEvent) => {
       if (this.activeInteractionId === payload.interactionId) {
         this.clearActivePlayback();
-        window.clicky.sendAudioPlaybackError(payload.interactionId, speechErrorEvent.error);
+        window.clickaa.sendAudioPlaybackError(payload.interactionId, speechErrorEvent.error);
       }
     };
 

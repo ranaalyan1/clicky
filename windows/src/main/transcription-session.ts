@@ -174,7 +174,7 @@ export class AssemblyAITranscriptionSession {
     this.isCancelled = true;
     this.clearFinalTranscriptTimer();
     this.sendJsonMessage({ type: "Terminate" });
-    this.webSocket?.close(1000, "Clicky session ended");
+    this.webSocket?.close(1000, "Clickaa session ended");
     this.webSocket = null;
   }
 

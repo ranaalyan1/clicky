@@ -8,11 +8,11 @@ const packageManifest = JSON.parse(
 );
 const expectedReleaseTag = `windows-v${packageManifest.version}`;
 const expectedInstallers = [
-  `Clicky-Setup-${packageManifest.version}-arm64.exe`,
-  `Clicky-Setup-${packageManifest.version}-x64.exe`,
+  `Clickaa-Setup-${packageManifest.version}-arm64.exe`,
+  `Clickaa-Setup-${packageManifest.version}-x64.exe`,
 ];
 const actualInstallers = readdirSync(resolve(windowsDirectory, "release"))
-  .filter((fileName) => /^Clicky-Setup-.*\.exe$/u.test(fileName))
+  .filter((fileName) => /^Clickaa-Setup-.*\.exe$/u.test(fileName))
   .sort();
 
 const problems = [];

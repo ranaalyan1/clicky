@@ -1,12 +1,16 @@
 import { contextBridge, ipcRenderer } from "electron";
 import {
   AudioPlaybackPayload,
-  ClickyPublicState,
+  BrainConnectionTestResult,
+  ClickaaPublicState,
+  ClickaaUserConfig,
   FallbackSpeechPayload,
+  IslandState,
+  IslandToggleKey,
   OverlayCursorPayload,
+  OverlayModePayload,
   OverlayPointPayload,
-  SupportedClaudeModel,
-  WorkerConnectionTestResult,
+  SelectionBoundsPayload,
 } from "../shared/contracts";
 
 function subscribe<T>(channel: string, listener: (payload: T) => void): () => void {
@@ -15,24 +19,33 @@ function subscribe<T>(channel: string, listener: (payload: T) => void): () => vo
   return () => ipcRenderer.removeListener(channel, wrappedListener);
 }
 
-contextBridge.exposeInMainWorld("clicky", {
-  getState: (): Promise<ClickyPublicState> => ipcRenderer.invoke("clicky:get-state"),
-  setWorkerUrl: (workerBaseUrl: string): Promise<ClickyPublicState> => {
-    return ipcRenderer.invoke("clicky:set-worker-url", workerBaseUrl);
+function subscribeToSignal(channel: string, listener: () => void): () => void {
+  const wrappedListener = (): void => listener();
+  ipcRenderer.on(channel, wrappedListener);
+  return () => ipcRenderer.removeListener(channel, wrappedListener);
+}
+
+/**
+ * One narrow, context-isolated bridge shared by the panel, the island, the
+ * cursor overlay, and the region selector. Each renderer only gets a view it
+ * needs, and the main process re-checks the sender of every message.
+ */
+contextBridge.exposeInMainWorld("clickaa", {
+  /* Panel: state and settings -------------------------------------------- */
+  getState: (): Promise<ClickaaPublicState> => ipcRenderer.invoke("clickaa:get-state"),
+  updateSettings: (settingsUpdates: Partial<ClickaaUserConfig>): Promise<ClickaaPublicState> => {
+    return ipcRenderer.invoke("clickaa:update-settings", settingsUpdates);
   },
-  testWorker: (workerBaseUrl: string): Promise<WorkerConnectionTestResult> => {
-    return ipcRenderer.invoke("clicky:test-worker", workerBaseUrl);
+  testBrain: (settingsUpdates: Partial<ClickaaUserConfig>): Promise<BrainConnectionTestResult> => {
+    return ipcRenderer.invoke("clickaa:test-brain", settingsUpdates);
   },
-  setModel: (selectedModel: SupportedClaudeModel): Promise<ClickyPublicState> => {
-    return ipcRenderer.invoke("clicky:set-model", selectedModel);
-  },
-  setCursorEnabled: (cursorEnabled: boolean): Promise<ClickyPublicState> => {
-    return ipcRenderer.invoke("clicky:set-cursor-enabled", cursorEnabled);
-  },
-  setLaunchAtLogin: (launchAtLogin: boolean): Promise<ClickyPublicState> => {
-    return ipcRenderer.invoke("clicky:set-launch-at-login", launchAtLogin);
-  },
-  hidePanel: (): void => ipcRenderer.send("clicky:panel-hide"),
+  refreshAppIndex: (): Promise<number> => ipcRenderer.invoke("clickaa:refresh-app-index"),
+  hidePanel: (): void => ipcRenderer.send("clickaa:panel-hide"),
+  openSetupVideo: (): void => ipcRenderer.send("clickaa:open-setup-video"),
+  onState: (listener: (state: ClickaaPublicState) => void): (() => void) => subscribe("clickaa:state", listener),
+  onOpenPanelPage: (listener: (page: string) => void): (() => void) => subscribe("panel:open-page", listener),
+
+  /* Panel: push-to-talk and audio --------------------------------------- */
   pushToTalkPressed: (): void => ipcRenderer.send("push-to-talk:pressed"),
   pushToTalkReleased: (): void => ipcRenderer.send("push-to-talk:released"),
   sendAudioCaptureStarted: (interactionId: number): void => {
@@ -56,12 +69,6 @@ contextBridge.exposeInMainWorld("clicky", {
   sendAudioPlaybackError: (interactionId: number, errorMessage: string): void => {
     ipcRenderer.send("audio-playback:error", interactionId, errorMessage);
   },
-  sendPointingAnimationCompleted: (interactionId: number): void => {
-    ipcRenderer.send("overlay:point-complete", interactionId);
-  },
-  onState: (listener: (state: ClickyPublicState) => void): (() => void) => {
-    return subscribe("clicky:state", listener);
-  },
   onAudioCaptureStart: (listener: (payload: { interactionId: number }) => void): (() => void) => {
     return subscribe("audio-capture:start", listener);
   },
@@ -75,12 +82,19 @@ contextBridge.exposeInMainWorld("clicky", {
     return subscribe("audio-playback:fallback-speech", listener);
   },
   onStopAudioPlayback: (listener: () => void): (() => void) => {
-    const wrappedListener = (): void => listener();
-    ipcRenderer.on("audio-playback:stop", wrappedListener);
-    return () => ipcRenderer.removeListener("audio-playback:stop", wrappedListener);
+    return subscribeToSignal("audio-playback:stop", listener);
+  },
+
+  addTodo: (todoText: string): void => ipcRenderer.send("panel:add-todo", todoText),
+  addMemory: (factText: string): void => ipcRenderer.send("panel:add-memory", factText),
+  clearMemory: (): void => ipcRenderer.send("panel:clear-memory"),
+
+  /* Cursor overlay ------------------------------------------------------- */
+  sendPointingAnimationCompleted: (interactionId: number): void => {
+    ipcRenderer.send("overlay:point-complete", interactionId);
   },
   onOverlayState: (
-    listener: (payload: Pick<ClickyPublicState, "voiceState" | "audioPowerLevel">) => void,
+    listener: (payload: Pick<ClickaaPublicState, "voiceState" | "audioPowerLevel">) => void,
   ): (() => void) => subscribe("overlay:state", listener),
   onOverlayCursor: (listener: (payload: OverlayCursorPayload) => void): (() => void) => {
     return subscribe("overlay:cursor", listener);
@@ -88,12 +102,61 @@ contextBridge.exposeInMainWorld("clicky", {
   onOverlayResponse: (listener: (responseText: string) => void): (() => void) => {
     return subscribe("overlay:response", listener);
   },
+  onOverlayMode: (listener: (payload: OverlayModePayload) => void): (() => void) => {
+    return subscribe("overlay:mode", listener);
+  },
   onOverlayCancelPointing: (listener: () => void): (() => void) => {
-    const wrappedListener = (): void => listener();
-    ipcRenderer.on("overlay:cancel-pointing", wrappedListener);
-    return () => ipcRenderer.removeListener("overlay:cancel-pointing", wrappedListener);
+    return subscribeToSignal("overlay:cancel-pointing", listener);
   },
   onOverlayPoint: (listener: (payload: OverlayPointPayload) => void): (() => void) => {
     return subscribe("overlay:point", listener);
   },
+
+  /* Island --------------------------------------------------------------- */
+  getIslandState: (): Promise<IslandState> => ipcRenderer.invoke("island:get-state"),
+  onIslandState: (listener: (state: IslandState) => void): (() => void) => subscribe("island:state", listener),
+  onIslandExpanded: (listener: (payload: { isExpanded: boolean }) => void): (() => void) => {
+    return subscribe("island:expanded", listener);
+  },
+  setIslandPointerOver: (isPointerOverIsland: boolean): void => {
+    ipcRenderer.send("island:pointer-over", isPointerOverIsland);
+  },
+  setIslandExpanded: (isExpanded: boolean): void => {
+    ipcRenderer.send("island:set-expanded", isExpanded);
+  },
+  resolveConfirmation: (confirmationId: string, decision: "approve" | "reject"): Promise<string> => {
+    return ipcRenderer.invoke("island:resolve-confirmation", confirmationId, decision);
+  },
+  undoActivity: (activityEntryId: string): Promise<boolean> => {
+    return ipcRenderer.invoke("island:undo-activity", activityEntryId);
+  },
+  launchApp: (appName: string): Promise<void> => ipcRenderer.invoke("island:launch-app", appName),
+  mediaControl: (operation: "play_pause" | "next" | "previous"): Promise<void> => {
+    return ipcRenderer.invoke("island:media-control", operation);
+  },
+  copyClip: (clipId: string): Promise<boolean> => ipcRenderer.invoke("island:copy-clip", clipId),
+  clearClips: (): void => ipcRenderer.send("island:clear-clips"),
+  toggleTodo: (todoId: string, isDone: boolean): void => {
+    ipcRenderer.send("island:toggle-todo", todoId, isDone);
+  },
+  removeTodo: (todoId: string): void => ipcRenderer.send("island:remove-todo", todoId),
+  toggleSchedule: (scheduleId: string, isEnabled: boolean): void => {
+    ipcRenderer.send("island:toggle-schedule", scheduleId, isEnabled);
+  },
+  removeSchedule: (scheduleId: string): void => ipcRenderer.send("island:remove-schedule", scheduleId),
+  removeMemory: (memoryFactId: string): void => ipcRenderer.send("island:remove-memory", memoryFactId),
+  setIslandToggle: (toggleKey: IslandToggleKey, isEnabled: boolean): void => {
+    ipcRenderer.send("island:set-toggle", toggleKey, isEnabled);
+  },
+  setWallpaperSolidColor: (wallpaperColor: string): Promise<void> => {
+    return ipcRenderer.invoke("island:set-wallpaper-solid", wallpaperColor);
+  },
+  openPanel: (page: string): void => ipcRenderer.send("island:open-panel", page),
+  showPanel: (page: string): void => ipcRenderer.send("panel:open-page", page),
+
+  /* Region selector (circle to ask) -------------------------------------- */
+  sendSelectionCompleted: (selectionBounds: SelectionBoundsPayload): void => {
+    ipcRenderer.send("selection:completed", selectionBounds);
+  },
+  sendSelectionCancelled: (): void => ipcRenderer.send("selection:cancelled"),
 });
