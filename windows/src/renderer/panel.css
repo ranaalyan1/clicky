@@ -245,6 +245,29 @@ button:disabled { opacity: .5; cursor: default; }
 .shortcut-row span { color: var(--muted); font-size: 10.5px; }
 .shortcut-keys { display: flex; gap: 3px; }
 
+.shortcut-key-list {
+  margin: 10px 0 0;
+  padding: 0;
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  color: var(--muted);
+  font-size: 10.5px;
+  line-height: 1.5;
+}
+
+.shortcut-key-list kbd {
+  display: inline-block;
+  margin-right: 2px;
+  padding: 1px 5px 2px;
+  border: 1px solid var(--clickaa-line-strong);
+  border-radius: 4px;
+  background: var(--clickaa-surface-raised);
+  color: var(--text);
+  font: 600 9.5px var(--clickaa-font-ui);
+}
+
 /* -------------------------------------------------------------- talk ----- */
 
 .talk-card { padding: 10px; }

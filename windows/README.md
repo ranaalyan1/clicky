@@ -5,6 +5,10 @@ Clickaa is the voice companion that lives on your Windows desktop: hold a key, a
 - Hold **Ctrl + Alt** globally to ask about whatever is on your screen.
 - Hold **Ctrl + Windows** to dictate: talk however you like, and cleaned, punctuated text lands in the app you are already typing in.
 - Hold **Ctrl + Shift** and circle anything on screen with the mouse to ask about just that part.
+- Press **Ctrl + Alt + S** and drag over any part of the screen: those pixels land on your clipboard and in `Pictures\Clickaa Snips`.
+- Ask Clickaa to **summarise, tighten, grammar-check or translate** whatever you copied, and the clipboard is rewritten in place with one click to put the old text back.
+- **Timers** ("set a timer for 12 minutes") tick down in the island and end with a notification, a chime-free spoken line, and a stop button.
+- **Snippets** ("save this as my address", then "insert my address") type a saved phrase into whatever window has focus.
 - Keep a transparent, click-through blue cursor next to the pointer that flies to the screen element it mentions.
 - Jump to a spoken answer with the **island**, the notch at the top of every screen: now playing, to-do list, reminders and routines, clipboard, launchable apps, wallpapers and quick switches.
 - Say "remember my brother's birthday is 4 March", "every morning at 9 open Unity and Spotify", or "search how to cook spaghetti on YouTube" and Clickaa keeps it and does it.

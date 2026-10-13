@@ -36,7 +36,7 @@ npm install
 npm run dev
 ```
 
-Paste the deployed Worker base URL into the panel and select **save & test**, or paste a [Google AI Studio](https://aistudio.google.com/api-keys) Gemini API key instead and skip the Worker entirely. Clickaa then lives in the Windows notification area. Hold **Ctrl + Alt** from any app, speak, and release to submit; **Ctrl + Windows** dictates clean text into the focused app, and **Ctrl + Shift** lets you circle something on screen and ask about it. To build x64 and ARM64 installers, run `npm run package:win` on Windows.
+Paste the deployed Worker base URL into the panel and select **save & test**, or paste a [Google AI Studio](https://aistudio.google.com/api-keys) Gemini API key instead and skip the Worker entirely. Clickaa then lives in the Windows notification area. Hold **Ctrl + Alt** from any app, speak, and release to submit; **Ctrl + Windows** dictates clean text into the focused app; **Ctrl + Shift** lets you circle something on screen and ask about it; and **Ctrl + Alt + S** snips any region straight onto your clipboard. Ask it to summarise or translate what you copied, set timers, and save phrases you retype often with snippets. To build x64 and ARM64 installers, run `npm run package:win` on Windows.
 
 See [`windows/README.md`](windows/README.md) for Windows requirements, architecture, packaging, tests, permission details, and troubleshooting.
 
