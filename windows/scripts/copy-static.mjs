@@ -13,6 +13,7 @@ await cp(compiledRendererSource, rendererDestination, { recursive: true });
 
 // Every renderer window is plain HTML + CSS referenced by the compiled modules.
 const rendererStaticFileNames = [
+  "brand.css",
   "panel.html",
   "panel.css",
   "overlay.html",

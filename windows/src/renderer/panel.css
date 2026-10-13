@@ -68,12 +68,18 @@ button { color: inherit; }
 
 .mini-cursor, .hero-cursor {
   display: block;
-  clip-path: polygon(8% 7%, 93% 47%, 53% 62%, 38% 97%);
-  transform: rotate(-9deg);
-  background: linear-gradient(145deg, var(--blue-bright), #2581f4 76%);
-  filter: drop-shadow(0 0 7px rgba(69, 150, 255, .55));
+  background-image: var(--clickaa-mark-image);
+  background-repeat: no-repeat;
+  background-position: center;
+  background-size: contain;
+  filter: drop-shadow(0 0 7px rgba(69, 150, 255, .35));
 }
-.mini-cursor { width: 17px; height: 20px; }
+.mini-cursor { width: 19px; height: 19px; }
+.hero-cursor { width: 30px; height: 30px; }
+
+/* The orb holds the mark, not a second cursor: one identity, one shape. */
+.status-orb[data-state="listening"] .hero-cursor { animation: mark-listen 1.25s ease-in-out infinite; }
+@keyframes mark-listen { 50% { transform: scale(1.1); filter: drop-shadow(0 0 14px rgba(69, 150, 255, .8)); } }
 
 .icon-button {
   width: 28px;
@@ -142,13 +148,17 @@ button { color: inherit; }
   border: 1px solid rgba(114,178,255,.18);
   box-shadow: inset 0 1px 1px rgba(255,255,255,.06), 0 10px 30px rgba(0,0,0,.24);
 }
-.hero-cursor { width: 25px; height: 29px; z-index: 2; }
+.hero-cursor { z-index: 2; }
 .orb-ring { position: absolute; inset: -1px; border: 1px solid rgba(69,150,255,.35); border-radius: 50%; opacity: 0; }
 
 .status-orb[data-state="listening"] .orb-ring { animation: pulse-ring 1.25s ease-out infinite; }
 .status-orb[data-state="listening"] .orb-ring-two { animation-delay: .55s; }
 .status-orb[data-state="processing"] .hero-cursor { animation: thinking 1.2s ease-in-out infinite; }
 .status-orb[data-state="responding"] .hero-cursor { animation: speaking .55s ease-in-out infinite alternate; }
+
+@media (prefers-reduced-motion: reduce) {
+  .status-orb .hero-cursor, .status-orb .orb-ring { animation: none !important; }
+}
 
 @keyframes pulse-ring { 0% { transform: scale(.88); opacity: .75; } 100% { transform: scale(1.45); opacity: 0; } }
 @keyframes thinking { 50% { transform: rotate(18deg) scale(.88); filter: drop-shadow(0 0 12px rgba(69,150,255,.9)); } }

@@ -79,12 +79,13 @@ html, body {
 }
 
 .hint-cursor {
-  width: 13px;
-  height: 15px;
-  clip-path: polygon(8% 7%, 93% 47%, 53% 62%, 38% 97%);
-  transform: rotate(-9deg);
-  background: linear-gradient(145deg, #86bfff, #2f83ee);
-  filter: drop-shadow(0 0 6px rgba(90, 162, 255, 0.55));
+  width: 16px;
+  height: 16px;
+  background-image: var(--clickaa-mark-image);
+  background-repeat: no-repeat;
+  background-position: center;
+  background-size: contain;
+  filter: drop-shadow(0 0 6px rgba(90, 162, 255, 0.45));
 }
 
 .hint-text { font-weight: 600; }
