@@ -11,6 +11,7 @@ import type {
   ResponseLengthId,
   SpeechProviderId,
 } from "../shared/contracts";
+import { createClickaaIcon, setIconButton } from "./icons.js";
 import { MicrophoneCapture } from "./audio-capture.js";
 import { CompanionAudioPlayback } from "./audio-playback.js";
 
@@ -137,6 +138,7 @@ const element = {
   islandMusicToggle: requireElement<HTMLInputElement>("island-music-toggle"),
   islandClipboardToggle: requireElement<HTMLInputElement>("island-clipboard-toggle"),
   refreshAppsButton: requireElement<HTMLButtonElement>("refresh-apps-button"),
+  talkMicrophone: requireElement<HTMLElement>("talk-microphone"),
   setupVideoButton: requireElement<HTMLButtonElement>("setup-video-button"),
   closeButton: requireElement<HTMLButtonElement>("close-button"),
 };
@@ -449,8 +451,7 @@ async function refreshIslandLists(): Promise<void> {
       const removeButton = document.createElement("button");
       removeButton.type = "button";
       removeButton.className = "row-action";
-      removeButton.textContent = "×";
-      removeButton.title = "remove";
+      setIconButton(removeButton, "close", "Remove this to-do", 13);
       removeButton.addEventListener("click", () => {
         window.clickaa.removeTodo(todoItem.id);
         window.setTimeout(() => void refreshIslandLists(), 120);
@@ -492,8 +493,7 @@ async function refreshIslandLists(): Promise<void> {
       const removeButton = document.createElement("button");
       removeButton.type = "button";
       removeButton.className = "row-action";
-      removeButton.textContent = "×";
-      removeButton.title = "remove";
+      setIconButton(removeButton, "close", "Remove this reminder", 13);
       removeButton.addEventListener("click", () => {
         window.clickaa.removeSchedule(scheduledTask.id);
         window.setTimeout(() => void refreshIslandLists(), 120);
@@ -519,8 +519,7 @@ async function refreshIslandLists(): Promise<void> {
       const removeButton = document.createElement("button");
       removeButton.type = "button";
       removeButton.className = "row-action";
-      removeButton.textContent = "×";
-      removeButton.title = "forget";
+      setIconButton(removeButton, "close", "Forget this", 13);
       removeButton.addEventListener("click", () => {
         window.clickaa.removeMemory(memoryFact.id);
         window.setTimeout(() => void refreshIslandLists(), 120);
@@ -546,8 +545,7 @@ async function refreshIslandLists(): Promise<void> {
       const copyButton = document.createElement("button");
       copyButton.type = "button";
       copyButton.className = "row-action neutral";
-      copyButton.textContent = "copy";
-      copyButton.style.fontSize = "10px";
+      setIconButton(copyButton, "copy", "Copy this clip back", 13);
       copyButton.addEventListener("click", () => void window.clickaa.copyClip(clipboardClip.id));
 
       row.append(copy, copyButton);
@@ -773,6 +771,9 @@ function stopPanelPushToTalk(): void {
   window.clickaa.pushToTalkReleased();
   renderPanelPressedState();
 }
+
+setIconButton(element.closeButton, "close", "Hide Clickaa", 14);
+element.talkMicrophone.replaceChildren(createClickaaIcon("microphone", 19));
 
 element.setupVideoButton.addEventListener("click", () => window.clickaa.openSetupVideo());
 element.closeButton.addEventListener("click", () => window.clickaa.hidePanel());

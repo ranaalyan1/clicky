@@ -1,3 +1,4 @@
+import { createClickaaIcon, setIconButton, updateIconButton } from "./icons.js";
 import type {
   ActivityFeedEntry,
   IslandToggleKey,
@@ -192,8 +193,11 @@ function renderActivityFeed(activityEntries: ActivityFeedEntry[]): void {
     if (activityEntry.isUndoable) {
       const undoButton = document.createElement("button");
       undoButton.type = "button";
-      undoButton.className = "undo-chip";
-      undoButton.textContent = activityEntry.isUndone ? "undone" : "undo";
+      undoButton.className = "undo-chip with-icon";
+      undoButton.append(
+        createClickaaIcon(activityEntry.isUndone ? "check" : "undo", 12),
+        document.createTextNode(activityEntry.isUndone ? "undone" : "undo"),
+      );
       undoButton.disabled = activityEntry.isUndone;
       undoButton.addEventListener("click", () => {
         undoButton.disabled = true;
@@ -230,7 +234,12 @@ function renderMusic(nowPlaying: NowPlayingInfo | null, showNowPlaying: boolean)
 
   const playPauseButton = element.musicCard.querySelector<HTMLButtonElement>('[data-media="play_pause"]');
   if (playPauseButton) {
-    playPauseButton.textContent = nowPlaying.isPlaying ? "⏸" : "▶";
+    updateIconButton(
+      playPauseButton,
+      nowPlaying.isPlaying ? "pause" : "play",
+      nowPlaying.isPlaying ? "Pause" : "Play",
+      15,
+    );
   }
 }
 
@@ -270,8 +279,7 @@ function buildTodoRow(todoItem: TodoItem): HTMLElement {
   const removeButton = document.createElement("button");
   removeButton.type = "button";
   removeButton.className = "row-icon-button";
-  removeButton.textContent = "×";
-  removeButton.title = "remove";
+  setIconButton(removeButton, "close", "Remove this to-do", 12);
   removeButton.addEventListener("click", () => window.clickaa.removeTodo(todoItem.id));
 
   row.prepend(checkButton);
@@ -303,8 +311,7 @@ function buildScheduledTaskRow(scheduledTask: ScheduledTask): HTMLElement {
   const removeButton = document.createElement("button");
   removeButton.type = "button";
   removeButton.className = "row-icon-button";
-  removeButton.textContent = "×";
-  removeButton.title = "remove";
+  setIconButton(removeButton, "close", "Remove this reminder", 12);
   removeButton.addEventListener("click", () => window.clickaa.removeSchedule(scheduledTask.id));
 
   row.append(toggleButton, removeButton);
@@ -318,8 +325,7 @@ function buildMemoryRow(memoryFact: MemoryFact): HTMLElement {
   const removeButton = document.createElement("button");
   removeButton.type = "button";
   removeButton.className = "row-icon-button";
-  removeButton.textContent = "×";
-  removeButton.title = "forget this";
+  setIconButton(removeButton, "close", "Forget this", 12);
   removeButton.addEventListener("click", () => window.clickaa.removeMemory(memoryFact.id));
 
   row.append(removeButton);
@@ -334,13 +340,19 @@ function renderClips(clipboardClips: ClipboardClip[]): void {
 
       const copyButton = document.createElement("button");
       copyButton.type = "button";
-      copyButton.className = "undo-chip";
-      copyButton.textContent = "copy";
+      copyButton.className = "undo-chip with-icon";
+      copyButton.append(createClickaaIcon("copy", 12), document.createTextNode("copy"));
       copyButton.addEventListener("click", () => {
-        copyButton.textContent = "copied";
+        copyButton.replaceChildren(
+          createClickaaIcon("check", 12),
+          document.createTextNode("copied"),
+        );
         void window.clickaa.copyClip(clipboardClip.id).then((didCopy) => {
           window.setTimeout(() => {
-            copyButton.textContent = didCopy ? "copy" : "gone";
+            copyButton.replaceChildren(
+              createClickaaIcon("copy", 12),
+              document.createTextNode(didCopy ? "copy" : "gone"),
+            );
           }, 1_200);
         });
       });
@@ -566,6 +578,8 @@ document.addEventListener("wheel", (wheelEvent) => {
     window.clickaa.setIslandExpanded(true);
   }
 }, { passive: false });
+
+setIconButton(element.closeButton, "close", "Close Clickaa", 13);
 
 window.clickaa.onIslandPresentation(({ presentation }) => {
   currentPresentation = presentation;

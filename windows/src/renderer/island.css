@@ -1,16 +1,4 @@
-:root {
-  color-scheme: dark;
-  font-family: "Segoe UI Variable", "Segoe UI", system-ui, sans-serif;
-  --island-background: #0b100e;
-  --island-surface: #141b18;
-  --island-line: rgba(255, 255, 255, 0.07);
-  --island-text: #eef4f1;
-  --island-muted: #8d9a93;
-  --island-faint: #5f6d66;
-  --island-blue: #5aa2ff;
-  --island-green: #66d99b;
-  --island-danger: #ff8f8f;
-}
+/* Palette, type and motion live in tokens.css. */
 
 * { box-sizing: border-box; }
 
@@ -272,15 +260,16 @@ body[data-media-playing="false"] .music-art span { animation-play-state: paused;
 .music-artist { margin: 2px 0 0; color: var(--island-faint); font-size: 9.5px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .music-controls { display: flex; gap: 3px; }
 .media-button {
-  width: 25px; height: 25px;
+  width: 26px; height: 26px;
   display: grid;
   place-items: center;
   border: 0;
   border-radius: 50%;
   background: rgba(255, 255, 255, 0.05);
   color: var(--island-muted);
-  font-size: 10px;
   cursor: pointer;
+  transition: background var(--clickaa-duration-fast) var(--clickaa-ease-out),
+    color var(--clickaa-duration-fast) var(--clickaa-ease-out);
 }
 .media-button:hover { color: var(--island-text); background: rgba(255, 255, 255, 0.1); }
 .media-button.primary { background: rgba(90, 162, 255, 0.2); color: #d9e9ff; }
@@ -350,7 +339,9 @@ body[data-media-playing="false"] .music-art span { animation-play-state: paused;
 }
 
 .row-icon-button {
-  width: 19px; height: 19px;
+  display: grid;
+  place-items: center;
+  width: 20px; height: 20px;
   flex: 0 0 19px;
   border: 0;
   border-radius: 6px;
@@ -363,6 +354,11 @@ body[data-media-playing="false"] .music-art span { animation-play-state: paused;
 .row-icon-button:hover { color: var(--island-danger); background: rgba(255, 255, 255, 0.06); }
 .row-icon-button.neutral:hover { color: var(--island-text); }
 
+.undo-chip.with-icon {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--clickaa-space-2);
+}
 .undo-chip {
   padding: 3px 8px;
   border: 1px solid rgba(90, 162, 255, 0.3);

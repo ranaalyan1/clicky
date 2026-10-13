@@ -1,18 +1,4 @@
-:root {
-  color-scheme: dark;
-  font-family: "Segoe UI Variable", "Segoe UI", system-ui, sans-serif;
-  --background: #0c110f;
-  --surface: #131a17;
-  --surface-raised: #18211d;
-  --line: rgba(255, 255, 255, 0.075);
-  --text: #f0f5f2;
-  --muted: #8e9b94;
-  --faint: #627068;
-  --blue: #4596ff;
-  --blue-bright: #72b2ff;
-  --green: #65d99a;
-  --danger: #ff8585;
-}
+/* Palette, type and motion live in tokens.css. */
 
 * { box-sizing: border-box; }
 
@@ -82,16 +68,17 @@ button { color: inherit; }
 @keyframes mark-listen { 50% { transform: scale(1.1); filter: drop-shadow(0 0 14px rgba(69, 150, 255, .8)); } }
 
 .icon-button {
+  display: grid;
+  place-items: center;
   width: 28px;
   height: 28px;
-  padding: 0 0 2px;
   border: 0;
-  border-radius: 7px;
+  border-radius: var(--clickaa-radius-sm);
   background: transparent;
   color: var(--muted);
-  font-size: 22px;
-  line-height: 1;
   cursor: pointer;
+  transition: background var(--clickaa-duration-fast) var(--clickaa-ease-out),
+    color var(--clickaa-duration-fast) var(--clickaa-ease-out);
 }
 .icon-button:hover { background: rgba(255,255,255,.07); color: var(--text); }
 
@@ -279,10 +266,12 @@ button:disabled { opacity: .5; cursor: default; }
 .talk-button-copy strong { font-size: 12.5px; }
 .talk-button-copy small { color: var(--muted); font-size: 10px; }
 .microphone-icon {
-  width: 15px; height: 20px;
-  border-radius: 8px 8px 6px 6px;
-  background: linear-gradient(180deg, #8fc4ff, #4a97f5);
-  box-shadow: 0 0 12px rgba(69,150,255,.5);
+  display: grid;
+  place-items: center;
+  width: 19px;
+  height: 19px;
+  color: #8fc4ff;
+  filter: drop-shadow(0 0 8px rgba(69, 150, 255, 0.45));
 }
 .live-wave { display: flex; align-items: flex-end; gap: 2px; height: 16px; }
 .live-wave i { width: 2.5px; height: 4px; border-radius: 2px; background: var(--blue-bright); opacity: .5; }

@@ -5,6 +5,7 @@
   <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data:; media-src 'self' data: blob:; connect-src 'none'; object-src 'none'; base-uri 'none'; form-action 'none'">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Clickaa</title>
+  <link rel="stylesheet" href="./tokens.css">
   <link rel="stylesheet" href="./brand.css">
   <link rel="stylesheet" href="./panel.css">
 </head>
@@ -16,7 +17,7 @@
         <span class="brand-name">clickaa</span>
         <span class="platform-pill">windows</span>
       </div>
-      <button id="close-button" class="icon-button no-drag" type="button" aria-label="Hide Clickaa">×</button>
+      <button id="close-button" class="icon-button no-drag" type="button" aria-label="Hide Clickaa"></button>
     </header>
 
     <nav class="tab-bar" role="tablist">
@@ -48,7 +49,7 @@
 
         <section class="talk-card">
           <button id="push-to-talk-button" class="push-to-talk-button" type="button">
-            <span class="microphone-icon" aria-hidden="true"></span>
+            <span id="talk-microphone" class="microphone-icon" aria-hidden="true"></span>
             <span class="talk-button-copy">
               <strong>hold to talk</strong>
               <small>or use the shortcut from any app</small>
