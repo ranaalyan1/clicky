@@ -175,6 +175,11 @@ function registerIpcHandlers(): void {
       desktopWindows?.setIslandInteractionEnabled(Boolean(isPointerOverIsland));
     }
   });
+  ipcMain.on("island:close", (event) => {
+    if (islandSentEvent(event.sender.id)) {
+      clickaaController?.handleIslandClosedByUser();
+    }
+  });
   ipcMain.on("island:set-expanded", (event, isExpanded: boolean) => {
     if (islandSentEvent(event.sender.id)) {
       clickaaController?.handleIslandExpandedChanged(Boolean(isExpanded));

@@ -1,7 +1,13 @@
 import { BrowserWindow, Menu, nativeImage, Notification, screen, Tray } from "electron";
 import { join } from "node:path";
 import {
+  buildSummonBand,
+  IslandPresentationController,
+  isPointInsideRect,
+} from "./island-presentation";
+import {
   AudioPlaybackPayload,
+  IslandPresentation,
   ClickaaPublicState,
   FallbackSpeechPayload,
   IslandState,
@@ -54,9 +60,15 @@ export class ClickaaDesktopWindows {
   private overlayWindowsShouldBeVisible = false;
   private cursorBroadcastTimer: NodeJS.Timeout | null = null;
   private latestPublicState: ClickaaPublicState | null = null;
-  private isIslandExpanded = false;
   private islandAnimationFrame: NodeJS.Timeout | null = null;
   private isQuitting = false;
+
+  private readonly islandPresentation = new IslandPresentationController();
+  private islandIsEnabled = true;
+  private islandSummonIsEnabled = true;
+  private islandIsAlwaysVisible = false;
+  private islandDisplayId: number | null = null;
+  private cursorTickCount = 0;
 
   constructor(private readonly callbacks: DesktopWindowCallbacks) {}
 
@@ -229,28 +241,54 @@ export class ClickaaDesktopWindows {
   }
 
   /** Shows the island at the top of the primary display's work area. */
-  setIslandVisible(shouldBeVisible: boolean): void {
-    if (!this.islandWindow) {
-      return;
-    }
+  /** The master switch: with the island off, nothing ever appears. */
+  setIslandEnabled(isEnabled: boolean): void {
+    this.islandIsEnabled = isEnabled;
+    this.refreshIslandPresentation();
+  }
 
-    if (shouldBeVisible) {
-      this.applyIslandBounds(this.isIslandExpanded, false);
-      this.islandWindow.showInactive();
-      this.islandWindow.setAlwaysOnTop(true, "screen-saver");
-    } else {
-      this.islandWindow.hide();
+  setIslandSummonEnabled(isSummonEnabled: boolean): void {
+    this.islandSummonIsEnabled = isSummonEnabled;
+  }
+
+  setIslandAlwaysVisible(isAlwaysVisible: boolean): void {
+    this.islandIsAlwaysVisible = isAlwaysVisible;
+    this.refreshIslandPresentation();
+  }
+
+  /** What the island is doing right now, for the panel and the agent loop. */
+  getIslandPresentation(): IslandPresentation {
+    if (!this.islandIsEnabled) {
+      return "hidden";
     }
+    return this.islandPresentation.presentation;
+  }
+
+  /** Opens the full island, for example when a confirmation needs an answer. */
+  openIsland(): void {
+    this.islandPresentation.openIsland(Date.now());
+    this.refreshIslandPresentation();
+  }
+
+  /** Brings the mark out without opening it, for example when listening starts. */
+  revealIsland(): void {
+    this.islandPresentation.notePointerOverIsland(false, Date.now());
+    this.refreshIslandPresentation();
+  }
+
+  /** Escape, or the island's own close button. */
+  closeIsland(): void {
+    this.islandPresentation.dismissIsland();
+    this.refreshIslandPresentation();
   }
 
   setIslandExpanded(shouldBeExpanded: boolean): void {
-    if (this.isIslandExpanded === shouldBeExpanded) {
+    if (shouldBeExpanded) {
+      this.openIsland();
       return;
     }
-
-    this.isIslandExpanded = shouldBeExpanded;
-    this.applyIslandBounds(shouldBeExpanded, true);
-    this.sendToIsland("island:expanded", { isExpanded: shouldBeExpanded });
+    this.islandPresentation.collapseIsland(Date.now());
+    this.refreshIslandPresentation();
   }
 
   /**
@@ -497,9 +535,11 @@ export class ClickaaDesktopWindows {
     void this.islandWindow.loadFile(islandHtmlPath);
   }
 
-  private calculateIslandBounds(shouldBeExpanded: boolean): Electron.Rectangle {
-    const primaryDisplay = screen.getPrimaryDisplay();
-    const workArea = primaryDisplay.workArea;
+  private calculateIslandBounds(shouldBeExpanded: boolean, displayId?: number): Electron.Rectangle {
+    const display = (displayId === undefined ? null : screen.getAllDisplays().find(
+      (candidateDisplay) => candidateDisplay.id === displayId,
+    )) ?? screen.getPrimaryDisplay();
+    const workArea = display.workArea;
     const requestedWidth = shouldBeExpanded ? islandBounds.expandedWidth : islandBounds.collapsedWidth;
     const requestedHeight = shouldBeExpanded ? islandBounds.expandedHeight : islandBounds.collapsedHeight;
 
@@ -512,6 +552,94 @@ export class ClickaaDesktopWindows {
       width,
       height,
     };
+  }
+
+  /**
+   * The single place that turns a presentation state into a real window: move it
+   * onto the display the pointer is on, size it, show or hide it, and tell the
+   * renderer which of the two shapes it should draw.
+   */
+  private applyIslandPresentation(presentation: IslandPresentation, shouldAnimate: boolean): void {
+    if (!this.islandWindow || this.islandWindow.isDestroyed()) {
+      return;
+    }
+
+    if (presentation === "hidden") {
+      this.islandWindow.hide();
+      this.sendToIsland("island:presentation", { presentation });
+      return;
+    }
+
+    const cursorPoint = screen.getCursorScreenPoint();
+    const pointerDisplay = screen.getDisplayNearestPoint(cursorPoint);
+    if (this.islandDisplayId !== pointerDisplay.id) {
+      // The mark always belongs to the display the pointer is on; when the
+      // pointer is elsewhere (for example after a wake word) keep the last one.
+      this.islandDisplayId = pointerDisplay.id;
+    }
+
+    const shouldBeExpanded = presentation === "open";
+    const targetBounds = this.calculateIslandBounds(shouldBeExpanded, this.islandDisplayId);
+    const currentBounds = this.islandWindow.getBounds();
+    const isAlreadyInPlace = currentBounds.x === targetBounds.x
+      && currentBounds.y === targetBounds.y
+      && currentBounds.width === targetBounds.width
+      && currentBounds.height === targetBounds.height;
+
+    if (!isAlreadyInPlace) {
+      if (shouldAnimate && currentBounds.width === islandBounds.collapsedWidth) {
+        this.applyIslandBounds(shouldBeExpanded, true);
+      } else {
+        this.islandWindow.setBounds(targetBounds, false);
+      }
+    }
+
+    this.islandWindow.showInactive();
+    this.islandWindow.setAlwaysOnTop(true, "screen-saver");
+    this.sendToIsland("island:presentation", { presentation });
+  }
+
+  /** Re-applies whatever the state machine currently says. */
+  private refreshIslandPresentation(shouldAnimate = true): void {
+    const presentation = this.getIslandPresentation();
+    if (presentation === "hidden") {
+      this.applyIslandPresentation("hidden", false);
+      return;
+    }
+    this.applyIslandPresentation(presentation, shouldAnimate);
+  }
+
+  /**
+   * Every cursor tick feeds the summon machine: the top edge of the display
+   * under the pointer reveals the mark, and the pointer leaving closes it again.
+   */
+  private updateIslandSummoning(): void {
+    const cursorPoint = screen.getCursorScreenPoint();
+    const pointerDisplay = screen.getDisplayNearestPoint(cursorPoint);
+    const islandBoundsOnScreen = this.islandWindow && this.islandWindow.isVisible()
+      ? this.islandWindow.getBounds()
+      : null;
+    const pointerIsOverIsland = this.islandPresentation.presentation !== "hidden"
+      && isPointInsideRect(cursorPoint, islandBoundsOnScreen);
+
+    this.islandPresentation.notePointerOverIsland(pointerIsOverIsland, Date.now());
+
+    const previousPresentation = this.islandPresentation.presentation;
+    const nextPresentation = this.islandPresentation.update({
+      nowMilliseconds: Date.now(),
+      pointer: cursorPoint,
+      summonBand: this.islandSummonIsEnabled && this.islandIsEnabled
+        ? buildSummonBand(pointerDisplay.workArea)
+        : null,
+      islandBounds: islandBoundsOnScreen,
+      hasActiveInteraction: this.latestPublicState?.voiceState !== undefined
+        && this.latestPublicState.voiceState !== "idle",
+      isAlwaysVisible: this.islandIsAlwaysVisible,
+    });
+
+    if (nextPresentation !== previousPresentation) {
+      this.applyIslandPresentation(nextPresentation, true);
+    }
   }
 
   /**
@@ -644,6 +772,14 @@ export class ClickaaDesktopWindows {
     }
 
     this.cursorBroadcastTimer = setInterval(() => {
+      this.cursorTickCount += 1;
+
+      // Summoning is checked four times less often than the cursor is drawn:
+      // 80 ms is still instant to a human eye and keeps an idle desktop cheap.
+      if (this.islandIsEnabled && this.cursorTickCount % 5 === 0) {
+        this.updateIslandSummoning();
+      }
+
       if (!this.overlayWindowsShouldBeVisible) {
         return;
       }

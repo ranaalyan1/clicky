@@ -38,6 +38,8 @@ export const defaultClickaaUserConfig: ClickaaUserConfig = {
   dictationCleanupEnabled: true,
   speakScheduledResults: true,
   islandEnabled: true,
+  islandSummonEnabled: true,
+  islandAlwaysVisible: false,
   islandShowNowPlaying: true,
   islandShowClipboard: true,
   clipboardHistoryEnabled: true,
@@ -174,6 +176,14 @@ export function sanitizeStoredConfig(storedConfig: unknown): ClickaaUserConfig {
       defaultClickaaUserConfig.speakScheduledResults,
     ),
     islandEnabled: readBoolean(possibleConfig.islandEnabled, defaultClickaaUserConfig.islandEnabled),
+    islandSummonEnabled: readBoolean(
+      possibleConfig.islandSummonEnabled,
+      defaultClickaaUserConfig.islandSummonEnabled,
+    ),
+    islandAlwaysVisible: readBoolean(
+      possibleConfig.islandAlwaysVisible,
+      defaultClickaaUserConfig.islandAlwaysVisible,
+    ),
     islandShowNowPlaying: readBoolean(
       possibleConfig.islandShowNowPlaying,
       defaultClickaaUserConfig.islandShowNowPlaying,

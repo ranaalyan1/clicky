@@ -104,6 +104,48 @@ body[data-voice-state="responding"] .notch-cursor { animation: notch-talk 0.5s e
 }
 .notch-badge.alert { background: rgba(255, 143, 143, 0.16); color: #ffc7c7; }
 
+/* A revealed mark is an invitation, not a panel: it lifts slightly under the
+   pointer and says what a click will do. */
+body[data-presentation="revealed"] .notch-row { cursor: pointer; }
+body[data-presentation="revealed"] .notch-row::after {
+  content: "click to open";
+  color: var(--island-faint);
+  font-size: 9px;
+  opacity: 0;
+  transform: translateX(-4px);
+  transition: opacity 0.18s ease, transform 0.18s ease;
+}
+body[data-presentation="revealed"]:hover .notch-row::after {
+  opacity: 1;
+  transform: none;
+}
+body[data-presentation="revealed"] .notch-cursor { animation: notch-breathe 2.6s ease-in-out infinite; }
+@keyframes notch-breathe {
+  0%, 100% { filter: drop-shadow(0 0 6px rgba(90, 162, 255, 0.45)); }
+  50% { filter: drop-shadow(0 0 11px rgba(90, 162, 255, 0.9)); }
+}
+
+.notch-close {
+  width: 20px;
+  height: 20px;
+  display: none;
+  place-items: center;
+  padding: 0 0 2px;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--island-faint);
+  font-size: 15px;
+  line-height: 1;
+  cursor: pointer;
+}
+body[data-expanded="true"] .notch-close { display: grid; }
+.notch-close:hover { background: rgba(255, 255, 255, 0.07); color: var(--island-text); }
+
+@media (prefers-reduced-motion: reduce) {
+  body[data-presentation="revealed"] .notch-cursor { animation: none; }
+}
+
 .notch-wave { display: flex; align-items: flex-end; gap: 2px; height: 13px; }
 .notch-wave i { width: 2px; height: 3px; border-radius: 2px; background: var(--island-blue); opacity: 0.35; }
 body[data-voice-state="listening"] .notch-wave i { opacity: 1; animation: notch-wave 0.9s ease-in-out infinite; }

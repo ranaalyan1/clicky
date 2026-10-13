@@ -5,6 +5,7 @@ import {
   ClickaaPublicState,
   ClickaaUserConfig,
   FallbackSpeechPayload,
+  IslandPresentation,
   IslandState,
   IslandToggleKey,
   OverlayCursorPayload,
@@ -118,6 +119,10 @@ contextBridge.exposeInMainWorld("clickaa", {
   onIslandExpanded: (listener: (payload: { isExpanded: boolean }) => void): (() => void) => {
     return subscribe("island:expanded", listener);
   },
+  onIslandPresentation: (listener: (payload: { presentation: IslandPresentation }) => void): (() => void) => {
+    return subscribe("island:presentation", listener);
+  },
+  closeIsland: (): void => ipcRenderer.send("island:close"),
   setIslandPointerOver: (isPointerOverIsland: boolean): void => {
     ipcRenderer.send("island:pointer-over", isPointerOverIsland);
   },

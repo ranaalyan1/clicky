@@ -132,6 +132,8 @@ const element = {
   dictationCleanupToggle: requireElement<HTMLInputElement>("dictation-cleanup-toggle"),
   speakScheduledToggle: requireElement<HTMLInputElement>("speak-scheduled-toggle"),
   launchToggle: requireElement<HTMLInputElement>("launch-toggle"),
+  islandSummonToggle: requireElement<HTMLInputElement>("island-summon-toggle"),
+  islandAlwaysToggle: requireElement<HTMLInputElement>("island-always-toggle"),
   islandMusicToggle: requireElement<HTMLInputElement>("island-music-toggle"),
   islandClipboardToggle: requireElement<HTMLInputElement>("island-clipboard-toggle"),
   refreshAppsButton: requireElement<HTMLButtonElement>("refresh-apps-button"),
@@ -344,6 +346,8 @@ function renderSetup(state: ClickaaPublicState): void {
   element.dictationCleanupToggle.checked = config.dictationCleanupEnabled;
   element.speakScheduledToggle.checked = config.speakScheduledResults;
   element.launchToggle.checked = config.launchAtLogin;
+  element.islandSummonToggle.checked = config.islandSummonEnabled;
+  element.islandAlwaysToggle.checked = config.islandAlwaysVisible;
   element.islandMusicToggle.checked = config.islandShowNowPlaying;
   element.islandClipboardToggle.checked = config.islandShowClipboard;
 
@@ -717,6 +721,12 @@ element.speakScheduledToggle.addEventListener("change", () => {
   void saveSettings({ speakScheduledResults: element.speakScheduledToggle.checked });
 });
 element.launchToggle.addEventListener("change", () => void saveSettings({ launchAtLogin: element.launchToggle.checked }));
+element.islandSummonToggle.addEventListener("change", () => {
+  void saveSettings({ islandSummonEnabled: element.islandSummonToggle.checked });
+});
+element.islandAlwaysToggle.addEventListener("change", () => {
+  void saveSettings({ islandAlwaysVisible: element.islandAlwaysToggle.checked });
+});
 element.islandMusicToggle.addEventListener("change", () => {
   void saveSettings({ islandShowNowPlaying: element.islandMusicToggle.checked });
 });

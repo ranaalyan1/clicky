@@ -2,6 +2,7 @@ import type {
   ActivityFeedEntry,
   IslandToggleKey,
   ClipboardClip,
+  IslandPresentation,
   IslandState,
   LaunchableAppView,
   MemoryFact,
@@ -25,6 +26,7 @@ const wallpaperSwatchColors = [
 let latestIslandState: IslandState | null = null;
 let activeSection = "now";
 let isPointerOverIsland = false;
+let currentPresentation: IslandPresentation = "hidden";
 
 function requireElement<ElementType extends HTMLElement>(elementId: string): ElementType {
   const element = document.getElementById(elementId);
@@ -39,6 +41,7 @@ const element = {
   notchLabel: requireElement<HTMLElement>("notch-label"),
   notchTrack: requireElement<HTMLElement>("notch-track"),
   notchBadge: requireElement<HTMLElement>("notch-badge"),
+  closeButton: requireElement<HTMLButtonElement>("close-button"),
   headerStatus: requireElement<HTMLElement>("header-status"),
   confirmationStack: requireElement<HTMLElement>("confirmation-stack"),
   musicCard: requireElement<HTMLElement>("music-card"),
@@ -465,6 +468,8 @@ function renderControlToggles(islandState: IslandState): void {
 
 function renderIsland(islandState: IslandState): void {
   latestIslandState = islandState;
+  currentPresentation = islandState.presentation;
+  element.body.dataset.presentation = islandState.presentation;
   element.body.dataset.expanded = String(islandState.isExpanded);
   renderNotch(islandState);
   renderConfirmations(islandState);
@@ -485,8 +490,21 @@ function renderIsland(islandState: IslandState): void {
 
 element.body.addEventListener("click", (mouseEvent) => {
   const clickedNotchRow = (mouseEvent.target as HTMLElement).closest(".notch-row");
-  if (clickedNotchRow && latestIslandState) {
-    window.clickaa.setIslandExpanded(!latestIslandState.isExpanded);
+  if (!clickedNotchRow) {
+    return;
+  }
+  if (currentPresentation === "open") {
+    window.clickaa.setIslandExpanded(false);
+    return;
+  }
+  window.clickaa.setIslandExpanded(true);
+});
+
+element.closeButton.addEventListener("click", () => window.clickaa.closeIsland());
+
+document.addEventListener("keydown", (keyboardEvent) => {
+  if (keyboardEvent.key === "Escape") {
+    window.clickaa.closeIsland();
   }
 });
 
@@ -548,6 +566,15 @@ document.addEventListener("wheel", (wheelEvent) => {
     window.clickaa.setIslandExpanded(true);
   }
 }, { passive: false });
+
+window.clickaa.onIslandPresentation(({ presentation }) => {
+  currentPresentation = presentation;
+  element.body.dataset.presentation = presentation;
+  if (latestIslandState) {
+    latestIslandState.presentation = presentation;
+    latestIslandState.isExpanded = presentation === "open";
+  }
+});
 
 window.clickaa.onIslandState(renderIsland);
 window.clickaa.onIslandExpanded(({ isExpanded }) => {

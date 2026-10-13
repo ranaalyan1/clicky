@@ -227,6 +227,7 @@ export class ClickaaController {
 
   handleEscapePressed(): void {
     this.desktopWindows.hideRegionSelector();
+    this.desktopWindows.closeIsland();
     this.cancelActiveWork();
     this.publicState.voiceState = "idle";
     this.publicState.interactionKind = null;
@@ -712,8 +713,7 @@ export class ClickaaController {
         `${describeActions(actionsToConfirm)} — say yes, or press run in the island`,
         false,
       );
-      this.desktopWindows.setIslandVisible(true);
-      this.desktopWindows.setIslandExpanded(true);
+      this.desktopWindows.openIsland();
       if (isScheduledTask) {
         this.desktopWindows.showNotification(
           "Clickaa needs a yes",
@@ -750,8 +750,7 @@ export class ClickaaController {
         outcome.message,
       );
       this.activityFeed.record("confirmation", "which one?", outcome.message, false);
-      this.desktopWindows.setIslandVisible(true);
-      this.desktopWindows.setIslandExpanded(true);
+      this.desktopWindows.openIsland();
       this.publishIslandState();
       return "";
     }
@@ -1235,6 +1234,13 @@ export class ClickaaController {
     this.desktopWindows.showPanel(pageName || "home");
   }
 
+  /** The island's own close button, or Escape sent by the renderer. */
+  handleIslandClosedByUser(): void {
+    this.isIslandCurrentlyExpanded = false;
+    this.desktopWindows.closeIsland();
+    this.publishIslandState();
+  }
+
   handleIslandExpandedChanged(isExpanded: boolean): void {
     this.isIslandCurrentlyExpanded = isExpanded;
     this.desktopWindows.setIslandExpanded(isExpanded);
@@ -1297,6 +1303,9 @@ export class ClickaaController {
     }
 
     this.scheduleStore.recordRun(scheduledTask.id, new Date());
+    // A routine that fires while the user is doing something else has to be
+    // visible, so the mark slides in even though nobody touched the top edge.
+    this.desktopWindows.revealIsland();
     this.publishIslandState();
 
     if (scheduledTask.kind === "routine") {
@@ -1479,7 +1488,9 @@ export class ClickaaController {
 
   private updateIslandVisibility(): void {
     const config = this.configStore.getConfig();
-    this.desktopWindows.setIslandVisible(config.islandEnabled && config.abilities.island);
+    this.desktopWindows.setIslandEnabled(config.islandEnabled && config.abilities.island);
+    this.desktopWindows.setIslandSummonEnabled(config.islandSummonEnabled);
+    this.desktopWindows.setIslandAlwaysVisible(config.islandAlwaysVisible);
   }
 
   private buildIslandState(): IslandState {
@@ -1499,6 +1510,7 @@ export class ClickaaController {
     return {
       isExpanded: this.isIslandCurrentlyExpanded,
       isEnabled: config.islandEnabled && config.abilities.island,
+      presentation: this.desktopWindows.getIslandPresentation(),
       cursorEnabled: config.cursorEnabled,
       automationPaused: config.automationPaused,
       status: {

@@ -315,6 +315,10 @@ export interface ClickaaUserConfig {
   speakScheduledResults: boolean;
 
   islandEnabled: boolean;
+  /** Slide the island in when the pointer touches the top edge of a display. */
+  islandSummonEnabled: boolean;
+  /** Keep the island open all the time instead of summoning it. */
+  islandAlwaysVisible: boolean;
   islandShowNowPlaying: boolean;
   islandShowClipboard: boolean;
   clipboardHistoryEnabled: boolean;
@@ -436,9 +440,19 @@ export interface IslandStatusSummary {
   audioPowerLevel: number;
 }
 
+/**
+ * What the island is doing right now:
+ *
+ * - `hidden`   nothing on screen,
+ * - `revealed` a mark peeking out of the top edge, waiting to be clicked,
+ * - `open`     the full island.
+ */
+export type IslandPresentation = "hidden" | "revealed" | "open";
+
 export interface IslandState {
   isExpanded: boolean;
   isEnabled: boolean;
+  presentation: IslandPresentation;
   cursorEnabled: boolean;
   automationPaused: boolean;
   status: IslandStatusSummary;

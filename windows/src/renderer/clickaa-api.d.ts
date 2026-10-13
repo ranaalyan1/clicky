@@ -4,6 +4,7 @@ import type {
   ClickaaPublicState,
   ClickaaUserConfig,
   FallbackSpeechPayload,
+  IslandPresentation,
   IslandState,
   IslandToggleKey,
   OverlayCursorPayload,
@@ -59,6 +60,8 @@ declare global {
       getIslandState(): Promise<IslandState>;
       onIslandState(listener: (state: IslandState) => void): () => void;
       onIslandExpanded(listener: (payload: { isExpanded: boolean }) => void): () => void;
+      onIslandPresentation(listener: (payload: { presentation: IslandPresentation }) => void): () => void;
+      closeIsland(): void;
       setIslandPointerOver(isPointerOverIsland: boolean): void;
       setIslandExpanded(isExpanded: boolean): void;
       resolveConfirmation(confirmationId: string, decision: "approve" | "reject"): Promise<string>;
