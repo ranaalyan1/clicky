@@ -521,7 +521,9 @@ const actionDefinitions: Record<ClickaaActionType, ActionDefinition> = {
 /** Action types that change something on the user's PC need a confirmation. */
 export function getActionRisk(actionType: ClickaaActionType): ActionRisk {
   return actionDefinitions[actionType].risk;
-}export function getActionRequiredAbility(actionType: ClickaaActionType): AbilityId {
+}
+
+export function getActionRequiredAbility(actionType: ClickaaActionType): AbilityId {
   return actionDefinitions[actionType].requiredAbility;
 }
 

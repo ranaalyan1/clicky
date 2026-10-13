@@ -3,6 +3,7 @@ import test from "node:test";
 import {
   actionNeedsConfirmation,
   filterActionsByAbilities,
+  getActionRequiredAbility,
   getActionRisk,
   parseModelResponse,
 } from "../src/main/action-protocol";
