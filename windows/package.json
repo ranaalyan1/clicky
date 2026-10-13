@@ -1,6 +1,6 @@
 {
   "name": "clickaa-windows",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "private": true,
   "description": "Clickaa, the voice companion that lives on your Windows desktop",
   "main": "dist/src/main/main.js",
