@@ -22,10 +22,14 @@ interface OverlayWindowRecord {
   bounds: Electron.Rectangle;
 }
 
+/** A held circle asks a question; a snip copies pixels. */
+export type RegionSelectorPurpose = "circle" | "snip";
+
 interface RegionSelectorWindowRecord {
   browserWindow: BrowserWindow;
   displayId: number;
   bounds: Electron.Rectangle;
+  purpose: RegionSelectorPurpose;
 }
 
 interface IslandBounds {
@@ -107,12 +111,13 @@ export class ClickaaDesktopWindows {
   /** Which display a selection window belongs to, and where that display sits. */
   getRegionSelectorRecord(
     webContentsId: number,
-  ): { displayId: number; bounds: Electron.Rectangle } | null {
+  ): { displayId: number; bounds: Electron.Rectangle; purpose: RegionSelectorPurpose } | null {
     for (const regionSelectorWindowRecord of this.regionSelectorWindows.values()) {
       if (regionSelectorWindowRecord.browserWindow.webContents.id === webContentsId) {
         return {
           displayId: regionSelectorWindowRecord.displayId,
           bounds: { ...regionSelectorWindowRecord.bounds },
+          purpose: regionSelectorWindowRecord.purpose,
         };
       }
     }
@@ -300,7 +305,7 @@ export class ClickaaDesktopWindows {
     this.islandWindow?.setIgnoreMouseEvents(!isInteractionEnabled, { forward: true });
   }
 
-  showRegionSelector(hintText: string): void {
+  showRegionSelector(hintText: string, purpose: RegionSelectorPurpose = "circle"): void {
     this.hideRegionSelector();
     const preloadPath = join(__dirname, "../preload/preload.js");
     const selectionHtmlPath = join(__dirname, "../renderer/selection.html");
@@ -342,6 +347,7 @@ export class ClickaaDesktopWindows {
         browserWindow: regionSelectorWindow,
         displayId: display.id,
         bounds: { ...display.bounds },
+        purpose,
       });
     }
 
@@ -349,6 +355,7 @@ export class ClickaaDesktopWindows {
       await regionSelectorWindowRecord.browserWindow.loadFile(selectionHtmlPath, {
         query: {
           hint: hintText,
+          purpose,
           displayWidth: String(regionSelectorWindowRecord.bounds.width),
           displayHeight: String(regionSelectorWindowRecord.bounds.height),
         },

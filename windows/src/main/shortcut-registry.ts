@@ -1,6 +1,7 @@
 import { DictationShortcutId } from "../shared/contracts";
 
 export const uiohookSpaceKeyCode = 57;
+export const uiohookSKeyCode = 31;
 export const uiohookCapsLockKeyCode = 58;
 
 export interface ModifierKeyCodes {
@@ -14,10 +15,16 @@ export interface ModifierKeyCodes {
   rightShift: number;
 }
 
-export type ShortcutId = "talk" | "dictation" | "circle";
+export type ShortcutId = "talk" | "dictation" | "circle" | "snip";
 
 export interface ShortcutDefinition {
   id: ShortcutId;
+  /**
+   * Shorter shortcuts this chord takes the keys from. Declared by hand rather
+   * than inferred, so a chord can never quietly cancel something the user did
+   * not mean to give up.
+   */
+  supersedes?: ShortcutId[];
   requiresControl: boolean;
   /** Left Alt only, so Windows AltGr (left Ctrl + right Alt) never triggers it. */
   requiresLeftAlt: boolean;
@@ -32,13 +39,20 @@ export interface ShortcutTransition {
   phase: "pressed" | "released";
 }
 
+/** Display names for the fixed shortcuts, used by the island and the panel. */
+export const shortcutLabels: Record<Exclude<ShortcutId, "dictation">, string> = {
+  talk: "Ctrl + Alt",
+  circle: "Ctrl + Shift",
+  snip: "Ctrl + Alt + S",
+};
+
 export const dictationShortcutLabels: Record<DictationShortcutId, string> = {
   "ctrl+windows": "Ctrl + Windows",
   "ctrl+shift+space": "Ctrl + Shift + Space",
   "capslock": "Caps Lock",
 };
 
-/** Builds the three hold-to-act shortcuts Clickaa listens for. */
+/** Builds the four shortcuts Clickaa listens for. */
 export function buildShortcutDefinitions(dictationShortcut: DictationShortcutId): ShortcutDefinition[] {
   const dictionaryDefinitions: ShortcutDefinition = dictationShortcut === "capslock"
     ? {
@@ -85,6 +99,18 @@ export function buildShortcutDefinitions(dictationShortcut: DictationShortcutId)
       requiresShift: true,
       requiredKeyCode: null,
     },
+    /* Ctrl+Alt+S. Longer than the talk chord on purpose: the state machine
+       hands the keys over to the snip shortcut the moment the S arrives. */
+    {
+      id: "snip",
+      // Ctrl+Alt on its own is push-to-talk; the S turns it into a snip.
+      supersedes: ["talk"],
+      requiresControl: true,
+      requiresLeftAlt: true,
+      requiresWindows: false,
+      requiresShift: false,
+      requiredKeyCode: uiohookSKeyCode,
+    },
   ];
 }
 
@@ -98,6 +124,12 @@ export function buildShortcutDefinitions(dictationShortcut: DictationShortcutId)
 export class ModifierShortcutStateMachine {
   private readonly pressedKeyCodes = new Set<number>();
   private readonly activeShortcutIds = new Set<ShortcutId>();
+  /**
+   * Shortcuts that lost their keys to a longer chord, for example talk when
+   * Ctrl+Alt+S turns into a snip. They stay quiet until every key is released,
+   * so letting go of the S does not restart the thing they were doing.
+   */
+  private readonly supersededShortcutIds = new Set<ShortcutId>();
 
   constructor(
     private readonly shortcutDefinitions: ShortcutDefinition[],
@@ -117,6 +149,7 @@ export class ModifierShortcutStateMachine {
   /** Releases everything, for example when the app is quitting. */
   reset(): ShortcutTransition[] {
     this.pressedKeyCodes.clear();
+    this.supersededShortcutIds.clear();
     return [...this.activeShortcutIds].map((shortcutId) => {
       this.activeShortcutIds.delete(shortcutId);
       return { shortcutId, phase: "released" as const };
@@ -128,18 +161,41 @@ export class ModifierShortcutStateMachine {
   }
 
   private collectTransitions(): ShortcutTransition[] {
+    if (!this.pressedKeyCodes.size) {
+      this.supersededShortcutIds.clear();
+    }
+
     const transitions: ShortcutTransition[] = [];
     for (const shortcutDefinition of this.shortcutDefinitions) {
       const isSatisfied = this.isShortcutSatisfied(shortcutDefinition);
       const wasActive = this.activeShortcutIds.has(shortcutDefinition.id);
 
-      if (isSatisfied && !wasActive) {
+      if (isSatisfied && !wasActive && !this.supersededShortcutIds.has(shortcutDefinition.id)) {
         this.activeShortcutIds.add(shortcutDefinition.id);
         transitions.push({ shortcutId: shortcutDefinition.id, phase: "pressed" });
+        transitions.push(...this.releaseSupersededShortcuts(shortcutDefinition));
       } else if (!isSatisfied && wasActive) {
         this.activeShortcutIds.delete(shortcutDefinition.id);
         transitions.push({ shortcutId: shortcutDefinition.id, phase: "released" });
       }
+    }
+    return transitions;
+  }
+
+  /**
+   * A chord like Ctrl+Alt+S borrows the keys of the shorter Ctrl+Alt shortcut
+   * that was already running, so that one steps aside for it.
+   */
+  private releaseSupersededShortcuts(shortcutDefinition: ShortcutDefinition): ShortcutTransition[] {
+    const transitions: ShortcutTransition[] = [];
+    for (const supersededShortcutId of shortcutDefinition.supersedes ?? []) {
+      if (!this.activeShortcutIds.has(supersededShortcutId)) {
+        continue;
+      }
+
+      this.activeShortcutIds.delete(supersededShortcutId);
+      this.supersededShortcutIds.add(supersededShortcutId);
+      transitions.push({ shortcutId: supersededShortcutId, phase: "released" });
     }
     return transitions;
   }

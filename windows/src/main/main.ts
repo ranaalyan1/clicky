@@ -296,18 +296,29 @@ function registerIpcHandlers(): void {
 
     // The renderer draws in display-relative pixels; the capture needs desktop
     // coordinates, which is what the selector window's own bounds provide.
-    clickaaController?.handleCircleRegionSelected({
+    const desktopRegionSelection = {
       displayId: selectorRecord.displayId,
       x: selectorRecord.bounds.x + selectionBounds.x,
       y: selectorRecord.bounds.y + selectionBounds.y,
       width: selectionBounds.width,
       height: selectionBounds.height,
-    });
+    };
+
     desktopWindows?.hideRegionSelector();
+    if (selectorRecord.purpose === "snip") {
+      void clickaaController?.handleSnipRegionSelected(desktopRegionSelection);
+    } else {
+      clickaaController?.handleCircleRegionSelected(desktopRegionSelection);
+    }
   });
   ipcMain.on("selection:cancelled", (event) => {
-    if (desktopWindows?.isRegionSelectorWebContents(event.sender.id)) {
-      clickaaController?.handleCircleSelectionCancelled();
+    const selectorRecord = desktopWindows?.getRegionSelectorRecord(event.sender.id) ?? null;
+    if (selectorRecord) {
+      if (selectorRecord.purpose === "snip") {
+        clickaaController?.handleSnipCancelled();
+      } else {
+        clickaaController?.handleCircleSelectionCancelled();
+      }
       desktopWindows?.hideRegionSelector();
     }
   });

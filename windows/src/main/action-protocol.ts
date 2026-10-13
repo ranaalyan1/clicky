@@ -496,6 +496,13 @@ const actionDefinitions: Record<ClickaaActionType, ActionDefinition> = {
       };
     },
   },
+  screenshot_region: {
+    type: "screenshot_region",
+    risk: "safe",
+    requiredAbility: "screenVision",
+    describe: () => "open the snip overlay",
+    normalize: () => ({ action: { type: "screenshot_region" }, problem: null }),
+  },
   open_panel: {
     type: "open_panel",
     risk: "safe",
@@ -705,7 +712,8 @@ export function buildActionProtocolInstructions(abilities: AbilitySettings): str
     sections.push(`- schedule_add: {"type":"schedule_add","name":"Gift wraps","prompt":"search amazon for gift wraps","startAt":"2026-11-10T11:00:00","repeat":"none"} — run a spoken task later on its own. repeat: none, daily, weekdays, weekends.
 - routine_add: {"type":"routine_add","name":"Morning","timeOfDay":"09:00","repeat":"daily","actions":[{"type":"open_app","name":"Unity"}]} — a repeating list of steps.
 - timer_start: {"type":"timer_start","durationMinutes":12,"label":"pasta"} — a countdown the island shows and that ends with a notification. use for "set a timer".
-- timer_cancel: {"type":"timer_cancel","query":"pasta"} — stop a running timer; query null stops every one.`);
+- timer_cancel: {"type":"timer_cancel","query":"pasta"} — stop a running timer; query null stops every one.
+- screenshot_region: {"type":"screenshot_region"} — opens the overlay so the user can drag over part of the screen; the pixels land on their clipboard. use it for "let me screenshot this", "snip this area", "grab that region".`);
   }
 
   if (abilities.clipboardHistory) {

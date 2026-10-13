@@ -143,6 +143,7 @@ export class ClickaaActionExecutor {
          them before the executor is ever reached. */
       case "timer_start":
       case "timer_cancel":
+      case "screenshot_region":
       case "clipboard_transform":
         return failedOutcome("that action is handled by Clickaa itself");
       default:

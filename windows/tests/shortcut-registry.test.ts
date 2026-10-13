@@ -105,3 +105,102 @@ test("shortcuts are mutually exclusive and reset releases whatever is held", () 
   assert.deepEqual(stateMachine.reset(), [{ shortcutId: "circle", phase: "released" }]);
   assert.equal(stateMachine.isShortcutActive("circle"), false);
 });
+
+const sKeyCode = 31;
+
+test("adding S to the talk chord hands the keys to the snip shortcut", () => {
+  const stateMachine = createStateMachine();
+
+  stateMachine.handleKeyDown(modifierKeyCodes.leftControl);
+  assert.deepEqual(stateMachine.handleKeyDown(modifierKeyCodes.leftAlt), [
+    { shortcutId: "talk", phase: "pressed" },
+  ]);
+
+  // The chord resolves on the S key: talk steps aside, snip takes over.
+  assert.deepEqual(stateMachine.handleKeyDown(sKeyCode), [
+    { shortcutId: "snip", phase: "pressed" },
+    { shortcutId: "talk", phase: "released" },
+  ]);
+  assert.equal(stateMachine.isShortcutActive("snip"), true);
+  assert.equal(stateMachine.isShortcutActive("talk"), false);
+});
+
+test("letting go of S does not restart the talk shortcut underneath", () => {
+  const stateMachine = createStateMachine();
+
+  stateMachine.handleKeyDown(modifierKeyCodes.leftControl);
+  stateMachine.handleKeyDown(modifierKeyCodes.leftAlt);
+  stateMachine.handleKeyDown(sKeyCode);
+
+  assert.deepEqual(stateMachine.handleKeyUp(sKeyCode), [
+    { shortcutId: "snip", phase: "released" },
+  ]);
+  // Ctrl+Alt is still held, and talk must stay quiet until the user starts over.
+  assert.equal(stateMachine.isShortcutActive("talk"), false);
+
+  stateMachine.handleKeyUp(modifierKeyCodes.leftAlt);
+  stateMachine.handleKeyUp(modifierKeyCodes.leftControl);
+
+  assert.deepEqual(stateMachine.handleKeyDown(modifierKeyCodes.leftControl), []);
+  assert.deepEqual(stateMachine.handleKeyDown(modifierKeyCodes.leftAlt), [
+    { shortcutId: "talk", phase: "pressed" },
+  ]);
+});
+
+test("a snip chord never blocks the circle shortcut or dictation", () => {
+  const stateMachine = createStateMachine("ctrl+shift+space");
+
+  // Ctrl+Shift alone still means circle.
+  stateMachine.handleKeyDown(modifierKeyCodes.leftControl);
+  assert.deepEqual(stateMachine.handleKeyDown(modifierKeyCodes.leftShift), [
+    { shortcutId: "circle", phase: "pressed" },
+  ]);
+
+  stateMachine.handleKeyUp(modifierKeyCodes.leftShift);
+  stateMachine.handleKeyUp(modifierKeyCodes.leftControl);
+
+  // Ctrl+Shift+Space is still dictation, untouched by the snip chord.
+  stateMachine.handleKeyDown(modifierKeyCodes.leftControl);
+  stateMachine.handleKeyDown(modifierKeyCodes.leftShift);
+  assert.deepEqual(stateMachine.handleKeyDown(spaceKeyCode), [
+    { shortcutId: "dictation", phase: "pressed" },
+  ]);
+});
+
+test("reset clears a superseded shortcut so the next chord behaves", () => {
+  const stateMachine = createStateMachine();
+
+  stateMachine.handleKeyDown(modifierKeyCodes.leftControl);
+  stateMachine.handleKeyDown(modifierKeyCodes.leftAlt);
+  stateMachine.handleKeyDown(sKeyCode);
+
+  assert.deepEqual(stateMachine.reset(), [
+    { shortcutId: "snip", phase: "released" },
+  ]);
+
+  assert.deepEqual(stateMachine.handleKeyDown(modifierKeyCodes.leftControl), []);
+  assert.deepEqual(stateMachine.handleKeyDown(modifierKeyCodes.leftAlt), [
+    { shortcutId: "talk", phase: "pressed" },
+  ]);
+});
+
+test("only the shortcuts a chord declares are ever taken from it", () => {
+  const definitions = buildShortcutDefinitions("ctrl+windows");
+  const snipShortcut = definitions.find((definition) => definition.id === "snip")!;
+
+  // The snip chord borrows the talk keys and nothing else: holding Ctrl+Shift to
+  // circle must never be cancelled by an accidental keypress.
+  assert.deepEqual(snipShortcut.supersedes, ["talk"]);
+  assert.deepEqual(
+    definitions.filter((definition) => definition.supersedes).map((definition) => definition.id),
+    ["snip"],
+  );
+
+  // Every declared id has to be a real shortcut.
+  const shortcutIds = definitions.map((definition) => definition.id);
+  for (const definition of definitions) {
+    for (const supersededShortcutId of definition.supersedes ?? []) {
+      assert.equal(shortcutIds.includes(supersededShortcutId), true);
+    }
+  }
+});

@@ -1,5 +1,7 @@
 import { randomUUID } from "node:crypto";
-import { app, clipboard } from "electron";
+import { mkdir, writeFile } from "node:fs/promises";
+import { join } from "node:path";
+import { app, clipboard, ClipboardItem } from "electron";
 import {
   ActiveTimer,
   BrainConnectionTestResult,
@@ -39,12 +41,14 @@ import {
   stripDictationCleanupWrappers,
 } from "./dictation-prompts";
 import { formatClockTime, formatFriendlyDateTime, formatLocalIso } from "./local-time";
+import { captureWindowsDesktopRegionPng } from "./screen-capture";
+import { ShortcutId } from "./shortcut-registry";
 import { mapImageCoordinateToWindowsDesktop, parsePointingTag, selectPointingDisplay } from "./pointing";
 import { ScheduleStore } from "./schedule-store";
 import { SnippetStore } from "./snippet-store";
 import { captureAllWindowsDisplays, captureWindowsDesktopRegion } from "./screen-capture";
 import { describeScheduledTask } from "./schedule-time";
-import { dictationShortcutLabels } from "./shortcut-registry";
+import { dictationShortcutLabels, shortcutLabels } from "./shortcut-registry";
 import { StartMenuAppIndex } from "./start-menu-app-index";
 import { buildSystemPrompt } from "./system-prompt";
 import { TodoStore } from "./todo-store";
@@ -105,6 +109,7 @@ export class ClickaaController {
   private nowPlayingTimer: NodeJS.Timeout | null = null;
   private lastClipboardText = "";
   private activeTimers: ActiveTimer[] = [];
+  private isSnipInFlight = false;
   private timerTickTimer: NodeJS.Timeout | null = null;
   private latestNowPlaying: NowPlayingInfo | null = null;
   private readonly runningScheduledTaskIds = new Set<string>();
@@ -150,7 +155,7 @@ export class ClickaaController {
       shortcutAvailable: true,
       shortcutLabel: "Ctrl + Alt",
       dictationShortcutLabel: dictationShortcutLabels[config.dictationShortcut],
-      circleShortcutLabel: "Ctrl + Shift",
+      circleShortcutLabel: shortcutLabels.circle,
       lastTranscript: "",
       partialTranscript: "",
       responseText: "",
@@ -212,14 +217,23 @@ export class ClickaaController {
   /* Interaction lifecycle                                                  */
   /* ---------------------------------------------------------------------- */
 
-  handleShortcutPressed(shortcutId: "talk" | "dictation" | "circle"): void {
+  handleShortcutPressed(shortcutId: ShortcutId): void {
+    if (shortcutId === "snip") {
+      this.beginSnip();
+      return;
+    }
     if (this.heldShortcutIds.has(shortcutId)) {
       return;
     }
     void this.beginInteraction(shortcutId);
   }
 
-  handleShortcutReleased(shortcutId: "talk" | "dictation" | "circle"): void {
+  handleShortcutReleased(shortcutId: ShortcutId): void {
+    if (shortcutId === "snip") {
+      // Lifting the S leaves the overlay up: the drag finishes the snip, and
+      // Escape or a bare click walks away from it.
+      return;
+    }
     if (!this.heldShortcutIds.has(shortcutId)) {
       return;
     }
@@ -240,6 +254,7 @@ export class ClickaaController {
   }
 
   handleEscapePressed(): void {
+    this.isSnipInFlight = false;
     this.desktopWindows.hideRegionSelector();
     this.desktopWindows.closeIsland();
     this.cancelActiveWork();
@@ -751,6 +766,12 @@ export class ClickaaController {
         outcome = await this.runTimerAction(action);
       } else if (action.type === "clipboard_transform") {
         outcome = await this.runClipboardTransform(action.operation, action.targetLanguage);
+      } else if (action.type === "screenshot_region") {
+        this.beginSnip();
+        outcome = completedActionOutcome(
+          "ready to snip",
+          "drag over the part of the screen you want and it lands on your clipboard",
+        );
       } else {
         outcome = await this.actionExecutor.execute(action);
       }
@@ -1462,6 +1483,121 @@ export class ClickaaController {
   /* Circle selection                                                       */
   /* ---------------------------------------------------------------------- */
 
+  /* ---------------------------------------------------------------------- */
+  /* Snips: drag a region, land it on the clipboard                         */
+  /* ---------------------------------------------------------------------- */
+
+  /**
+   * Starts a snip. Not a conversation: nothing is recorded and nothing is sent
+   * anywhere, the overlay just waits for a drag.
+   */
+  beginSnip(): void {
+    const config = this.configStore.getConfig();
+    if (!config.abilities.screenVision) {
+      this.publicState.errorMessage = "screen vision is switched off, so Clickaa cannot take a snip. turn it back on in the soul tab.";
+      this.desktopWindows.showPanel("soul");
+      this.publishState();
+      return;
+    }
+    if (config.automationPaused) {
+      this.publicState.errorMessage = "actions are paused, so Clickaa did not start a snip.";
+      this.publishState();
+      return;
+    }
+
+    // The Ctrl+Alt half of the chord may already have started talking.
+    this.cancelActiveWork();
+    this.publicState.errorMessage = null;
+    this.publicState.voiceState = "idle";
+    this.publicState.interactionKind = null;
+    this.isSnipInFlight = true;
+    this.desktopWindows.updateOverlayMode({ interactionKind: null, hint: "", typedText: "" });
+    this.desktopWindows.updateOverlayResponse("");
+    this.desktopWindows.closeIsland();
+    this.desktopWindows.showRegionSelector(
+      "drag over the part you want, then let go to copy it",
+      "snip",
+    );
+    this.publishState();
+    this.publishIslandState();
+  }
+
+  isSnipActive(): boolean {
+    return this.isSnipInFlight;
+  }
+
+  async handleSnipRegionSelected(selection: RegionSelectorSelection): Promise<void> {
+    if (!this.isSnipInFlight) {
+      return;
+    }
+    this.isSnipInFlight = false;
+
+    let capturedSnip: { pngBuffer: Buffer; width: number; height: number };
+    try {
+      capturedSnip = await captureWindowsDesktopRegionPng(selection);
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      this.activityFeed.record("action", "could not take that snip", errorMessage, false);
+      this.desktopWindows.showNotification("Clickaa snip", "I could not capture that region.");
+      this.publishIslandState();
+      return;
+    }
+
+    const savedFilePath = await this.saveSnipFile(capturedSnip.pngBuffer);
+
+    let copiedToClipboard = true;
+    try {
+      await clipboard.write([
+        new ClipboardItem({
+          "image/png": new Blob([new Uint8Array(capturedSnip.pngBuffer)], { type: "image/png" }),
+        }),
+      ]);
+    } catch {
+      // The pixels still exist on disk, so the path is the next best thing.
+      copiedToClipboard = false;
+      if (savedFilePath) {
+        await clipboard.writeText(savedFilePath);
+      }
+    }
+
+    const sizeDescription = `${capturedSnip.width} × ${capturedSnip.height}`;
+    const destinationDescription = savedFilePath
+      ? `saved to ${savedFilePath}`
+      : "not saved to disk";
+    const message = copiedToClipboard
+      ? `copied a ${sizeDescription} snip to your clipboard`
+      : `saved a ${sizeDescription} snip but could not reach the clipboard`;
+
+    this.activityFeed.record("action", message, destinationDescription, false);
+    this.desktopWindows.showNotification("Clickaa snip", copiedToClipboard
+      ? `${sizeDescription} pixels are on your clipboard. Paste anywhere.`
+      : `${sizeDescription} pixels are saved in Pictures.`);
+    this.desktopWindows.revealIsland();
+    this.publishIslandState();
+  }
+
+  handleSnipCancelled(): void {
+    if (!this.isSnipInFlight) {
+      return;
+    }
+    this.isSnipInFlight = false;
+    this.publishIslandState();
+  }
+
+  /** Saves every snip so a copy that gets overwritten is never lost. */
+  private async saveSnipFile(pngBuffer: Buffer): Promise<string | null> {
+    try {
+      const snipDirectory = join(app.getPath("pictures"), "Clickaa Snips");
+      await mkdir(snipDirectory, { recursive: true });
+      const timestamp = new Date().toISOString().replace(/[:.]/gu, "-").slice(0, 19);
+      const snipFilePath = join(snipDirectory, `Clickaa snip ${timestamp}.png`);
+      await writeFile(snipFilePath, pngBuffer);
+      return snipFilePath;
+    } catch {
+      return null;
+    }
+  }
+
   handleCircleRegionSelected(selection: RegionSelectorSelection): void {
     if (this.activeInteractionKind !== "circle") {
       return;
@@ -1750,9 +1886,10 @@ export class ClickaaController {
       quickLaunchApps: config.abilities.automation ? this.appIndex.quickLaunchApps(8) : [],
       brainLabel: this.brainRouter.getBrainLabel(config),
       shortcuts: [
-        { label: this.publicState.shortcutLabel, description: "hold to talk about your screen" },
-        { label: this.publicState.dictationShortcutLabel, description: "hold to dictate clean text anywhere" },
-        { label: this.publicState.circleShortcutLabel, description: "hold, circle anything, ask about it" },
+        { label: this.publicState.shortcutLabel, description: "hold to talk about your screen", hint: "hold" },
+        { label: this.publicState.dictationShortcutLabel, description: "hold to dictate clean text anywhere", hint: "hold" },
+        { label: this.publicState.circleShortcutLabel, description: "hold, circle anything, ask about it", hint: "hold" },
+        { label: shortcutLabels.snip, description: "drag over any part of the screen to copy it", hint: "press" },
       ],
     };
   }

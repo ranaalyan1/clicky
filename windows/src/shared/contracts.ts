@@ -245,6 +245,11 @@ export interface ClipboardTransformAction {
   targetLanguage: string | null;
 }
 
+/** "screenshot this area" — opens the snipping overlay and waits for a drag. */
+export interface ScreenshotRegionAction {
+  type: "screenshot_region";
+}
+
 export interface OpenPanelAction {
   type: "open_panel";
   page: string;
@@ -275,7 +280,8 @@ export type ClickaaAction =
   | TimerCancelAction
   | SnippetSaveAction
   | SnippetInsertAction
-  | ClipboardTransformAction;
+  | ClipboardTransformAction
+  | ScreenshotRegionAction;
 
 export type ClickaaActionType =
   | "open_app"
@@ -302,7 +308,8 @@ export type ClickaaActionType =
   | "timer_cancel"
   | "snippet_save"
   | "snippet_insert"
-  | "clipboard_transform";
+  | "clipboard_transform"
+  | "screenshot_region";
 
 /** Canonical action list, kept in the shared contracts so both sides agree. */
 export const clickaaActionTypes: readonly ClickaaActionType[] = [
@@ -331,6 +338,7 @@ export const clickaaActionTypes: readonly ClickaaActionType[] = [
   "snippet_save",
   "snippet_insert",
   "clipboard_transform",
+  "screenshot_region",
 ];
 
 export type ActionRisk = "safe" | "confirm";
@@ -532,7 +540,7 @@ export interface IslandState {
   clipboardClips: ClipboardClip[];
   quickLaunchApps: LaunchableAppView[];
   brainLabel: string;
-  shortcuts: { label: string; description: string }[];
+  shortcuts: Array<{ label: string; description: string; hint: string }>;
 }
 
 /* -------------------------------------------------------------------------- */

@@ -220,7 +220,7 @@ function renderShortcutList(islandState: IslandState): void {
     copy.append(createTitle(shortcut.label), createMeta(shortcut.description));
     const hint = document.createElement("span");
     hint.className = "island-row-meta";
-    hint.textContent = "hold";
+    hint.textContent = shortcut.hint;
     row.append(hint);
     return row;
   }));

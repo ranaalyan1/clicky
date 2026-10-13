@@ -106,6 +106,25 @@ test("timers run freely while typing a snippet asks first", () => {
   assert.equal(getActionRisk("timer_start"), "safe");
 });
 
+test("a snip action parses, stays safe, and needs screen vision", () => {
+  const parsedResponse = parseModelResponse(
+    'sure. <actions>[{"type":"screenshot_region"}]</actions>',
+  );
+  assert.deepEqual(parsedResponse.actions, [{ type: "screenshot_region" }]);
+  assert.equal(getActionRisk("screenshot_region"), "safe");
+  assert.equal(getActionRequiredAbility("screenshot_region"), "screenVision");
+  assert.equal(
+    actionNeedsConfirmation({ type: "screenshot_region" }, "risky", []),
+    false,
+  );
+
+  // An unrelated field is ignored rather than dropping the action.
+  const withExtraField = parseModelResponse(
+    '<actions>[{"type":"screenshot_region","note":"this area"}]</actions>',
+  );
+  assert.deepEqual(withExtraField.actions, [{ type: "screenshot_region" }]);
+});
+
 test("clipboard rewrites only accept the four operations clickaa knows", () => {
   const parsedResponse = parseModelResponse(
     '<actions>[{"type":"clipboard_transform","operation":"translate","targetLanguage":"urdu"}]</actions>',
