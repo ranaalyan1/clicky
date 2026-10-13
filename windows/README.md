@@ -1,6 +1,6 @@
-# Clicky for Windows
+# Clickaa for Windows
 
-This is the Windows 10/11 client for Clicky. It is a system-tray app with the same core interaction as the original macOS client:
+This is the Windows 10/11 client for Clickaa. It is a system-tray app with the same core interaction as the original macOS client:
 
 - Hold **Ctrl + Alt** globally to talk, then release to submit.
 - Stream 16 kHz PCM microphone audio to AssemblyAI for transcription.
@@ -14,10 +14,10 @@ This is the Windows 10/11 client for Clicky. It is a system-tray app with the sa
 
 - Windows 10 version 22H2 or Windows 11 (64-bit x64 or ARM64)
 - Node.js 22.12 or newer when building from source
-- A deployed Clicky Cloudflare Worker (see the repository's root `README.md`)
+- A deployed Clickaa Cloudflare Worker (see the repository's root `README.md`)
 - Microphone access when Windows asks on the first push-to-talk interaction
 
-Windows does not require the macOS Accessibility or Screen Recording permissions. Clicky captures the desktop through Electron's Windows capture API and never sends a screenshot until a push-to-talk request is submitted.
+Windows does not require the macOS Accessibility or Screen Recording permissions. Clickaa captures the desktop through Electron's Windows capture API and never sends a screenshot until a push-to-talk request is submitted.
 
 ## Run from source
 
@@ -29,7 +29,7 @@ npm install
 npm run dev
 ```
 
-Clicky appears in the Windows notification area. On the first launch, its panel opens automatically:
+Clickaa appears in the Windows notification area. On the first launch, its panel opens automatically:
 
 1. Paste the base URL printed by `npx wrangler deploy`, without `/chat` or another route.
 2. Select **save & test**. The test verifies the Worker's AssemblyAI token route.
@@ -51,10 +51,10 @@ npm run package:win
 
 The NSIS installers are written to `windows/release/`:
 
-- `Clicky-Setup-<version>-x64.exe`
-- `Clicky-Setup-<version>-arm64.exe`
+- `Clickaa-Setup-<version>-x64.exe`
+- `Clickaa-Setup-<version>-arm64.exe`
 
-The installer is per-user, offers an install location, creates Start Menu and desktop shortcuts, and preserves Clicky's settings on uninstall. The app can register itself to start when the user signs in; this is controllable in the panel.
+The installer is per-user, offers an install location, creates Start Menu and desktop shortcuts, and preserves Clickaa's settings on uninstall. The app can register itself to start when the user signs in; this is controllable in the panel.
 
 CI also launches the packaged x64 application for ten seconds before accepting a build. This catches missing native binaries, invalid preload paths, and main-process startup crashes that compilation alone cannot detect.
 
@@ -85,7 +85,7 @@ The tests cover Worker URL validation and persistence, chunked SSE parsing, glob
 windows/
   src/main/
     main.ts                    Electron lifecycle and secure IPC
-    clicky-controller.ts       Push-to-talk → vision → speech state machine
+    clickaa-controller.ts       Push-to-talk → vision → speech state machine
     desktop-windows.ts         tray, settings panel, and per-monitor overlays
     transcription-session.ts   AssemblyAI v3 websocket client
     claude-client.ts           Claude SSE and ElevenLabs clients
@@ -102,7 +102,7 @@ The Electron renderers are sandboxed with context isolation and no Node integrat
 
 ## Shortcut details
 
-Clicky tracks physical key-down and key-up events through `uiohook-napi`, which is necessary for true push-to-talk behavior. Either Control key works, and the shortcut requires **left Alt**. Requiring left Alt intentionally avoids triggering on the Windows AltGr sequence used by many international keyboard layouts.
+Clickaa tracks physical key-down and key-up events through `uiohook-napi`, which is necessary for true push-to-talk behavior. Either Control key works, and the shortcut requires **left Alt**. Requiring left Alt intentionally avoids triggering on the Windows AltGr sequence used by many international keyboard layouts.
 
 If the global listener cannot start, the tray panel remains usable through its **hold to talk** button.
 
@@ -110,6 +110,6 @@ If the global listener cannot start, the tray panel remains usable through its *
 
 - **The panel says the Worker is not connected:** confirm you entered only the base URL and deployed all three Worker secrets.
 - **No microphone prompt appeared:** open **Settings → Privacy & security → Microphone** and allow desktop apps to access the microphone.
-- **Ctrl + Alt does nothing:** exit and restart Clicky. Security tools that block global keyboard hooks may require Clicky to be allow-listed; the hold-to-talk button remains available.
+- **Ctrl + Alt does nothing:** exit and restart Clickaa. Security tools that block global keyboard hooks may require Clickaa to be allow-listed; the hold-to-talk button remains available.
 - **The wrong monitor is targeted:** run `npm test` first, then report the monitor layout and Windows display scaling values.
-- **The app is still running after the panel closes:** this is expected. Use **Quit Clicky** from the tray icon's context menu.
+- **The app is still running after the panel closes:** this is expected. Use **Quit Clickaa** from the tray icon's context menu.

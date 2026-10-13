@@ -1,13 +1,13 @@
 import { app } from "electron";
 import {
-  ClickyPublicState,
-  ClickyUserConfig,
+  ClickaaPublicState,
+  ClickaaUserConfig,
   SupportedClaudeModel,
   WorkerConnectionTestResult,
 } from "../shared/contracts";
 import { ClaudeClient, ConversationExchange } from "./claude-client";
-import { ClickyConfigStore } from "./config-store";
-import { ClickyDesktopWindows } from "./desktop-windows";
+import { ClickaaConfigStore } from "./config-store";
+import { ClickaaDesktopWindows } from "./desktop-windows";
 import {
   mapImageCoordinateToWindowsDesktop,
   parsePointingTag,
@@ -16,10 +16,10 @@ import {
 import { captureAllWindowsDisplays } from "./screen-capture";
 import { AssemblyAITranscriptionSession } from "./transcription-session";
 
-export class ClickyController {
+export class ClickaaController {
   private readonly claudeClient = new ClaudeClient();
   private readonly conversationHistory: ConversationExchange[] = [];
-  private publicState: ClickyPublicState;
+  private publicState: ClickaaPublicState;
   private shortcutIsPressed = false;
   private pushToTalkSource: "globalShortcut" | "panelButton" = "globalShortcut";
   private activeInteractionId = 0;
@@ -31,8 +31,8 @@ export class ClickyController {
   private transientOverlayHideTimer: NodeJS.Timeout | null = null;
 
   constructor(
-    private readonly configStore: ClickyConfigStore,
-    private readonly desktopWindows: ClickyDesktopWindows,
+    private readonly configStore: ClickaaConfigStore,
+    private readonly desktopWindows: ClickaaDesktopWindows,
   ) {
     const config = configStore.getConfig();
     this.publicState = {
@@ -55,7 +55,7 @@ export class ClickyController {
   start(shortcutAvailable: boolean): void {
     this.publicState.shortcutAvailable = shortcutAvailable;
     if (!shortcutAvailable) {
-      this.publicState.errorMessage = "The global Ctrl + Alt shortcut could not start. Restart Clicky, or use the hold-to-talk button.";
+      this.publicState.errorMessage = "The global Ctrl + Alt shortcut could not start. Restart Clickaa, or use the hold-to-talk button.";
     }
     this.desktopWindows.setOverlayVisibility(this.publicState.cursorEnabled);
     this.applyLaunchAtLogin(this.publicState.launchAtLogin);
@@ -68,7 +68,7 @@ export class ClickyController {
     this.clearTransientOverlayHideTimer();
   }
 
-  getPublicState(): ClickyPublicState {
+  getPublicState(): ClickaaPublicState {
     return { ...this.publicState };
   }
 
@@ -194,7 +194,7 @@ export class ClickyController {
     this.scheduleTransientOverlayHideIfPossible();
   }
 
-  updateWorkerBaseUrl(workerBaseUrl: string): ClickyPublicState {
+  updateWorkerBaseUrl(workerBaseUrl: string): ClickaaPublicState {
     const updatedConfig = this.configStore.updateConfig({ workerBaseUrl });
     this.applyConfigToPublicState(updatedConfig);
     this.publicState.errorMessage = null;
@@ -202,14 +202,14 @@ export class ClickyController {
     return this.getPublicState();
   }
 
-  updateSelectedModel(selectedModel: SupportedClaudeModel): ClickyPublicState {
+  updateSelectedModel(selectedModel: SupportedClaudeModel): ClickaaPublicState {
     const updatedConfig = this.configStore.updateConfig({ selectedModel });
     this.applyConfigToPublicState(updatedConfig);
     this.publishState();
     return this.getPublicState();
   }
 
-  updateCursorEnabled(cursorEnabled: boolean): ClickyPublicState {
+  updateCursorEnabled(cursorEnabled: boolean): ClickaaPublicState {
     const updatedConfig = this.configStore.updateConfig({ cursorEnabled });
     this.applyConfigToPublicState(updatedConfig);
     this.clearTransientOverlayHideTimer();
@@ -222,7 +222,7 @@ export class ClickyController {
     this.updateCursorEnabled(!this.publicState.cursorEnabled);
   }
 
-  updateLaunchAtLogin(launchAtLogin: boolean): ClickyPublicState {
+  updateLaunchAtLogin(launchAtLogin: boolean): ClickaaPublicState {
     const updatedConfig = this.configStore.updateConfig({ launchAtLogin });
     this.applyConfigToPublicState(updatedConfig);
     this.applyLaunchAtLogin(launchAtLogin);
@@ -296,7 +296,7 @@ export class ClickyController {
     this.transcriptionOpenAbortController = transcriptionOpenAbortController;
     const transcriptionSession = new AssemblyAITranscriptionSession({
       workerBaseUrl: config.workerBaseUrl,
-      keyterms: ["Clicky", "Claude", "Windows"],
+      keyterms: ["Clickaa", "Claude", "Windows"],
       onTranscriptUpdate: (transcriptText) => {
         if (interactionId !== this.activeInteractionId) {
           return;
@@ -437,7 +437,7 @@ export class ClickyController {
           return;
         }
         // Chromium's speechSynthesis uses the installed Windows voices and gives
-        // Clicky a functional offline fallback if ElevenLabs is unavailable.
+        // Clickaa a functional offline fallback if ElevenLabs is unavailable.
         this.publicState.errorMessage = `ElevenLabs unavailable; using a Windows voice. ${this.describeError(speechError)}`;
         this.audioPlaybackInteractionId = interactionId;
         this.desktopWindows.speakWithWindowsVoice({ interactionId, text: spokenText });
@@ -477,7 +477,7 @@ export class ClickyController {
     this.scheduleTransientOverlayHideIfPossible();
   }
 
-  private applyConfigToPublicState(config: ClickyUserConfig): void {
+  private applyConfigToPublicState(config: ClickaaUserConfig): void {
     this.publicState.workerBaseUrl = config.workerBaseUrl;
     this.publicState.configured = Boolean(config.workerBaseUrl);
     this.publicState.selectedModel = config.selectedModel;

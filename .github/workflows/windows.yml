@@ -62,10 +62,10 @@ jobs:
         env:
           ELECTRON_ENABLE_LOGGING: "1"
         run: |
-          $applicationPath = Resolve-Path "release/win-unpacked/Clicky.exe"
-          $standardOutputPath = Join-Path $env:RUNNER_TEMP "clicky-smoke-stdout.log"
-          $standardErrorPath = Join-Path $env:RUNNER_TEMP "clicky-smoke-stderr.log"
-          $clickyProcess = Start-Process `
+          $applicationPath = Resolve-Path "release/win-unpacked/Clickaa.exe"
+          $standardOutputPath = Join-Path $env:RUNNER_TEMP "clickaa-smoke-stdout.log"
+          $standardErrorPath = Join-Path $env:RUNNER_TEMP "clickaa-smoke-stderr.log"
+          $clickaaProcess = Start-Process `
             -FilePath $applicationPath `
             -PassThru `
             -RedirectStandardOutput $standardOutputPath `
@@ -73,8 +73,8 @@ jobs:
 
           try {
             Start-Sleep -Seconds 10
-            if ($clickyProcess.HasExited) {
-              Write-Host "Clicky exited with code $($clickyProcess.ExitCode)."
+            if ($clickaaProcess.HasExited) {
+              Write-Host "Clickaa exited with code $($clickaaProcess.ExitCode)."
               if (Test-Path $standardOutputPath) { Get-Content $standardOutputPath }
               if (Test-Path $standardErrorPath) { Get-Content $standardErrorPath }
               throw "The packaged x64 application did not stay running."
@@ -82,16 +82,16 @@ jobs:
             Write-Host "Packaged x64 application remained healthy for the smoke-test window."
           }
           finally {
-            if (-not $clickyProcess.HasExited) {
-              Stop-Process -Id $clickyProcess.Id -Force
+            if (-not $clickaaProcess.HasExited) {
+              Stop-Process -Id $clickaaProcess.Id -Force
             }
           }
 
       - name: Upload Windows installers
         uses: actions/upload-artifact@v7
         with:
-          name: clicky-windows-installers
-          path: windows/release/Clicky-Setup-*.exe
+          name: clickaa-windows-installers
+          path: windows/release/Clickaa-Setup-*.exe
           if-no-files-found: error
 
       - name: Publish Windows GitHub release
@@ -111,16 +111,16 @@ jobs:
             throw "Release tag must match package version: $expectedReleaseTag"
           }
 
-          $installerPaths = Get-ChildItem "windows/release/Clicky-Setup-*.exe"
+          $installerPaths = Get-ChildItem "windows/release/Clickaa-Setup-*.exe"
           if ($installerPaths.Count -ne 2) {
             throw "Expected exactly two Windows installers, found $($installerPaths.Count)."
           }
 
-          $releaseNotesPath = Join-Path $env:RUNNER_TEMP "clicky-windows-release-notes.md"
+          $releaseNotesPath = Join-Path $env:RUNNER_TEMP "clickaa-windows-release-notes.md"
           @"
-          Clicky for Windows $($packageManifest.version).
+          Clickaa for Windows $($packageManifest.version).
 
-          This release contains per-user NSIS installers for Windows x64 and ARM64. After installation, open Clicky from the notification area, paste your deployed Cloudflare Worker URL, and select **save & test**.
+          This release contains per-user NSIS installers for Windows x64 and ARM64. After installation, open Clickaa from the notification area, paste your deployed Cloudflare Worker URL, and select **save & test**.
 
           The installers are currently unsigned, so Windows SmartScreen may display an unrecognized-app warning for this open-source build.
           "@ | Set-Content $releaseNotesPath
@@ -128,7 +128,7 @@ jobs:
           $releaseArguments = @(
             "release", "create", $env:RELEASE_TAG,
             "--target", $env:GITHUB_SHA,
-            "--title", "Clicky for Windows $($packageManifest.version)",
+            "--title", "Clickaa for Windows $($packageManifest.version)",
             "--notes-file", $releaseNotesPath
           ) + $installerPaths.FullName
 
@@ -142,5 +142,5 @@ jobs:
         uses: softprops/action-gh-release@v3
         with:
           tag_name: ${{ github.event.release.tag_name }}
-          files: windows/release/Clicky-Setup-*.exe
+          files: windows/release/Clickaa-Setup-*.exe
           fail_on_unmatched_files: true

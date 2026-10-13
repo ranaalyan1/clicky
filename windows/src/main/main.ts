@@ -1,8 +1,8 @@
 import { app, ipcMain, screen, session } from "electron";
 import { join } from "node:path";
-import { ClickyController } from "./clicky-controller";
-import { ClickyConfigStore } from "./config-store";
-import { ClickyDesktopWindows } from "./desktop-windows";
+import { ClickaaController } from "./clickaa-controller";
+import { ClickaaConfigStore } from "./config-store";
+import { ClickaaDesktopWindows } from "./desktop-windows";
 import { GlobalPushToTalkMonitor } from "./global-shortcut-monitor";
 import { SupportedClaudeModel } from "../shared/contracts";
 
@@ -13,8 +13,8 @@ if (!hasSingleInstanceLock) {
   app.quit();
 }
 
-let desktopWindows: ClickyDesktopWindows | null = null;
-let clickyController: ClickyController | null = null;
+let desktopWindows: ClickaaDesktopWindows | null = null;
+let clickaaController: ClickaaController | null = null;
 let globalPushToTalkMonitor: GlobalPushToTalkMonitor | null = null;
 let isQuitting = false;
 
@@ -38,57 +38,57 @@ function registerSecureMediaPermissions(): void {
 function registerIpcHandlers(): void {
   const requirePanelSender = (webContentsId: number): void => {
     if (desktopWindows?.isPanelWebContents(webContentsId) !== true) {
-      throw new Error("IPC request rejected: sender is not the Clicky panel.");
+      throw new Error("IPC request rejected: sender is not the Clickaa panel.");
     }
   };
   const panelSentEvent = (webContentsId: number): boolean => {
     return desktopWindows?.isPanelWebContents(webContentsId) === true;
   };
 
-  ipcMain.handle("clicky:get-state", (event) => {
+  ipcMain.handle("clickaa:get-state", (event) => {
     requirePanelSender(event.sender.id);
-    return clickyController?.getPublicState();
+    return clickaaController?.getPublicState();
   });
-  ipcMain.handle("clicky:set-worker-url", (event, workerBaseUrl: string) => {
+  ipcMain.handle("clickaa:set-worker-url", (event, workerBaseUrl: string) => {
     requirePanelSender(event.sender.id);
-    return clickyController?.updateWorkerBaseUrl(workerBaseUrl);
+    return clickaaController?.updateWorkerBaseUrl(workerBaseUrl);
   });
-  ipcMain.handle("clicky:test-worker", (event, workerBaseUrl: string) => {
+  ipcMain.handle("clickaa:test-worker", (event, workerBaseUrl: string) => {
     requirePanelSender(event.sender.id);
-    return clickyController?.testWorkerConnection(workerBaseUrl);
+    return clickaaController?.testWorkerConnection(workerBaseUrl);
   });
-  ipcMain.handle("clicky:set-model", (event, selectedModel: SupportedClaudeModel) => {
+  ipcMain.handle("clickaa:set-model", (event, selectedModel: SupportedClaudeModel) => {
     requirePanelSender(event.sender.id);
-    return clickyController?.updateSelectedModel(selectedModel);
+    return clickaaController?.updateSelectedModel(selectedModel);
   });
-  ipcMain.handle("clicky:set-cursor-enabled", (event, cursorEnabled: boolean) => {
+  ipcMain.handle("clickaa:set-cursor-enabled", (event, cursorEnabled: boolean) => {
     requirePanelSender(event.sender.id);
-    return clickyController?.updateCursorEnabled(cursorEnabled);
+    return clickaaController?.updateCursorEnabled(cursorEnabled);
   });
-  ipcMain.handle("clicky:set-launch-at-login", (event, launchAtLogin: boolean) => {
+  ipcMain.handle("clickaa:set-launch-at-login", (event, launchAtLogin: boolean) => {
     requirePanelSender(event.sender.id);
-    return clickyController?.updateLaunchAtLogin(launchAtLogin);
+    return clickaaController?.updateLaunchAtLogin(launchAtLogin);
   });
 
-  ipcMain.on("clicky:panel-hide", (event) => {
+  ipcMain.on("clickaa:panel-hide", (event) => {
     if (panelSentEvent(event.sender.id)) {
       desktopWindows?.hidePanel();
     }
   });
   ipcMain.on("push-to-talk:pressed", (event) => {
     if (panelSentEvent(event.sender.id)) {
-      clickyController?.handlePushToTalkPressed("panelButton");
+      clickaaController?.handlePushToTalkPressed("panelButton");
     }
   });
   ipcMain.on("push-to-talk:released", (event) => {
     if (panelSentEvent(event.sender.id)) {
-      clickyController?.handlePushToTalkReleased();
+      clickaaController?.handlePushToTalkReleased();
     }
   });
 
   ipcMain.on("audio-capture:started", (event, interactionId: number) => {
     if (panelSentEvent(event.sender.id)) {
-      clickyController?.handleMicrophoneCaptureStarted(interactionId);
+      clickaaController?.handleMicrophoneCaptureStarted(interactionId);
     }
   });
   ipcMain.on(
@@ -109,68 +109,68 @@ function registerIpcHandlers(): void {
         );
       }
       if (audioBytes) {
-        clickyController?.appendMicrophoneAudio(interactionId, audioBytes);
+        clickaaController?.appendMicrophoneAudio(interactionId, audioBytes);
       }
     },
   );
   ipcMain.on("audio-capture:level", (event, interactionId: number, audioPowerLevel: number) => {
     if (panelSentEvent(event.sender.id) && Number.isFinite(audioPowerLevel)) {
-      clickyController?.handleAudioPowerLevel(interactionId, audioPowerLevel);
+      clickaaController?.handleAudioPowerLevel(interactionId, audioPowerLevel);
     }
   });
   ipcMain.on("audio-capture:error", (event, interactionId: number, errorMessage: string) => {
     if (panelSentEvent(event.sender.id)) {
-      clickyController?.handleMicrophoneCaptureError(interactionId, String(errorMessage));
+      clickaaController?.handleMicrophoneCaptureError(interactionId, String(errorMessage));
     }
   });
 
   ipcMain.on("audio-playback:started", (event, interactionId: number) => {
     if (panelSentEvent(event.sender.id)) {
-      clickyController?.handleAudioPlaybackStarted(interactionId);
+      clickaaController?.handleAudioPlaybackStarted(interactionId);
     }
   });
   ipcMain.on("audio-playback:ended", (event, interactionId: number) => {
     if (panelSentEvent(event.sender.id)) {
-      clickyController?.handleAudioPlaybackEnded(interactionId);
+      clickaaController?.handleAudioPlaybackEnded(interactionId);
     }
   });
   ipcMain.on("audio-playback:error", (event, interactionId: number, errorMessage: string) => {
     if (panelSentEvent(event.sender.id)) {
-      clickyController?.handleAudioPlaybackError(interactionId, String(errorMessage));
+      clickaaController?.handleAudioPlaybackError(interactionId, String(errorMessage));
     }
   });
   ipcMain.on("overlay:point-complete", (event, interactionId: number) => {
     if (desktopWindows?.isOverlayWebContents(event.sender.id)) {
-      clickyController?.handlePointingAnimationCompleted(interactionId);
+      clickaaController?.handlePointingAnimationCompleted(interactionId);
     }
   });
 }
 
-async function startClicky(): Promise<void> {
+async function startClickaa(): Promise<void> {
   registerSecureMediaPermissions();
 
-  const configStore = new ClickyConfigStore(join(app.getPath("userData"), "settings.json"));
-  desktopWindows = new ClickyDesktopWindows({
-    onToggleCursor: () => clickyController?.toggleCursorEnabled(),
+  const configStore = new ClickaaConfigStore(join(app.getPath("userData"), "settings.json"));
+  desktopWindows = new ClickaaDesktopWindows({
+    onToggleCursor: () => clickaaController?.toggleCursorEnabled(),
     onQuit: () => {
       isQuitting = true;
       app.quit();
     },
   });
-  clickyController = new ClickyController(configStore, desktopWindows);
+  clickaaController = new ClickaaController(configStore, desktopWindows);
 
   registerIpcHandlers();
   await desktopWindows.create();
 
   globalPushToTalkMonitor = new GlobalPushToTalkMonitor((transition) => {
     if (transition === "pressed") {
-      clickyController?.handlePushToTalkPressed();
+      clickaaController?.handlePushToTalkPressed();
     } else {
-      clickyController?.handlePushToTalkReleased();
+      clickaaController?.handlePushToTalkReleased();
     }
   });
   const shortcutAvailable = globalPushToTalkMonitor.start();
-  clickyController.start(shortcutAvailable);
+  clickaaController.start(shortcutAvailable);
 
   if (!configStore.getConfig().workerBaseUrl) {
     desktopWindows.showPanel();
@@ -182,20 +182,20 @@ async function startClicky(): Promise<void> {
 }
 
 if (hasSingleInstanceLock) {
-  void app.whenReady().then(startClicky);
+  void app.whenReady().then(startClickaa);
 
   app.on("second-instance", () => {
     desktopWindows?.showPanel();
   });
 
   app.on("window-all-closed", () => {
-    // Clicky is a tray app. Closing its panel must not terminate background PTT.
+    // Clickaa is a tray app. Closing its panel must not terminate background PTT.
   });
 
   app.on("before-quit", () => {
     isQuitting = true;
     globalPushToTalkMonitor?.stop();
-    clickyController?.stop();
+    clickaaController?.stop();
     desktopWindows?.destroy();
   });
 

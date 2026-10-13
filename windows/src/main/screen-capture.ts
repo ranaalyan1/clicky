@@ -72,7 +72,7 @@ export async function captureAllWindowsDisplays(): Promise<CapturedDisplayImage[
   }
 
   if (!capturedDisplays.length) {
-    throw new Error("Clicky could not capture a usable image from any display.");
+    throw new Error("Clickaa could not capture a usable image from any display.");
   }
 
   return capturedDisplays;

@@ -3,14 +3,14 @@ export type CompanionVoiceState = "idle" | "listening" | "processing" | "respond
 export const supportedClaudeModels = ["claude-sonnet-4-6", "claude-opus-4-6"] as const;
 export type SupportedClaudeModel = (typeof supportedClaudeModels)[number];
 
-export interface ClickyUserConfig {
+export interface ClickaaUserConfig {
   workerBaseUrl: string;
   selectedModel: SupportedClaudeModel;
   cursorEnabled: boolean;
   launchAtLogin: boolean;
 }
 
-export interface ClickyPublicState {
+export interface ClickaaPublicState {
   voiceState: CompanionVoiceState;
   configured: boolean;
   cursorEnabled: boolean;

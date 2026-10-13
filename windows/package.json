@@ -1,10 +1,10 @@
 {
-  "name": "clicky-windows",
+  "name": "clickaa-windows",
   "version": "1.0.0",
   "private": true,
-  "description": "Clicky, the screen-aware voice companion for Windows",
+  "description": "Clickaa, the voice companion that lives on your Windows desktop",
   "main": "dist/src/main/main.js",
-  "author": "Clicky contributors",
+  "author": "Clickaa contributors",
   "license": "MIT",
   "engines": {
     "node": ">=22.12"
@@ -35,8 +35,8 @@
     "typescript": "5.9.3"
   },
   "build": {
-    "appId": "com.clicky.windows",
-    "productName": "Clicky",
+    "appId": "com.clickaa.windows",
+    "productName": "Clickaa",
     "asar": true,
     "npmRebuild": false,
     "asarUnpack": [
@@ -60,7 +60,7 @@
           ]
         }
       ],
-      "artifactName": "Clicky-Setup-${version}-${arch}.${ext}"
+      "artifactName": "Clickaa-Setup-${version}-${arch}.${ext}"
     },
     "nsis": {
       "buildUniversalInstaller": false,
@@ -68,7 +68,7 @@
       "allowToChangeInstallationDirectory": true,
       "createDesktopShortcut": true,
       "createStartMenuShortcut": true,
-      "shortcutName": "Clicky",
+      "shortcutName": "Clickaa",
       "deleteAppDataOnUninstall": false
     }
   }

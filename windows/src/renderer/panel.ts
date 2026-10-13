@@ -1,4 +1,4 @@
-import type { ClickyPublicState, SupportedClaudeModel } from "../shared/contracts";
+import type { ClickaaPublicState, SupportedClaudeModel } from "../shared/contracts";
 import { MicrophoneCapture } from "./audio-capture.js";
 import { CompanionAudioPlayback } from "./audio-playback.js";
 
@@ -26,7 +26,7 @@ const opusModelButton = requireElement<HTMLButtonElement>("opus-model-button");
 const shortcutStatus = requireElement<HTMLElement>("shortcut-status");
 const closeButton = requireElement<HTMLButtonElement>("close-button");
 
-let latestState: ClickyPublicState | null = null;
+let latestState: ClickaaPublicState | null = null;
 let panelPushToTalkIsPressed = false;
 let hasInitializedWorkerField = false;
 
@@ -38,7 +38,7 @@ function requireElement<ElementType extends HTMLElement>(elementId: string): Ele
   return element as ElementType;
 }
 
-function renderState(state: ClickyPublicState): void {
+function renderState(state: ClickaaPublicState): void {
   latestState = state;
   statusOrb.dataset.state = state.voiceState;
   cursorToggle.checked = state.cursorEnabled;
@@ -56,7 +56,7 @@ function renderState(state: ClickyPublicState): void {
   connectionBadge.textContent = state.configured ? "connected" : "not connected";
   pushToTalkButton.disabled = !state.configured;
 
-  const statusMessages: Record<ClickyPublicState["voiceState"], [string, string]> = {
+  const statusMessages: Record<ClickaaPublicState["voiceState"], [string, string]> = {
     idle: [
       state.configured ? "ready when you are" : "connect your worker",
       state.configured ? "hold Ctrl + Alt anywhere to talk" : "paste the Worker URL below to get started",
@@ -75,7 +75,7 @@ function renderState(state: ClickyPublicState): void {
   activityCard.hidden = !displayedActivity;
   if (displayedActivity) {
     transcriptLabel.textContent = state.responseText
-      ? "clicky"
+      ? "clickaa"
       : state.partialTranscript
         ? "hearing"
         : "you said";
@@ -99,13 +99,13 @@ async function saveWorkerUrl(shouldTestConnection: boolean): Promise<void> {
 
   try {
     if (shouldTestConnection) {
-      const testResult = await window.clicky.testWorker(workerBaseUrl);
+      const testResult = await window.clickaa.testWorker(workerBaseUrl);
       connectionResult.classList.add(testResult.ok ? "success" : "failure");
       connectionResult.textContent = testResult.message;
-      const refreshedState = await window.clicky.getState();
+      const refreshedState = await window.clickaa.getState();
       renderState(refreshedState);
     } else {
-      const updatedState = await window.clicky.setWorkerUrl(workerBaseUrl);
+      const updatedState = await window.clickaa.setWorkerUrl(workerBaseUrl);
       renderState(updatedState);
       connectionResult.classList.add("success");
       connectionResult.textContent = "Worker URL saved.";
@@ -128,7 +128,7 @@ function startPanelPushToTalk(pointerId?: number): void {
   if (pointerId !== undefined) {
     pushToTalkButton.setPointerCapture(pointerId);
   }
-  window.clicky.pushToTalkPressed();
+  window.clickaa.pushToTalkPressed();
 }
 
 function stopPanelPushToTalk(): void {
@@ -137,11 +137,11 @@ function stopPanelPushToTalk(): void {
   }
   panelPushToTalkIsPressed = false;
   pushToTalkButton.classList.remove("is-pressed");
-  window.clicky.pushToTalkReleased();
+  window.clickaa.pushToTalkReleased();
 }
 
 function setModel(selectedModel: SupportedClaudeModel): void {
-  void window.clicky.setModel(selectedModel).then(renderState).catch(showTransientError);
+  void window.clickaa.setModel(selectedModel).then(renderState).catch(showTransientError);
 }
 
 function showTransientError(error: unknown): void {
@@ -178,14 +178,14 @@ pushToTalkButton.addEventListener("keyup", (keyboardEvent) => {
 });
 
 cursorToggle.addEventListener("change", () => {
-  void window.clicky.setCursorEnabled(cursorToggle.checked).then(renderState).catch(showTransientError);
+  void window.clickaa.setCursorEnabled(cursorToggle.checked).then(renderState).catch(showTransientError);
 });
 launchToggle.addEventListener("change", () => {
-  void window.clicky.setLaunchAtLogin(launchToggle.checked).then(renderState).catch(showTransientError);
+  void window.clickaa.setLaunchAtLogin(launchToggle.checked).then(renderState).catch(showTransientError);
 });
 sonnetModelButton.addEventListener("click", () => setModel("claude-sonnet-4-6"));
 opusModelButton.addEventListener("click", () => setModel("claude-opus-4-6"));
-closeButton.addEventListener("click", () => window.clicky.hidePanel());
+closeButton.addEventListener("click", () => window.clickaa.hidePanel());
 
 document.addEventListener("contextmenu", (event) => event.preventDefault());
 window.addEventListener("blur", () => {
@@ -194,17 +194,17 @@ window.addEventListener("blur", () => {
   }
 });
 
-window.clicky.onState(renderState);
-window.clicky.onAudioCaptureStart(({ interactionId }) => {
+window.clickaa.onState(renderState);
+window.clickaa.onAudioCaptureStart(({ interactionId }) => {
   void microphoneCapture.start(interactionId);
 });
-window.clicky.onAudioCaptureStop(({ interactionId }) => {
+window.clickaa.onAudioCaptureStop(({ interactionId }) => {
   void microphoneCapture.stop(interactionId);
 });
-window.clicky.onAudioPlayback((payload) => {
+window.clickaa.onAudioPlayback((payload) => {
   void companionAudioPlayback.playAudio(payload);
 });
-window.clicky.onFallbackSpeech((payload) => companionAudioPlayback.speakWithWindowsVoice(payload));
-window.clicky.onStopAudioPlayback(() => companionAudioPlayback.stop());
+window.clickaa.onFallbackSpeech((payload) => companionAudioPlayback.speakWithWindowsVoice(payload));
+window.clickaa.onStopAudioPlayback(() => companionAudioPlayback.stop());
 
-void window.clicky.getState().then(renderState).catch(showTransientError);
+void window.clickaa.getState().then(renderState).catch(showTransientError);

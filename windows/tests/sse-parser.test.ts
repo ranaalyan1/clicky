@@ -15,9 +15,9 @@ test("extractTextDelta returns only Anthropic text delta events", () => {
   assert.equal(
     extractTextDelta(JSON.stringify({
       type: "content_block_delta",
-      delta: { type: "text_delta", text: "clicky" },
+      delta: { type: "text_delta", text: "clickaa" },
     })),
-    "clicky",
+    "clickaa",
   );
   assert.equal(extractTextDelta("[DONE]"), "");
   assert.equal(extractTextDelta("not-json"), "");

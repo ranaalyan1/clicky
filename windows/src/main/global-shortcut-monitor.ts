@@ -26,7 +26,7 @@ export class GlobalPushToTalkMonitor {
       this.isStarted = true;
       return true;
     } catch (error) {
-      console.error("Clicky could not start the global Ctrl + Alt monitor:", error);
+      console.error("Clickaa could not start the global Ctrl + Alt monitor:", error);
       return false;
     }
   }

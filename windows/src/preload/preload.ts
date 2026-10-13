@@ -1,7 +1,7 @@
 import { contextBridge, ipcRenderer } from "electron";
 import {
   AudioPlaybackPayload,
-  ClickyPublicState,
+  ClickaaPublicState,
   FallbackSpeechPayload,
   OverlayCursorPayload,
   OverlayPointPayload,
@@ -15,24 +15,24 @@ function subscribe<T>(channel: string, listener: (payload: T) => void): () => vo
   return () => ipcRenderer.removeListener(channel, wrappedListener);
 }
 
-contextBridge.exposeInMainWorld("clicky", {
-  getState: (): Promise<ClickyPublicState> => ipcRenderer.invoke("clicky:get-state"),
-  setWorkerUrl: (workerBaseUrl: string): Promise<ClickyPublicState> => {
-    return ipcRenderer.invoke("clicky:set-worker-url", workerBaseUrl);
+contextBridge.exposeInMainWorld("clickaa", {
+  getState: (): Promise<ClickaaPublicState> => ipcRenderer.invoke("clickaa:get-state"),
+  setWorkerUrl: (workerBaseUrl: string): Promise<ClickaaPublicState> => {
+    return ipcRenderer.invoke("clickaa:set-worker-url", workerBaseUrl);
   },
   testWorker: (workerBaseUrl: string): Promise<WorkerConnectionTestResult> => {
-    return ipcRenderer.invoke("clicky:test-worker", workerBaseUrl);
+    return ipcRenderer.invoke("clickaa:test-worker", workerBaseUrl);
   },
-  setModel: (selectedModel: SupportedClaudeModel): Promise<ClickyPublicState> => {
-    return ipcRenderer.invoke("clicky:set-model", selectedModel);
+  setModel: (selectedModel: SupportedClaudeModel): Promise<ClickaaPublicState> => {
+    return ipcRenderer.invoke("clickaa:set-model", selectedModel);
   },
-  setCursorEnabled: (cursorEnabled: boolean): Promise<ClickyPublicState> => {
-    return ipcRenderer.invoke("clicky:set-cursor-enabled", cursorEnabled);
+  setCursorEnabled: (cursorEnabled: boolean): Promise<ClickaaPublicState> => {
+    return ipcRenderer.invoke("clickaa:set-cursor-enabled", cursorEnabled);
   },
-  setLaunchAtLogin: (launchAtLogin: boolean): Promise<ClickyPublicState> => {
-    return ipcRenderer.invoke("clicky:set-launch-at-login", launchAtLogin);
+  setLaunchAtLogin: (launchAtLogin: boolean): Promise<ClickaaPublicState> => {
+    return ipcRenderer.invoke("clickaa:set-launch-at-login", launchAtLogin);
   },
-  hidePanel: (): void => ipcRenderer.send("clicky:panel-hide"),
+  hidePanel: (): void => ipcRenderer.send("clickaa:panel-hide"),
   pushToTalkPressed: (): void => ipcRenderer.send("push-to-talk:pressed"),
   pushToTalkReleased: (): void => ipcRenderer.send("push-to-talk:released"),
   sendAudioCaptureStarted: (interactionId: number): void => {
@@ -59,8 +59,8 @@ contextBridge.exposeInMainWorld("clicky", {
   sendPointingAnimationCompleted: (interactionId: number): void => {
     ipcRenderer.send("overlay:point-complete", interactionId);
   },
-  onState: (listener: (state: ClickyPublicState) => void): (() => void) => {
-    return subscribe("clicky:state", listener);
+  onState: (listener: (state: ClickaaPublicState) => void): (() => void) => {
+    return subscribe("clickaa:state", listener);
   },
   onAudioCaptureStart: (listener: (payload: { interactionId: number }) => void): (() => void) => {
     return subscribe("audio-capture:start", listener);
@@ -80,7 +80,7 @@ contextBridge.exposeInMainWorld("clicky", {
     return () => ipcRenderer.removeListener("audio-playback:stop", wrappedListener);
   },
   onOverlayState: (
-    listener: (payload: Pick<ClickyPublicState, "voiceState" | "audioPowerLevel">) => void,
+    listener: (payload: Pick<ClickaaPublicState, "voiceState" | "audioPowerLevel">) => void,
   ): (() => void) => subscribe("overlay:state", listener),
   onOverlayCursor: (listener: (payload: OverlayCursorPayload) => void): (() => void) => {
     return subscribe("overlay:cursor", listener);

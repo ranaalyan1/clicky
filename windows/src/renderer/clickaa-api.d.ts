@@ -1,6 +1,6 @@
 import type {
   AudioPlaybackPayload,
-  ClickyPublicState,
+  ClickaaPublicState,
   FallbackSpeechPayload,
   OverlayCursorPayload,
   OverlayPointPayload,
@@ -10,13 +10,13 @@ import type {
 
 declare global {
   interface Window {
-    clicky: {
-      getState(): Promise<ClickyPublicState>;
-      setWorkerUrl(workerBaseUrl: string): Promise<ClickyPublicState>;
+    clickaa: {
+      getState(): Promise<ClickaaPublicState>;
+      setWorkerUrl(workerBaseUrl: string): Promise<ClickaaPublicState>;
       testWorker(workerBaseUrl: string): Promise<WorkerConnectionTestResult>;
-      setModel(selectedModel: SupportedClaudeModel): Promise<ClickyPublicState>;
-      setCursorEnabled(cursorEnabled: boolean): Promise<ClickyPublicState>;
-      setLaunchAtLogin(launchAtLogin: boolean): Promise<ClickyPublicState>;
+      setModel(selectedModel: SupportedClaudeModel): Promise<ClickaaPublicState>;
+      setCursorEnabled(cursorEnabled: boolean): Promise<ClickaaPublicState>;
+      setLaunchAtLogin(launchAtLogin: boolean): Promise<ClickaaPublicState>;
       hidePanel(): void;
       pushToTalkPressed(): void;
       pushToTalkReleased(): void;
@@ -28,14 +28,14 @@ declare global {
       sendAudioPlaybackEnded(interactionId: number): void;
       sendAudioPlaybackError(interactionId: number, errorMessage: string): void;
       sendPointingAnimationCompleted(interactionId: number): void;
-      onState(listener: (state: ClickyPublicState) => void): () => void;
+      onState(listener: (state: ClickaaPublicState) => void): () => void;
       onAudioCaptureStart(listener: (payload: { interactionId: number }) => void): () => void;
       onAudioCaptureStop(listener: (payload: { interactionId: number }) => void): () => void;
       onAudioPlayback(listener: (payload: AudioPlaybackPayload) => void): () => void;
       onFallbackSpeech(listener: (payload: FallbackSpeechPayload) => void): () => void;
       onStopAudioPlayback(listener: () => void): () => void;
       onOverlayState(
-        listener: (payload: Pick<ClickyPublicState, "voiceState" | "audioPowerLevel">) => void,
+        listener: (payload: Pick<ClickaaPublicState, "voiceState" | "audioPowerLevel">) => void,
       ): () => void;
       onOverlayCursor(listener: (payload: OverlayCursorPayload) => void): () => void;
       onOverlayResponse(listener: (responseText: string) => void): () => void;

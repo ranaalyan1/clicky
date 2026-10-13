@@ -1,12 +1,12 @@
 import { mkdirSync, readFileSync, renameSync, rmSync, writeFileSync } from "node:fs";
 import { dirname } from "node:path";
 import {
-  ClickyUserConfig,
+  ClickaaUserConfig,
   SupportedClaudeModel,
   supportedClaudeModels,
 } from "../shared/contracts";
 
-export const defaultClickyUserConfig: ClickyUserConfig = {
+export const defaultClickaaUserConfig: ClickaaUserConfig = {
   workerBaseUrl: "",
   selectedModel: "claude-sonnet-4-6",
   cursorEnabled: true,
@@ -23,7 +23,7 @@ export function normalizeWorkerBaseUrl(rawWorkerBaseUrl: string): string {
   try {
     parsedWorkerUrl = new URL(trimmedWorkerBaseUrl);
   } catch {
-    throw new Error("Enter a valid Worker URL, for example https://clicky.example.workers.dev");
+    throw new Error("Enter a valid Worker URL, for example https://clickaa.example.workers.dev");
   }
 
   const isLocalDevelopmentHost = ["localhost", "127.0.0.1", "::1"].includes(
@@ -55,12 +55,12 @@ function isSupportedModel(candidateModel: unknown): candidateModel is SupportedC
     && supportedClaudeModels.includes(candidateModel as SupportedClaudeModel);
 }
 
-function sanitizeStoredConfig(storedConfig: unknown): ClickyUserConfig {
+function sanitizeStoredConfig(storedConfig: unknown): ClickaaUserConfig {
   if (!storedConfig || typeof storedConfig !== "object") {
-    return { ...defaultClickyUserConfig };
+    return { ...defaultClickaaUserConfig };
   }
 
-  const possibleConfig = storedConfig as Partial<ClickyUserConfig>;
+  const possibleConfig = storedConfig as Partial<ClickaaUserConfig>;
   let workerBaseUrl = "";
   if (typeof possibleConfig.workerBaseUrl === "string") {
     try {
@@ -74,36 +74,36 @@ function sanitizeStoredConfig(storedConfig: unknown): ClickyUserConfig {
     workerBaseUrl,
     selectedModel: isSupportedModel(possibleConfig.selectedModel)
       ? possibleConfig.selectedModel
-      : defaultClickyUserConfig.selectedModel,
+      : defaultClickaaUserConfig.selectedModel,
     cursorEnabled: typeof possibleConfig.cursorEnabled === "boolean"
       ? possibleConfig.cursorEnabled
-      : defaultClickyUserConfig.cursorEnabled,
+      : defaultClickaaUserConfig.cursorEnabled,
     launchAtLogin: typeof possibleConfig.launchAtLogin === "boolean"
       ? possibleConfig.launchAtLogin
-      : defaultClickyUserConfig.launchAtLogin,
+      : defaultClickaaUserConfig.launchAtLogin,
   };
 }
 
-export class ClickyConfigStore {
-  private currentConfig: ClickyUserConfig;
+export class ClickaaConfigStore {
+  private currentConfig: ClickaaUserConfig;
 
   constructor(private readonly configFilePath: string) {
     this.currentConfig = this.readConfigFromDisk();
   }
 
-  getConfig(): ClickyUserConfig {
+  getConfig(): ClickaaUserConfig {
     return { ...this.currentConfig };
   }
 
-  updateConfig(configUpdates: Partial<ClickyUserConfig>): ClickyUserConfig {
-    const updatedConfig: ClickyUserConfig = {
+  updateConfig(configUpdates: Partial<ClickaaUserConfig>): ClickaaUserConfig {
+    const updatedConfig: ClickaaUserConfig = {
       ...this.currentConfig,
       ...configUpdates,
     };
 
     updatedConfig.workerBaseUrl = normalizeWorkerBaseUrl(updatedConfig.workerBaseUrl);
     if (!isSupportedModel(updatedConfig.selectedModel)) {
-      throw new Error("That Claude model is not supported by this version of Clicky.");
+      throw new Error("That Claude model is not supported by this version of Clickaa.");
     }
 
     this.writeConfigToDisk(updatedConfig);
@@ -111,16 +111,16 @@ export class ClickyConfigStore {
     return this.getConfig();
   }
 
-  private readConfigFromDisk(): ClickyUserConfig {
+  private readConfigFromDisk(): ClickaaUserConfig {
     try {
       const serializedConfig = readFileSync(this.configFilePath, "utf8");
       return sanitizeStoredConfig(JSON.parse(serializedConfig) as unknown);
     } catch {
-      return { ...defaultClickyUserConfig };
+      return { ...defaultClickaaUserConfig };
     }
   }
 
-  private writeConfigToDisk(config: ClickyUserConfig): void {
+  private writeConfigToDisk(config: ClickaaUserConfig): void {
     mkdirSync(dirname(this.configFilePath), { recursive: true });
     const temporaryConfigPath = `${this.configFilePath}.tmp`;
     writeFileSync(temporaryConfigPath, `${JSON.stringify(config, null, 2)}\n`, "utf8");

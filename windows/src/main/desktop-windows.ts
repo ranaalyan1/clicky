@@ -2,7 +2,7 @@ import { BrowserWindow, Menu, nativeImage, screen, Tray } from "electron";
 import { join } from "node:path";
 import {
   AudioPlaybackPayload,
-  ClickyPublicState,
+  ClickaaPublicState,
   CompanionVoiceState,
   FallbackSpeechPayload,
   OverlayPointPayload,
@@ -19,13 +19,13 @@ export interface DesktopWindowCallbacks {
   onQuit: () => void;
 }
 
-export class ClickyDesktopWindows {
+export class ClickaaDesktopWindows {
   private panelWindow: BrowserWindow | null = null;
   private tray: Tray | null = null;
   private readonly overlayWindows = new Map<number, OverlayWindowRecord>();
   private overlayWindowsShouldBeVisible = false;
   private cursorBroadcastTimer: NodeJS.Timeout | null = null;
-  private latestPublicState: ClickyPublicState | null = null;
+  private latestPublicState: ClickaaPublicState | null = null;
   private isQuitting = false;
 
   constructor(private readonly callbacks: DesktopWindowCallbacks) {}
@@ -51,11 +51,11 @@ export class ClickyDesktopWindows {
     );
   }
 
-  publishState(publicState: ClickyPublicState): void {
+  publishState(publicState: ClickaaPublicState): void {
     const trayMenuNeedsRefresh = this.latestPublicState === null
       || this.latestPublicState.cursorEnabled !== publicState.cursorEnabled;
     this.latestPublicState = publicState;
-    this.sendToPanel("clicky:state", publicState);
+    this.sendToPanel("clickaa:state", publicState);
     this.broadcastToOverlays("overlay:state", {
       voiceState: publicState.voiceState,
       audioPowerLevel: publicState.audioPowerLevel,
@@ -284,7 +284,7 @@ export class ClickyDesktopWindows {
     const trayIconPath = join(__dirname, "../../assets/tray.png");
     const trayIcon = nativeImage.createFromPath(trayIconPath);
     this.tray = new Tray(trayIcon);
-    this.tray.setToolTip("Clicky — hold Ctrl + Alt to talk");
+    this.tray.setToolTip("Clickaa — hold Ctrl + Alt to talk");
     this.tray.on("click", () => this.togglePanel());
     this.rebuildTrayContextMenu();
   }
@@ -297,18 +297,18 @@ export class ClickyDesktopWindows {
     const cursorEnabled = this.latestPublicState?.cursorEnabled ?? true;
     this.tray.setContextMenu(Menu.buildFromTemplate([
       {
-        label: "Open Clicky",
+        label: "Open Clickaa",
         click: () => this.showPanel(),
       },
       {
-        label: "Show Clicky cursor",
+        label: "Show Clickaa cursor",
         type: "checkbox",
         checked: cursorEnabled,
         click: () => this.callbacks.onToggleCursor(),
       },
       { type: "separator" },
       {
-        label: "Quit Clicky",
+        label: "Quit Clickaa",
         click: () => this.callbacks.onQuit(),
       },
     ]));

@@ -1,5 +1,5 @@
 import type {
-  ClickyPublicState,
+  ClickaaPublicState,
   OverlayCursorPayload,
   OverlayPointPayload,
 } from "../shared/contracts";
@@ -12,7 +12,7 @@ let latestCursor: OverlayCursorPayload = { x: 0, y: 0, visible: false };
 let isPointing = false;
 let pointingAnimationGeneration = 0;
 let responseText = "";
-let currentVoiceState: ClickyPublicState["voiceState"] = "idle";
+let currentVoiceState: ClickaaPublicState["voiceState"] = "idle";
 
 function requireElement<ElementType extends HTMLElement>(elementId: string): ElementType {
   const element = document.getElementById(elementId);
@@ -97,7 +97,7 @@ async function performPointingAnimation(payload: OverlayPointPayload): Promise<v
     ? { x: latestCursor.x, y: latestCursor.y }
     : {
       // Main sends cursor coordinates relative to every display, even when the
-      // cursor is outside this one. Clamping that off-screen point makes Clicky
+      // cursor is outside this one. Clamping that off-screen point makes Clickaa
       // enter from the physically nearest monitor edge.
       x: Math.max(20, Math.min(window.innerWidth - 20, latestCursor.x)),
       y: Math.max(20, Math.min(window.innerHeight - 20, latestCursor.y)),
@@ -132,10 +132,10 @@ async function performPointingAnimation(payload: OverlayPointPayload): Promise<v
   isPointing = false;
   renderResponseBubble();
   buddyElement.classList.toggle("visible", latestCursor.visible);
-  window.clicky.sendPointingAnimationCompleted(payload.interactionId);
+  window.clickaa.sendPointingAnimationCompleted(payload.interactionId);
 }
 
-window.clicky.onOverlayCursor((cursorPayload) => {
+window.clickaa.onOverlayCursor((cursorPayload) => {
   latestCursor = cursorPayload;
   if (isPointing) {
     return;
@@ -146,14 +146,14 @@ window.clicky.onOverlayCursor((cursorPayload) => {
   }
 });
 
-window.clicky.onOverlayState(({ voiceState, audioPowerLevel }) => {
+window.clickaa.onOverlayState(({ voiceState, audioPowerLevel }) => {
   currentVoiceState = voiceState;
   buddyElement.dataset.state = voiceState;
   buddyElement.style.setProperty("--audio-level", audioPowerLevel.toFixed(3));
   renderResponseBubble();
 });
 
-window.clicky.onOverlayResponse((updatedResponseText) => {
+window.clickaa.onOverlayResponse((updatedResponseText) => {
   responseText = updatedResponseText;
   if (!updatedResponseText) {
     pointLabel.textContent = "";
@@ -161,7 +161,7 @@ window.clicky.onOverlayResponse((updatedResponseText) => {
   renderResponseBubble();
 });
 
-window.clicky.onOverlayCancelPointing(() => {
+window.clickaa.onOverlayCancelPointing(() => {
   pointingAnimationGeneration += 1;
   isPointing = false;
   pointLabel.textContent = "";
@@ -172,7 +172,7 @@ window.clicky.onOverlayCancelPointing(() => {
   }
 });
 
-window.clicky.onOverlayPoint((pointPayload) => {
+window.clickaa.onOverlayPoint((pointPayload) => {
   void performPointingAnimation(pointPayload);
 });
 
