@@ -2,6 +2,7 @@ import {
   ActionRisk,
   AbilityId,
   AbilitySettings,
+  ClipboardTransformOperation,
   ClickaaAction,
   ClickaaActionType,
   ConfirmationMode,
@@ -24,6 +25,13 @@ import {
  * unit-testable without touching a network. Every action is validated and
  * normalized here before anything is allowed to touch the user's PC.
  */
+
+export const clipboardTransformOperations: readonly ClipboardTransformOperation[] = [
+  "summarize",
+  "fix_grammar",
+  "shorten",
+  "translate",
+];
 
 export const actionBlockOpeningTag = "<actions>";
 export const actionBlockClosingTag = "</actions>";
@@ -51,6 +59,15 @@ function readRequiredText(rawAction: Record<string, unknown>, key: string): stri
     return null;
   }
   return rawValue.trim();
+}
+
+/** Optional text: missing or blank reads as "the model did not say". */
+function readOptionalText(rawAction: Record<string, unknown>, key: string): string | null {
+  const rawValue = rawAction[key];
+  if (typeof rawValue !== "string" || !rawValue.trim()) {
+    return null;
+  }
+  return rawValue.trim().slice(0, 200);
 }
 
 function normalizeSearchTarget(rawTarget: unknown): SearchTarget {
@@ -383,6 +400,102 @@ const actionDefinitions: Record<ClickaaActionType, ActionDefinition> = {
       return { action: { type: "wallpaper", operation, path, color }, problem: null };
     },
   },
+  timer_start: {
+    type: "timer_start",
+    risk: "safe",
+    requiredAbility: "scheduling",
+    describe: (action) => {
+      const timerAction = action as { durationMinutes: number; label: string };
+      return `start a ${timerAction.durationMinutes} minute ${timerAction.label} timer`;
+    },
+    normalize: (rawAction) => {
+      const rawDuration = rawAction.durationMinutes;
+      const durationMinutes = typeof rawDuration === "number" && Number.isFinite(rawDuration)
+        ? Math.round(rawDuration)
+        : Number.parseInt(String(rawDuration ?? ""), 10);
+      if (!Number.isFinite(durationMinutes) || durationMinutes <= 0) {
+        return { action: null, problem: "timer_start needs a positive durationMinutes" };
+      }
+
+      const label = readOptionalText(rawAction, "label") ?? "timer";
+      return {
+        action: {
+          type: "timer_start",
+          durationMinutes: Math.min(durationMinutes, 24 * 60),
+          label,
+        },
+        problem: null,
+      };
+    },
+  },
+  timer_cancel: {
+    type: "timer_cancel",
+    risk: "safe",
+    requiredAbility: "scheduling",
+    describe: () => "stop the running timer",
+    normalize: (rawAction) => ({
+      action: { type: "timer_cancel", query: readOptionalText(rawAction, "query") },
+      problem: null,
+    }),
+  },
+  snippet_save: {
+    type: "snippet_save",
+    risk: "safe",
+    requiredAbility: "automation",
+    describe: (action) => `save the ${(action as { name: string }).name} snippet`,
+    normalize: (rawAction) => {
+      const name = readRequiredText(rawAction, "name");
+      const text = readRequiredText(rawAction, "text");
+      if (!name || !text) {
+        return { action: null, problem: "snippet_save needs a name and the text to save" };
+      }
+      return { action: { type: "snippet_save", name, text }, problem: null };
+    },
+  },
+  snippet_insert: {
+    type: "snippet_insert",
+    risk: "confirm",
+    requiredAbility: "automation",
+    describe: (action) => `type the ${(action as { name: string }).name} snippet`,
+    normalize: (rawAction) => {
+      const name = readRequiredText(rawAction, "name");
+      return name
+        ? { action: { type: "snippet_insert", name }, problem: null }
+        : { action: null, problem: "snippet_insert needs a name" };
+    },
+  },
+  clipboard_transform: {
+    type: "clipboard_transform",
+    risk: "confirm",
+    requiredAbility: "clipboardHistory",
+    describe: (action) => {
+      const transformAction = action as { operation: string; targetLanguage: string | null };
+      return transformAction.operation === "translate"
+        ? `translate what is on the clipboard into ${transformAction.targetLanguage ?? "english"}`
+        : `${transformAction.operation.replace(/_/gu, " ")} what is on the clipboard`;
+    },
+    normalize: (rawAction) => {
+      const rawOperation = readRequiredText(rawAction, "operation") ?? "";
+      const operation = clipboardTransformOperations.find(
+        (candidateOperation) => candidateOperation === rawOperation,
+      );
+      if (!operation) {
+        return {
+          action: null,
+          problem: `clipboard_transform supports ${clipboardTransformOperations.join(", ")}`,
+        };
+      }
+      return {
+        action: {
+          type: "clipboard_transform",
+          operation,
+          targetLanguage: readOptionalText(rawAction, "targetLanguage")
+            ?? readOptionalText(rawAction, "language"),
+        },
+        problem: null,
+      };
+    },
+  },
   open_panel: {
     type: "open_panel",
     risk: "safe",
@@ -566,6 +679,8 @@ export function buildActionProtocolInstructions(abilities: AbilitySettings): str
 - clipboard_write: {"type":"clipboard_write","text":"..."} — put text on the clipboard.
 - notify: {"type":"notify","title":"...","body":"..."} — show a Windows notification.
 - scroll: {"type":"scroll","direction":"down","amount":3} — scroll the focused window.
+- snippet_save: {"type":"snippet_save","name":"my address","text":"..."} — save a phrase the user will reuse. use it whenever someone says "save this as ..." or "remember this text as ...".
+- snippet_insert: {"type":"snippet_insert","name":"my address"} — type a saved phrase into the focused window.
 - open_panel: {"type":"open_panel","page":"plans"} — open this app's own panel (pages: home, soul, plans, memory, setup).`);
   }
 
@@ -588,7 +703,13 @@ export function buildActionProtocolInstructions(abilities: AbilitySettings): str
 
   if (abilities.scheduling) {
     sections.push(`- schedule_add: {"type":"schedule_add","name":"Gift wraps","prompt":"search amazon for gift wraps","startAt":"2026-11-10T11:00:00","repeat":"none"} — run a spoken task later on its own. repeat: none, daily, weekdays, weekends.
-- routine_add: {"type":"routine_add","name":"Morning","timeOfDay":"09:00","repeat":"daily","actions":[{"type":"open_app","name":"Unity"}]} — a repeating list of steps.`);
+- routine_add: {"type":"routine_add","name":"Morning","timeOfDay":"09:00","repeat":"daily","actions":[{"type":"open_app","name":"Unity"}]} — a repeating list of steps.
+- timer_start: {"type":"timer_start","durationMinutes":12,"label":"pasta"} — a countdown the island shows and that ends with a notification. use for "set a timer".
+- timer_cancel: {"type":"timer_cancel","query":"pasta"} — stop a running timer; query null stops every one.`);
+  }
+
+  if (abilities.clipboardHistory) {
+    sections.push(`- clipboard_transform: {"type":"clipboard_transform","operation":"summarize","targetLanguage":null} — rewrite what is on the clipboard using the user's brain. operations: summarize, fix_grammar, shorten, translate. for translate, set targetLanguage. use it for "fix what i copied", "summarize this", "translate my clipboard".`);
   }
 
   if (abilities.memory) {

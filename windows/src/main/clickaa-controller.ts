@@ -1,5 +1,7 @@
+import { randomUUID } from "node:crypto";
 import { app, clipboard } from "electron";
 import {
+  ActiveTimer,
   BrainConnectionTestResult,
   CapturedDisplayImage,
   ClickaaAction,
@@ -7,6 +9,7 @@ import {
   ClickaaUserConfig,
   InteractionKind,
   IslandState,
+  ClipboardTransformOperation,
   IslandToggleKey,
   NowPlayingInfo,
   RegionSelectorSelection,
@@ -20,7 +23,12 @@ import {
 import { ActivityFeed, MemoryStore } from "./memory-store";
 import { AudioRecordingBuffer } from "./audio-recording-buffer";
 import { BrainRouter } from "./brain-router";
-import { ClickaaActionExecutor } from "./system-actions";
+import {
+  ActionExecutionOutcome,
+  completedActionOutcome,
+  ClickaaActionExecutor,
+  failedActionOutcome,
+} from "./system-actions";
 import { ClipboardHistoryStore } from "./clipboard-history-store";
 import { ConfirmationQueue, interpretConfirmationAnswer } from "./confirmation-queue";
 import { ClickaaConfigStore } from "./config-store";
@@ -30,9 +38,10 @@ import {
   shouldSkipDictationCleanup,
   stripDictationCleanupWrappers,
 } from "./dictation-prompts";
-import { formatFriendlyDateTime } from "./local-time";
+import { formatClockTime, formatFriendlyDateTime, formatLocalIso } from "./local-time";
 import { mapImageCoordinateToWindowsDesktop, parsePointingTag, selectPointingDisplay } from "./pointing";
 import { ScheduleStore } from "./schedule-store";
+import { SnippetStore } from "./snippet-store";
 import { captureAllWindowsDisplays, captureWindowsDesktopRegion } from "./screen-capture";
 import { describeScheduledTask } from "./schedule-time";
 import { dictationShortcutLabels } from "./shortcut-registry";
@@ -65,6 +74,7 @@ export class ClickaaController {
   private readonly todoStore: TodoStore;
   private readonly memoryStore: MemoryStore;
   private readonly scheduleStore: ScheduleStore;
+  private readonly snippetStore: SnippetStore;
   private readonly clipboardHistoryStore: ClipboardHistoryStore;
   private readonly activityFeed = new ActivityFeed();
   private readonly confirmationQueue = new ConfirmationQueue();
@@ -94,6 +104,8 @@ export class ClickaaController {
   private clipboardPollTimer: NodeJS.Timeout | null = null;
   private nowPlayingTimer: NodeJS.Timeout | null = null;
   private lastClipboardText = "";
+  private activeTimers: ActiveTimer[] = [];
+  private timerTickTimer: NodeJS.Timeout | null = null;
   private latestNowPlaying: NowPlayingInfo | null = null;
   private readonly runningScheduledTaskIds = new Set<string>();
 
@@ -107,6 +119,7 @@ export class ClickaaController {
     this.todoStore = new TodoStore(`${userDataDirectory}/todos.json`);
     this.memoryStore = new MemoryStore(`${userDataDirectory}/memory.json`);
     this.scheduleStore = new ScheduleStore(`${userDataDirectory}/schedules.json`);
+    this.snippetStore = new SnippetStore(`${userDataDirectory}/snippets.json`);
     this.clipboardHistoryStore = new ClipboardHistoryStore(
       `${userDataDirectory}/clipboard-history.json`,
     );
@@ -116,6 +129,7 @@ export class ClickaaController {
       todoStore: this.todoStore,
       memoryStore: this.memoryStore,
       scheduleStore: this.scheduleStore,
+      snippetStore: this.snippetStore,
       openExternalUrl: async (url) => {
         const { shell } = await import("electron");
         await shell.openExternal(url);
@@ -560,6 +574,7 @@ export class ClickaaController {
       openTodoItems: config.abilities.toDoList ? this.todoStore.summarizeOpenItems(8) : [],
       upcomingSchedules: config.abilities.scheduling ? this.scheduleStore.listNextRunsDescription(5) : [],
       clipboardPreview: this.buildClipboardPreview(config),
+      savedSnippetNames: config.abilities.automation ? this.snippetStore.summarizeSnippetNames(12) : [],
       hasScreenshots,
       isCircledRegion: interactionKind === "circle",
       isScheduledTask: interactionKind === "scheduled",
@@ -730,7 +745,15 @@ export class ClickaaController {
   private async executeAndRecordAction(action: ClickaaAction): Promise<string> {
     let outcome;
     try {
-      outcome = await this.actionExecutor.execute(action);
+      // Timers and clipboard rewrites need controller state (the clock and the
+      // user's brain), so they are answered here rather than in the executor.
+      if (action.type === "timer_start" || action.type === "timer_cancel") {
+        outcome = await this.runTimerAction(action);
+      } else if (action.type === "clipboard_transform") {
+        outcome = await this.runClipboardTransform(action.operation, action.targetLanguage);
+      } else {
+        outcome = await this.actionExecutor.execute(action);
+      }
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : String(error);
       this.activityFeed.record(
@@ -770,6 +793,194 @@ export class ClickaaController {
 
     this.publishIslandState();
     return outcome.status === "completed" ? outcome.message : "";
+  }
+
+  /* ---------------------------------------------------------------------- */
+  /* Timers                                                                 */
+  /* ---------------------------------------------------------------------- */
+
+  private async runTimerAction(
+    action: Extract<ClickaaAction, { type: "timer_start" | "timer_cancel" }>,
+  ): Promise<ActionExecutionOutcome> {
+    if (action.type === "timer_start") {
+      const timerId = randomUUID();
+      const durationMilliseconds = action.durationMinutes * 60_000;
+      const endsAt = new Date(Date.now() + durationMilliseconds);
+      const createdTimer: ActiveTimer = {
+        id: timerId,
+        label: action.label,
+        endsAtIso: formatLocalIso(endsAt),
+        remainingSeconds: action.durationMinutes * 60,
+      };
+
+      this.activeTimers.push(createdTimer);
+      this.startTimerTicking();
+      this.publishIslandState();
+
+      const durationDescription = action.durationMinutes >= 60
+        ? `${Math.floor(action.durationMinutes / 60)} hour${action.durationMinutes >= 120 ? "s" : ""}${action.durationMinutes % 60 ? ` and ${action.durationMinutes % 60} minutes` : ""}`
+        : `${action.durationMinutes} minute${action.durationMinutes === 1 ? "" : "s"}`;
+
+      return {
+        status: "completed",
+        message: `started a ${durationDescription} ${action.label} timer`,
+        detail: `ends at ${formatClockTime(endsAt)}`,
+        undoLabel: "stop the timer",
+        undo: () => {
+          this.removeTimer(timerId);
+          this.publishIslandState();
+        },
+        choices: [],
+      };
+    }
+
+    const normalizedQuery = (action.query ?? "").trim().toLowerCase();
+    const timersToStop = normalizedQuery
+      ? this.activeTimers.filter((timer) => timer.label.toLowerCase().includes(normalizedQuery))
+      : [...this.activeTimers];
+
+    if (!timersToStop.length) {
+      return failedActionOutcome(
+        normalizedQuery
+          ? `there is no "${action.query}" timer running.`
+          : "no timers are running.",
+      );
+    }
+
+    for (const timerToStop of timersToStop) {
+      this.removeTimer(timerToStop.id);
+    }
+    this.publishIslandState();
+
+    return completedActionOutcome(
+      timersToStop.length === 1
+        ? `stopped the ${timersToStop[0]!.label} timer`
+        : `stopped ${timersToStop.length} timers`,
+    );
+  }
+
+  private removeTimer(timerId: string): void {
+    this.activeTimers = this.activeTimers.filter((timer) => timer.id !== timerId);
+    if (!this.activeTimers.length && this.timerTickTimer) {
+      clearInterval(this.timerTickTimer);
+      this.timerTickTimer = null;
+    }
+  }
+
+  /** One tick per second only while a timer is running. */
+  private startTimerTicking(): void {
+    if (this.timerTickTimer) {
+      return;
+    }
+
+    this.timerTickTimer = setInterval(() => {
+      const now = Date.now();
+      const finishedTimers: ActiveTimer[] = [];
+      const runningTimers: ActiveTimer[] = [];
+
+      for (const timer of this.activeTimers) {
+        const remainingSeconds = Math.max(
+          0,
+          Math.round((Date.parse(timer.endsAtIso) - now) / 1_000),
+        );
+        if (remainingSeconds <= 0) {
+          finishedTimers.push({ ...timer, remainingSeconds: 0 });
+        } else {
+          runningTimers.push({ ...timer, remainingSeconds });
+        }
+      }
+
+      this.activeTimers = runningTimers;
+      if (!this.activeTimers.length && this.timerTickTimer) {
+        clearInterval(this.timerTickTimer);
+        this.timerTickTimer = null;
+      }
+
+      for (const finishedTimer of finishedTimers) {
+        void this.finishTimer(finishedTimer);
+      }
+
+      this.publishIslandState();
+    }, 1_000);
+  }
+
+  private async finishTimer(finishedTimer: ActiveTimer): Promise<void> {
+    const announcement = `your ${finishedTimer.label} timer is done.`;
+    this.activityFeed.record("system", announcement, `started at ${finishedTimer.endsAtIso}`, false);
+    this.desktopWindows.showNotification("Clickaa timer", announcement);
+    this.desktopWindows.revealIsland();
+    this.publishIslandState();
+    await this.speakResponse(this.activeInteractionId, announcement);
+  }
+
+  /* ---------------------------------------------------------------------- */
+  /* Clipboard intelligence                                                 */
+  /* ---------------------------------------------------------------------- */
+
+  /**
+   * Rewrites whatever is on the clipboard and puts the result back, so the user
+   * can paste it straight away. The previous text is kept for undo.
+   */
+  private async runClipboardTransform(
+    operation: ClipboardTransformOperation,
+    targetLanguage: string | null,
+  ): Promise<ActionExecutionOutcome> {
+    const config = this.configStore.getConfig();
+    if (!this.brainRouter.isConfigured(config)) {
+      return failedActionOutcome(this.brainRouter.configurationHint(config));
+    }
+    if (config.automationPaused) {
+      return failedActionOutcome("actions are paused, so I did not rewrite the clipboard.");
+    }
+
+    const originalText = (await clipboard.readText()).trim();
+    if (!originalText) {
+      return failedActionOutcome("there is nothing on the clipboard to work with.");
+    }
+
+    const instructionLines: Record<ClipboardTransformOperation, string> = {
+      summarize: "Summarise the text the user gives you. Keep every fact, drop the padding. Reply with the summary only.",
+      fix_grammar: "Fix the spelling, grammar and punctuation of the text the user gives you. Keep the wording, tone and line breaks. Reply with the corrected text only.",
+      shorten: "Rewrite the text the user gives you so it says the same thing in noticeably fewer words. Reply with the rewritten text only.",
+      translate: `Translate the text the user gives you into ${targetLanguage ?? "English"}. Keep the tone and formatting. Reply with the translation only.`,
+    };
+
+    const responseText = await this.brainRouter.streamResponse(config, {
+      systemPrompt: `${instructionLines[operation]} never add a preamble, never explain what you did, never wrap the answer in quotes or a code block.`,
+      userPrompt: originalText,
+      images: [],
+      conversationHistory: [],
+      signal: new AbortController().signal,
+      onTextUpdate: () => undefined,
+    });
+
+    const transformedText = responseText.trim();
+    if (!transformedText) {
+      return failedActionOutcome("the model came back empty, so I left your clipboard alone.");
+    }
+
+    await clipboard.writeText(transformedText);
+    this.clipboardHistoryStore.pushText(transformedText);
+    this.lastClipboardText = transformedText;
+
+    const operationMessages: Record<ClipboardTransformOperation, string> = {
+      summarize: "summarised your clipboard",
+      fix_grammar: "fixed the grammar on your clipboard",
+      shorten: "shortened your clipboard",
+      translate: `translated your clipboard into ${targetLanguage ?? "English"}`,
+    };
+
+    return {
+      status: "completed",
+      message: operationMessages[operation],
+      detail: transformedText.replace(/\s+/gu, " ").slice(0, 160),
+      undoLabel: "put the old text back",
+      undo: async () => {
+        await clipboard.writeText(originalText);
+        this.lastClipboardText = originalText;
+      },
+      choices: [],
+    };
   }
 
   /** Applies a yes/no, either from the island's buttons or from the user's voice. */
@@ -1511,6 +1722,8 @@ export class ClickaaController {
       isExpanded: this.isIslandCurrentlyExpanded,
       isEnabled: config.islandEnabled && config.abilities.island,
       presentation: this.desktopWindows.getIslandPresentation(),
+      activeTimers: this.activeTimers,
+      snippets: this.snippetStore.list().slice(0, 20),
       cursorEnabled: config.cursorEnabled,
       automationPaused: config.automationPaused,
       status: {

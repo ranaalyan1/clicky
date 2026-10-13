@@ -50,6 +50,10 @@ const element = {
   musicArtist: requireElement<HTMLElement>("music-artist"),
   activityList: requireElement<HTMLElement>("activity-list"),
   shortcutList: requireElement<HTMLElement>("shortcut-list"),
+  timerCard: requireElement<HTMLElement>("timer-card"),
+  timerSummary: requireElement<HTMLElement>("timer-summary"),
+  timerList: requireElement<HTMLElement>("timer-list"),
+  snippetList: requireElement<HTMLElement>("snippet-list"),
   todoCount: requireElement<HTMLElement>("todo-count"),
   todoList: requireElement<HTMLElement>("todo-list"),
   scheduleList: requireElement<HTMLElement>("schedule-list"),
@@ -241,6 +245,48 @@ function renderMusic(nowPlaying: NowPlayingInfo | null, showNowPlaying: boolean)
       15,
     );
   }
+}
+
+/** Turns 754 seconds into "12:34", and anything past an hour into "1:02:03". */
+function formatTimerRemaining(remainingSeconds: number): string {
+  const hours = Math.floor(remainingSeconds / 3_600);
+  const minutes = Math.floor((remainingSeconds % 3_600) / 60);
+  const seconds = remainingSeconds % 60;
+  const paddedSeconds = String(seconds).padStart(2, "0");
+  if (hours > 0) {
+    return `${hours}:${String(minutes).padStart(2, "0")}:${paddedSeconds}`;
+  }
+  return `${minutes}:${paddedSeconds}`;
+}
+
+function renderTimers(islandState: IslandState): void {
+  const runningTimers = islandState.activeTimers;
+  element.timerCard.hidden = !runningTimers.length;
+  element.timerSummary.textContent = runningTimers.length
+    ? `${runningTimers.length} running`
+    : "";
+
+  element.timerList.replaceChildren(...runningTimers.map((activeTimer) => {
+    const { row, copy } = createListRow();
+    copy.append(
+      createTitle(`${activeTimer.label} · ${formatTimerRemaining(activeTimer.remainingSeconds)}`),
+      createMeta(`ends at ${activeTimer.endsAtIso.slice(11, 16)}`),
+    );
+    return row;
+  }));
+}
+
+function renderSnippets(islandState: IslandState): void {
+  element.snippetList.replaceChildren(...(islandState.snippets.length
+    ? islandState.snippets.map((snippet) => {
+      const { row, copy } = createListRow();
+      copy.append(
+        createTitle(snippet.name),
+        createMeta(snippet.text.replace(/\s+/gu, " ").slice(0, 90)),
+      );
+      return row;
+    })
+    : [createEmptyRow("say \"save this as my address\" and it lands here.")]));
 }
 
 function renderPlans(islandState: IslandState): void {
@@ -485,6 +531,8 @@ function renderIsland(islandState: IslandState): void {
   element.body.dataset.expanded = String(islandState.isExpanded);
   renderNotch(islandState);
   renderConfirmations(islandState);
+  renderTimers(islandState);
+  renderSnippets(islandState);
   renderActivityFeed(islandState.activityFeed);
   renderShortcutList(islandState);
   renderMusic(islandState.nowPlaying, islandState.showNowPlaying);

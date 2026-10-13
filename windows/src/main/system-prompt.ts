@@ -16,6 +16,8 @@ export interface SystemPromptContext {
   upcomingSchedules: string[];
   /** A short preview of the clipboard, or "" when there is nothing useful. */
   clipboardPreview: string;
+  /** Names of the phrases the user saved, so insertions use real names. */
+  savedSnippetNames: string[];
   /** True when screenshots are attached to this request. */
   hasScreenshots: boolean;
   /** True when the request is a cropped region the user circled. */
@@ -62,6 +64,10 @@ function describeLiveContext(context: SystemPromptContext): string[] {
 
   if (context.upcomingSchedules.length) {
     contextLines.push(`scheduled tasks coming up: ${context.upcomingSchedules.join("; ")}`);
+  }
+
+  if (context.savedSnippetNames.length) {
+    contextLines.push(`saved snippets the user can have typed: ${context.savedSnippetNames.join(", ")}. only use snippet_insert with one of these names.`);
   }
 
   if (context.clipboardPreview) {

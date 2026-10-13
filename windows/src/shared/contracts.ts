@@ -211,6 +211,40 @@ export interface WallpaperAction {
   color: string | null;
 }
 
+/** "Set a timer for 12 minutes." Timers are in-memory and die with the process. */
+export interface TimerStartAction {
+  type: "timer_start";
+  durationMinutes: number;
+  label: string;
+}
+
+export interface TimerCancelAction {
+  type: "timer_cancel";
+  /** Matching words, or null to drop every running timer. */
+  query: string | null;
+}
+
+/** A phrase the user saves once and inserts anywhere later. */
+export interface SnippetSaveAction {
+  type: "snippet_save";
+  name: string;
+  text: string;
+}
+
+export interface SnippetInsertAction {
+  type: "snippet_insert";
+  name: string;
+}
+
+export type ClipboardTransformOperation = "summarize" | "fix_grammar" | "shorten" | "translate";
+
+/** Rewrites whatever is on the clipboard, in place, using the user's brain. */
+export interface ClipboardTransformAction {
+  type: "clipboard_transform";
+  operation: ClipboardTransformOperation;
+  targetLanguage: string | null;
+}
+
 export interface OpenPanelAction {
   type: "open_panel";
   page: string;
@@ -236,7 +270,12 @@ export type ClickaaAction =
   | RememberAction
   | ForgetAction
   | WallpaperAction
-  | OpenPanelAction;
+  | OpenPanelAction
+  | TimerStartAction
+  | TimerCancelAction
+  | SnippetSaveAction
+  | SnippetInsertAction
+  | ClipboardTransformAction;
 
 export type ClickaaActionType =
   | "open_app"
@@ -258,7 +297,12 @@ export type ClickaaActionType =
   | "remember"
   | "forget"
   | "wallpaper"
-  | "open_panel";
+  | "open_panel"
+  | "timer_start"
+  | "timer_cancel"
+  | "snippet_save"
+  | "snippet_insert"
+  | "clipboard_transform";
 
 /** Canonical action list, kept in the shared contracts so both sides agree. */
 export const clickaaActionTypes: readonly ClickaaActionType[] = [
@@ -282,6 +326,11 @@ export const clickaaActionTypes: readonly ClickaaActionType[] = [
   "forget",
   "wallpaper",
   "open_panel",
+  "timer_start",
+  "timer_cancel",
+  "snippet_save",
+  "snippet_insert",
+  "clipboard_transform",
 ];
 
 export type ActionRisk = "safe" | "confirm";
@@ -335,6 +384,13 @@ export interface TodoItem {
   text: string;
   dueAt: string | null;
   isDone: boolean;
+  createdAtIso: string;
+}
+
+export interface Snippet {
+  id: string;
+  name: string;
+  text: string;
   createdAtIso: string;
 }
 
@@ -431,6 +487,13 @@ export interface ClickaaPublicState {
   config: ClickaaUserConfig;
 }
 
+export interface ActiveTimer {
+  id: string;
+  label: string;
+  endsAtIso: string;
+  remainingSeconds: number;
+}
+
 export interface IslandStatusSummary {
   voiceState: CompanionVoiceState;
   label: string;
@@ -461,6 +524,8 @@ export interface IslandState {
   showClipboard: boolean;
   activityFeed: ActivityFeedEntry[];
   pendingConfirmations: PendingConfirmation[];
+  activeTimers: ActiveTimer[];
+  snippets: Snippet[];
   todos: TodoItem[];
   scheduledTasks: ScheduledTask[];
   memoryFacts: MemoryFact[];

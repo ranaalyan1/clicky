@@ -7,6 +7,7 @@ import { MemoryStore } from "./memory-store";
 import { ScheduleStore } from "./schedule-store";
 import { describeScheduledTask } from "./schedule-time";
 import { StartMenuAppIndex } from "./start-menu-app-index";
+import { SnippetStore } from "./snippet-store";
 import { TodoStore } from "./todo-store";
 import { ClickaaWindowsBridge } from "./windows-bridge";
 
@@ -31,10 +32,19 @@ export interface ActionExecutorDependencies {
   todoStore: TodoStore;
   memoryStore: MemoryStore;
   scheduleStore: ScheduleStore;
+  snippetStore: SnippetStore;
   openExternalUrl: (url: string) => Promise<void>;
   showNotification: (title: string, body: string) => void;
   showPanel: (page: string) => void;
   now: () => Date;
+}
+
+export function completedActionOutcome(message: string, detail = ""): ActionExecutionOutcome {
+  return completedOutcome(message, detail);
+}
+
+export function failedActionOutcome(message: string): ActionExecutionOutcome {
+  return failedOutcome(message);
 }
 
 function completedOutcome(message: string, detail = ""): ActionExecutionOutcome {
@@ -122,12 +132,55 @@ export class ClickaaActionExecutor {
       }
       case "wallpaper":
         return this.changeWallpaper(action.operation, action.path, action.color);
+      case "snippet_save":
+        return this.saveSnippet(action.name, action.text);
+      case "snippet_insert":
+        return this.insertSnippet(action.name);
       case "open_panel":
         this.dependencies.showPanel(action.page);
         return completedOutcome("opened the Clickaa panel");
+      /* Timers and clipboard rewrites need state the controller owns; it runs
+         them before the executor is ever reached. */
+      case "timer_start":
+      case "timer_cancel":
+      case "clipboard_transform":
+        return failedOutcome("that action is handled by Clickaa itself");
       default:
         return failedOutcome("that action is not supported yet");
     }
+  }
+
+  private saveSnippet(snippetName: string, snippetText: string): ActionExecutionOutcome {
+    const savedSnippet = this.dependencies.snippetStore.save(snippetName, snippetText);
+    const preview = savedSnippet.text.replace(/\s+/gu, " ").slice(0, 120);
+    return {
+      status: "completed",
+      message: `saved the "${savedSnippet.name}" snippet`,
+      detail: preview,
+      undoLabel: `delete the "${savedSnippet.name}" snippet`,
+      undo: () => {
+        this.dependencies.snippetStore.remove(savedSnippet.id);
+      },
+      choices: [],
+    };
+  }
+
+  private async insertSnippet(snippetName: string): Promise<ActionExecutionOutcome> {
+    const lookupResult = this.dependencies.snippetStore.resolveForInsert(snippetName);
+    if (!lookupResult.snippet) {
+      return failedOutcome(lookupResult.message || `I could not find a snippet called "${snippetName}".`);
+    }
+
+    // Inserting is typing: it goes through exactly the same path, so it lands in
+    // the focused window and offers the same undo.
+    const typingOutcome = await this.typeText(lookupResult.snippet.text);
+    if (typingOutcome.status !== "completed") {
+      return typingOutcome;
+    }
+    return {
+      ...typingOutcome,
+      message: `typed the "${lookupResult.snippet.name}" snippet`,
+    };
   }
 
   private async openApp(spokenAppName: string): Promise<ActionExecutionOutcome> {
