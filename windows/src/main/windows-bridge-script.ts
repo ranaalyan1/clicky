@@ -269,6 +269,77 @@ public static class ClickaaNative
         mouse_event(MouseEventWheel, 0, 0, amount * 120, UIntPtr.Zero);
     }
 
+    public const int MouseEventLeftDown = 0x0002;
+    public const int MouseEventLeftUp = 0x0004;
+    public const int MouseEventRightDown = 0x0008;
+    public const int MouseEventRightUp = 0x0010;
+    public const int MouseEventMiddleDown = 0x0020;
+    public const int MouseEventMiddleUp = 0x0040;
+
+    [DllImport("user32.dll")]
+    public static extern bool SetCursorPos(int x, int y);
+
+    [DllImport("user32.dll")]
+    public static extern bool GetCursorPos(out POINT point);
+
+    [StructLayout(LayoutKind.Sequential)]
+    public struct POINT
+    {
+        public int x;
+        public int y;
+    }
+
+    /** Parks the pointer where the user asked, in whole pixels. */
+    public static bool MoveTo(int x, int y)
+    {
+        return SetCursorPos(x, y);
+    }
+
+    public static int[] ReadCursorPosition()
+    {
+        POINT point;
+        GetCursorPos(out point);
+        int[] position = new int[2];
+        position[0] = point.x;
+        position[1] = point.y;
+        return position;
+    }
+
+    /**
+     * A real click: the pointer moves first so hover states, tooltips and focus
+     * all land the way they would for the user's own hand.
+     */
+    public static void ClickAt(int x, int y, string button, bool isDoubleClick)
+    {
+        SetCursorPos(x, y);
+        System.Threading.Thread.Sleep(60);
+
+        int downFlag = MouseEventLeftDown;
+        int upFlag = MouseEventLeftUp;
+        if (button == "right")
+        {
+            downFlag = MouseEventRightDown;
+            upFlag = MouseEventRightUp;
+        }
+        else if (button == "middle")
+        {
+            downFlag = MouseEventMiddleDown;
+            upFlag = MouseEventMiddleUp;
+        }
+
+        int clickCount = isDoubleClick ? 2 : 1;
+        for (int clickIndex = 0; clickIndex < clickCount; clickIndex++)
+        {
+            mouse_event((uint)downFlag, 0, 0, 0, UIntPtr.Zero);
+            System.Threading.Thread.Sleep(40);
+            mouse_event((uint)upFlag, 0, 0, 0, UIntPtr.Zero);
+            if (clickIndex + 1 < clickCount)
+            {
+                System.Threading.Thread.Sleep(80);
+            }
+        }
+    }
+
     private const int RenderDataFlow = 0;
     private const int MultimediaRole = 1;
     private const int AllClassContexts = 23;
@@ -600,6 +671,26 @@ function Invoke-BridgeCommand($request) {
             if ([string]$request.direction -eq 'up') { $directionMultiplier = -1 }
             [ClickaaNative]::ScrollWheel(($scrollAmount * $directionMultiplier) * 1)
             return @{ direction = [string]$request.direction; amount = $scrollAmount }
+        }
+        'move_mouse' {
+            $pointX = [int]$request.x
+            $pointY = [int]$request.y
+            [ClickaaNative]::MoveTo($pointX, $pointY) | Out-Null
+            return @{ x = $pointX; y = $pointY }
+        }
+        'click' {
+            $clickX = [int]$request.x
+            $clickY = [int]$request.y
+            $clickButton = 'left'
+            if ($null -ne $request.button) { $clickButton = [string]$request.button }
+            $isDoubleClick = $false
+            if ($null -ne $request.double) { $isDoubleClick = [bool]$request.double }
+            [ClickaaNative]::ClickAt($clickX, $clickY, $clickButton, $isDoubleClick)
+            return @{ x = $clickX; y = $clickY; button = $clickButton; double = $isDoubleClick }
+        }
+        'cursor_position' {
+            $cursorPosition = [ClickaaNative]::ReadCursorPosition()
+            return @{ x = $cursorPosition[0]; y = $cursorPosition[1] }
         }
         'volume' {
             $volumeOperation = [string]$request.operation

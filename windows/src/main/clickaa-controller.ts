@@ -44,6 +44,13 @@ import {
 import { formatClockTime, formatFriendlyDateTime, formatLocalIso } from "./local-time";
 import { captureWindowsDesktopRegionPng } from "./screen-capture";
 import { WakeWordDetection, WakeWordListener, WakeWordListenerState } from "./wake-word-listener";
+import {
+  AgentLoopLookResult,
+  buildAgentLookPrompt,
+  ClickaaAgentLoop,
+  defaultAgentLoopBudget,
+  parseAgentLookResponse,
+} from "./agent-loop";
 import { ShortcutId } from "./shortcut-registry";
 import { mapImageCoordinateToWindowsDesktop, parsePointingTag, selectPointingDisplay } from "./pointing";
 import { ScheduleStore } from "./schedule-store";
@@ -132,6 +139,11 @@ export class ClickaaController {
   private wakeFollowUpTimer: NodeJS.Timeout | null = null;
   private wakeFollowUpStartedAtMs = 0;
   private wakeFollowUpHeardSpeechAtMs = 0;
+  private readonly agentLoop: ClickaaAgentLoop;
+  /** Task goals waiting on the user's yes, keyed by confirmation id. */
+  private readonly pendingTaskGoals = new Map<string, string>();
+  private isAgentTaskRunning = false;
+  private agentTaskCancelled = true;
   private timerTickTimer: NodeJS.Timeout | null = null;
   private latestNowPlaying: NowPlayingInfo | null = null;
   private readonly runningScheduledTaskIds = new Set<string>();
@@ -165,6 +177,21 @@ export class ClickaaController {
       showPanel: (page) => this.desktopWindows.showPanel(page),
       now: () => new Date(),
     });
+
+    this.agentLoop = new ClickaaAgentLoop({
+      runActions: (actions) => this.runAgentStepActions(actions),
+      look: (lookRequest) => this.lookAtScreenForTask(lookRequest),
+      readNowPlaying: async () => {
+        try {
+          return await this.bridge.readNowPlaying();
+        } catch {
+          return null;
+        }
+      },
+      shouldStop: () => this.agentTaskCancelled || this.configStore.getConfig().automationPaused,
+      wait: (milliseconds) => new Promise((resolve) => setTimeout(resolve, milliseconds)),
+      onProgress: (progressEvent) => this.handleAgentProgress(progressEvent),
+    }, defaultAgentLoopBudget);
 
     this.wakeWordListener = new WakeWordListener(userDataDirectory, {
       onStateChanged: (state, message) => this.handleWakeWordListenerState(state, message),
@@ -287,6 +314,9 @@ export class ClickaaController {
   }
 
   handleEscapePressed(): void {
+    this.cancelAgentTask();
+    this.pendingTaskGoals.clear();
+    this.confirmationQueue.clear();
     this.isSnipInFlight = false;
     this.desktopWindows.hideRegionSelector();
     this.desktopWindows.closeIsland();
@@ -566,11 +596,22 @@ export class ClickaaController {
         console.warn("Clickaa skipped some requested actions:", parsedResponse.problems.join("; "));
       }
 
-      this.publicState.lastActionSummary = await this.runModelActions(
-        interactionId,
-        parsedResponse.actions,
-        interactionKind === "scheduled",
-      );
+      if (parsedResponse.taskGoal && interactionKind !== "scheduled") {
+        // The model asked Clickaa to keep working until the goal is met, so the
+        // loop runs the first step itself instead of running it here.
+        this.publicState.lastActionSummary = await this.beginModelTask(
+          interactionId,
+          parsedResponse.taskGoal,
+          parsedResponse.actions,
+          this.configStore.getConfig(),
+        );
+      } else {
+        this.publicState.lastActionSummary = await this.runModelActions(
+          interactionId,
+          parsedResponse.actions,
+          interactionKind === "scheduled",
+        );
+      }
       this.publishState();
       this.publishIslandState();
 
@@ -600,11 +641,13 @@ export class ClickaaController {
         height: circleRegion.height,
       });
       this.lastPointingTargets = [capturedRegion];
+      this.actionExecutor.setClickCoordinateSpace([capturedRegion]);
       return [capturedRegion];
     }
 
     const capturedDisplays = await captureAllWindowsDisplays();
     this.lastPointingTargets = capturedDisplays;
+    this.actionExecutor.setClickCoordinateSpace(capturedDisplays);
     return capturedDisplays;
   }
 
@@ -1048,10 +1091,29 @@ export class ClickaaController {
     }
 
     if (decision === "reject") {
+      const rejectedTaskGoal = this.pendingTaskGoals.get(confirmationId);
+      if (rejectedTaskGoal) {
+        this.pendingTaskGoals.delete(confirmationId);
+        this.activityFeed.record("confirmation", "skipped it", rejectedTaskGoal, false);
+        this.desktopWindows.setIslandExpanded(false);
+        this.publishIslandState();
+        return "skipped that.";
+      }
       this.activityFeed.record("confirmation", "skipped it", describeActions(pendingConfirmation.actions), false);
       this.desktopWindows.setIslandExpanded(false);
       this.publishIslandState();
       return "skipped that.";
+    }
+
+    const approvedTaskGoal = this.pendingTaskGoals.get(confirmationId) ?? null;
+    if (approvedTaskGoal) {
+      // A task approval runs nothing here: the loop runs the first step, which
+      // keeps one code path for stepping, looking and reporting.
+      this.pendingTaskGoals.delete(confirmationId);
+      this.desktopWindows.setIslandExpanded(false);
+      this.publishIslandState();
+      void this.runAgentTask(approvedTaskGoal, pendingConfirmation.actions);
+      return `working on: ${approvedTaskGoal}`;
     }
 
     const completedMessages: string[] = [];
@@ -1526,6 +1588,205 @@ export class ClickaaController {
     this.isIslandCurrentlyExpanded = isExpanded;
     this.desktopWindows.setIslandExpanded(isExpanded);
     this.publishIslandState();
+  }
+
+  /* ---------------------------------------------------------------------- */
+  /* Multi-step tasks                                                       */
+  /* ---------------------------------------------------------------------- */
+
+  /**
+   * Enters the agent loop for a reply that described a goal instead of a single
+   * action. One approval covers the whole task — the user sees the goal, not a
+   * click-by-click script — and every step is still logged and undoable, with
+   * Escape stopping everything immediately.
+   */
+  private async beginModelTask(
+    interactionId: number,
+    goal: string,
+    initialActions: ClickaaAction[],
+    config: ClickaaUserConfig,
+  ): Promise<string> {
+    if (config.automationPaused) {
+      this.activityFeed.record(
+        "system",
+        "actions are paused",
+        `Clickaa would have worked on: ${goal}`,
+        false,
+      );
+      this.publishIslandState();
+      return "actions are paused";
+    }
+
+    if (!config.abilities.screenVision) {
+      // Without eyes, a task cannot be checked and must not be attempted blind.
+      this.activityFeed.record(
+        "system",
+        "I need to see the screen for that",
+        "switch screen vision back on in the soul tab and ask me again",
+        false,
+      );
+      this.publishIslandState();
+      return "I need screen vision for that";
+    }
+
+    const { allowedActions, blockedActions } = filterActionsByAbilities(initialActions, config.abilities);
+    for (const blockedAction of blockedActions) {
+      this.activityFeed.record(
+        "system",
+        "skipped an action",
+        `${blockedAction.action.type.replace(/_/gu, " ")} needs the "${blockedAction.ability}" ability, which is switched off`,
+        false,
+      );
+    }
+
+    const actionsNeedingApproval = allowedActions.filter((action) =>
+      actionNeedsConfirmation(action, config.confirmationMode, config.autoApprovedActionTypes));
+
+    if (actionsNeedingApproval.length) {
+      const pendingConfirmation = this.confirmationQueue.enqueue(
+        interactionId,
+        allowedActions,
+        `work on: ${goal}`,
+      );
+      this.pendingTaskGoals.set(pendingConfirmation.id, goal);
+      this.activityFeed.record(
+        "confirmation",
+        "waiting for your yes",
+        `${goal} — Clickaa will click and type on this pc until that is done, or press Esc to stop`,
+        false,
+      );
+      this.desktopWindows.openIsland();
+      this.publishIslandState();
+      return `waiting for your yes to work on: ${goal}`;
+    }
+
+    void this.runAgentTask(goal, allowedActions);
+    return `working on: ${goal}`;
+  }
+
+  /** Runs the loop and reports where it ended up. */
+  private async runAgentTask(goal: string, initialActions: ClickaaAction[]): Promise<void> {
+    if (this.isAgentTaskRunning) {
+      return;
+    }
+
+    this.isAgentTaskRunning = true;
+    this.agentTaskCancelled = false;
+    this.activityFeed.record("system", `working on: ${goal}`, "step by step, checking the screen as it goes", false);
+    this.desktopWindows.openIsland();
+    this.publishIslandState();
+
+    try {
+      const taskResult = await this.agentLoop.run(goal, initialActions);
+      this.activityFeed.record(
+        taskResult.outcome === "completed" ? "system" : "system",
+        taskResult.outcome === "completed" ? "finished" : "stopped",
+        `${goal} — ${taskResult.note}`,
+        false,
+      );
+      this.publicState.lastActionSummary = taskResult.note;
+      if (taskResult.outcome !== "completed") {
+        this.desktopWindows.showNotification("Clickaa", `${goal}: ${taskResult.note}`);
+      }
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      this.activityFeed.record("system", "that task did not finish", errorMessage, false);
+    } finally {
+      this.isAgentTaskRunning = false;
+      this.agentTaskCancelled = true;
+      this.publishState();
+      this.publishIslandState();
+    }
+  }
+
+  /** One step of a task: the ordinary action path, minus the per-step prompts. */
+  private async runAgentStepActions(actions: ClickaaAction[]): Promise<string> {
+    const stepMessages: string[] = [];
+    for (const action of actions) {
+      if (this.agentTaskCancelled) {
+        break;
+      }
+      const completedMessage = await this.executeAndRecordAction(action);
+      if (completedMessage) {
+        stepMessages.push(completedMessage);
+      }
+    }
+    this.publishIslandState();
+    return stepMessages.join("; ");
+  }
+
+  /**
+   * Looks at the screen and asks the model whether the goal is met. Clickaa
+   * sends the same multi-monitor screenshots it uses for answering, so clicks
+   * the model proposes are expressed in a space Clickaa can map back.
+   */
+  private async lookAtScreenForTask(lookRequest: {
+    goal: string;
+    stepNumber: number;
+    previousSummary: string;
+    previousActions: ClickaaAction[];
+  }): Promise<AgentLoopLookResult> {
+    const config = this.configStore.getConfig();
+    if (this.agentTaskCancelled || config.automationPaused) {
+      return { kind: "give_up", note: "I stopped because you asked me to" };
+    }
+    if (!this.brainRouter.isConfigured(config)) {
+      return { kind: "unavailable", note: this.brainRouter.configurationHint(config) };
+    }
+
+    let capturedDisplays: CapturedDisplayImage[] = [];
+    try {
+      capturedDisplays = await captureAllWindowsDisplays();
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      return { kind: "unavailable", note: `I could not take a screenshot: ${errorMessage}` };
+    }
+
+    // Clicks in the model's next step are in this screenshot's pixel space.
+    this.actionExecutor.setClickCoordinateSpace(capturedDisplays);
+    this.lastPointingTargets = capturedDisplays;
+
+    const abortController = new AbortController();
+    let responseText = "";
+    try {
+      responseText = await this.brainRouter.streamResponse(config, {
+        systemPrompt: buildAgentLookPrompt({
+          goal: lookRequest.goal,
+          stepNumber: lookRequest.stepNumber,
+          previousSummary: lookRequest.previousSummary,
+          hasScreenshots: capturedDisplays.length > 0,
+        }),
+        userPrompt: `step ${lookRequest.stepNumber} just finished. check the goal and answer with DONE, NEXT or GIVE_UP.`,
+        images: capturedDisplays.map(toBrainImage),
+        conversationHistory: [],
+        signal: abortController.signal,
+        onTextUpdate: () => undefined,
+      });
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      return { kind: "unavailable", note: `I could not check the screen: ${errorMessage}` };
+    }
+
+    return parseAgentLookResponse(responseText);
+  }
+
+  private handleAgentProgress(progressEvent: {
+    kind: string;
+    stepNumber: number;
+    note: string;
+    actionSummary: string;
+  }): void {
+    if (progressEvent.kind === "step_started") {
+      this.desktopWindows.updateOverlayResponse(`step ${progressEvent.stepNumber}: ${progressEvent.note}`);
+    } else if (progressEvent.kind === "step_finished") {
+      this.activityFeed.record("action", `step ${progressEvent.stepNumber}`, progressEvent.note, false);
+      this.publishIslandState();
+    }
+  }
+
+  /** Escape, a new request, quitting: everything the task loop must obey. */
+  private cancelAgentTask(): void {
+    this.agentTaskCancelled = true;
   }
 
   /* ---------------------------------------------------------------------- */
@@ -2141,6 +2402,8 @@ export class ClickaaController {
   /* ---------------------------------------------------------------------- */
 
   private cancelActiveWork(): void {
+    // Escape, a new request and quitting all have to stop a running task too.
+    this.cancelAgentTask();
     this.interactionAbortController?.abort();
     this.interactionAbortController = null;
     this.responseAbortController?.abort();

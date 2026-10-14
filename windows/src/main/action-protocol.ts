@@ -40,6 +40,12 @@ export interface ParsedModelResponse {
   spokenText: string;
   actions: ClickaaAction[];
   problems: string[];
+  /**
+   * The finished result the user asked for, when the reply expects Clickaa to
+   * keep working (a page to load, a video to start). The agent loop verifies
+   * against this; a reply without it is a one-shot answer.
+   */
+  taskGoal: string | null;
 }
 
 interface ActionDefinition {
@@ -59,6 +65,18 @@ function readRequiredText(rawAction: Record<string, unknown>, key: string): stri
     return null;
   }
   return rawValue.trim();
+}
+
+/** Coordinates arrive as numbers or as strings more often than one would hope. */
+function readCoordinate(rawAction: Record<string, unknown>, key: string): number | null {
+  const rawValue = rawAction[key];
+  const coordinate = typeof rawValue === "number"
+    ? rawValue
+    : Number.parseInt(String(rawValue ?? ""), 10);
+  if (!Number.isFinite(coordinate) || coordinate < 0) {
+    return null;
+  }
+  return Math.round(coordinate);
 }
 
 /** Optional text: missing or blank reads as "the model did not say". */
@@ -496,6 +514,56 @@ const actionDefinitions: Record<ClickaaActionType, ActionDefinition> = {
       };
     },
   },
+  click_at: {
+    type: "click_at",
+    risk: "confirm",
+    requiredAbility: "automation",
+    describe: (action) => {
+      const clickAction = action as { label: string };
+      return `click ${clickAction.label}`;
+    },
+    normalize: (rawAction) => {
+      const xCoordinate = readCoordinate(rawAction, "x");
+      const yCoordinate = readCoordinate(rawAction, "y");
+      if (xCoordinate === null || yCoordinate === null) {
+        return { action: null, problem: "click_at needs x and y coordinates from the screenshot" };
+      }
+
+      const rawScreenNumber = readCoordinate(rawAction, "screenNumber")
+        ?? readCoordinate(rawAction, "screen");
+      return {
+        action: {
+          type: "click_at",
+          x: xCoordinate,
+          y: yCoordinate,
+          screenNumber: rawScreenNumber !== null && rawScreenNumber >= 1 ? rawScreenNumber : null,
+          label: readOptionalText(rawAction, "label")
+            ?? readOptionalText(rawAction, "target")
+            ?? "that spot",
+        },
+        problem: null,
+      };
+    },
+  },
+  wait: {
+    type: "wait",
+    risk: "safe",
+    requiredAbility: "automation",
+    describe: (action) => `wait ${(action as { seconds: number }).seconds} seconds`,
+    normalize: (rawAction) => {
+      const rawSeconds = rawAction.seconds ?? rawAction.durationSeconds;
+      const seconds = typeof rawSeconds === "number" && Number.isFinite(rawSeconds)
+        ? rawSeconds
+        : Number.parseFloat(String(rawSeconds ?? ""));
+      if (!Number.isFinite(seconds) || seconds <= 0) {
+        return { action: null, problem: "wait needs a positive number of seconds" };
+      }
+      return {
+        action: { type: "wait", seconds: Math.min(seconds, 20) },
+        problem: null,
+      };
+    },
+  },
   screenshot_region: {
     type: "screenshot_region",
     risk: "safe",
@@ -619,13 +687,43 @@ export function parseClickaaActions(rawPayload: unknown): { actions: ClickaaActi
 }
 
 export function parseModelResponse(modelResponseText: string): ParsedModelResponse {
-  const { spokenText, serializedActions } = splitSpokenTextFromActionBlock(modelResponseText);
+  const { spokenText: textWithoutTask, taskGoal } = splitTaskGoalFromResponse(modelResponseText);
+  const { spokenText, serializedActions } = splitSpokenTextFromActionBlock(textWithoutTask);
   if (serializedActions === null) {
-    return { spokenText, actions: [], problems: [] };
+    return { spokenText, actions: [], problems: [], taskGoal };
   }
 
   const { actions, problems } = parseClickaaActions(serializedActions);
-  return { spokenText, actions, problems };
+  return { spokenText, actions, problems, taskGoal };
+}
+
+/**
+ * Pulls the <task> block (and the optional <plan> block that models sometimes
+ * add for themselves) out of a reply. The goal is capped so a runaway model
+ * cannot turn it into a paragraph the user has to read twice.
+ */
+export function splitTaskGoalFromResponse(modelResponseText: string): {
+  spokenText: string;
+  taskGoal: string | null;
+} {
+  let taskGoal: string | null = null;
+  let remainingText = modelResponseText;
+
+  for (const blockName of ["task", "plan"] as const) {
+    const blockPattern = new RegExp(`<${blockName}>([\\s\\S]*?)</${blockName}>`, "iu");
+    const blockMatch = blockPattern.exec(remainingText);
+    if (!blockMatch) {
+      continue;
+    }
+
+    remainingText = remainingText.replace(blockMatch[0], " ");
+    const blockText = blockMatch[1] ?? "";
+    if (!taskGoal && blockText.trim()) {
+      taskGoal = blockText.trim().slice(0, 300);
+    }
+  }
+
+  return { spokenText: remainingText, taskGoal };
 }
 
 /**
@@ -715,9 +813,25 @@ export function buildActionProtocolInstructions(abilities: AbilitySettings): str
 - routine_add: {"type":"routine_add","name":"Morning","timeOfDay":"09:00","repeat":"daily","actions":[{"type":"open_app","name":"Unity"}]} — a repeating list of steps.
 - timer_start: {"type":"timer_start","durationMinutes":12,"label":"pasta"} — a countdown the island shows and that ends with a notification. use for "set a timer".
 - timer_cancel: {"type":"timer_cancel","query":"pasta"} — stop a running timer; query null stops every one.
-- screenshot_region: {"type":"screenshot_region"} — opens the overlay so the user can drag over part of the screen; the pixels land on their clipboard. use it for "let me screenshot this", "snip this area", "grab that region".`);
+- screenshot_region: {"type":"screenshot_region"} — opens the overlay so the user can drag over part of the screen; the pixels land on their clipboard. use it for "let me screenshot this", "snip this area", "grab that region".
+- click_at: {"type":"click_at","x":420,"y":310,"label":"the first video"} — clicks a real point on screen. x and y are pixels in the screenshot you were shown, exactly like the numbers in [POINT:x,y]. set "screenNumber" when the target is on a different display than the pointer. always name what you are clicking in "label".
+- wait: {"type":"wait","seconds":2} — pause before the next action, for pages that are still loading.`);
   }
 
+  if (abilities.automation && abilities.screenVision) {
+    sections.push(`Tasks that need several steps:
+
+if the user asks for something that cannot be finished in one action — "go to youtube and play anything", "open my email and reply to the last message", "search amazon for a cable and add the cheapest one to the basket" — first say what you are about to do in one short spoken sentence, then add a <task> block holding the end goal, and put only the FIRST step in <actions>.
+
+<task>play a video on youtube</task><actions>[{"type":"open_url","url":"https://youtube.com"}]</actions>
+
+Clickaa will run that first step, look at the screen, and continue on its own until the goal is met. so:
+- put the goal in <task>, never the whole plan, and never the same thing as the <actions> step
+- prefer one or two actions per step; Clickaa looks in between
+- use click_at with coordinates taken from the screenshot to click real things
+- use wait when a page is clearly still loading
+- the goal in <task> is what the user asked for, phrased as the finished result`);
+  }
   if (abilities.clipboardHistory) {
     sections.push(`- clipboard_transform: {"type":"clipboard_transform","operation":"summarize","targetLanguage":null} — rewrite what is on the clipboard using the user's brain. operations: summarize, fix_grammar, shorten, translate. for translate, set targetLanguage. use it for "fix what i copied", "summarize this", "translate my clipboard".`);
   }

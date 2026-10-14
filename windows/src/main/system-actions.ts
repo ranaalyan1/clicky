@@ -1,6 +1,6 @@
 import { spawn } from "node:child_process";
 import { clipboard, shell } from "electron";
-import { ClickaaAction } from "../shared/contracts";
+import { CapturedDisplayImage, ClickaaAction } from "../shared/contracts";
 import { isAppChoiceAmbiguous, LaunchableApp } from "./app-name-matching";
 import { buildSearchUrl } from "./web-search";
 import { MemoryStore } from "./memory-store";
@@ -9,6 +9,7 @@ import { describeScheduledTask } from "./schedule-time";
 import { StartMenuAppIndex } from "./start-menu-app-index";
 import { SnippetStore } from "./snippet-store";
 import { TodoStore } from "./todo-store";
+import { mapImageCoordinateToWindowsDesktop, selectPointingDisplay } from "./pointing";
 import { ClickaaWindowsBridge } from "./windows-bridge";
 
 export interface ActionChoice {
@@ -66,7 +67,20 @@ const pasteInsteadOfTypingThreshold = 400;
  * interrupt a spoken reply.
  */
 export class ClickaaActionExecutor {
+  /**
+   * The screenshots the model was shown for the current request. Clicks are
+   * expressed in that pixel space, so this is what makes them land correctly.
+   */
+  private clickCoordinateSpace: CapturedDisplayImage[] = [];
   constructor(private readonly dependencies: ActionExecutorDependencies) {}
+
+  /**
+   * Tells the executor which screenshots a click's coordinates came from. The
+   * controller calls this for every request that carries screenshots.
+   */
+  setClickCoordinateSpace(capturedDisplays: CapturedDisplayImage[]): void {
+    this.clickCoordinateSpace = capturedDisplays;
+  }
 
   async execute(action: ClickaaAction): Promise<ActionExecutionOutcome> {
     switch (action.type) {
@@ -132,6 +146,11 @@ export class ClickaaActionExecutor {
       }
       case "wallpaper":
         return this.changeWallpaper(action.operation, action.path, action.color);
+      case "click_at":
+        return this.clickAt(action);
+      case "wait":
+        await new Promise((resolve) => setTimeout(resolve, action.seconds * 1_000));
+        return completedOutcome(`waited ${action.seconds} seconds`);
       case "snippet_save":
         return this.saveSnippet(action.name, action.text);
       case "snippet_insert":
@@ -149,6 +168,33 @@ export class ClickaaActionExecutor {
       default:
         return failedOutcome("that action is not supported yet");
     }
+  }
+
+  /**
+   * Clicks a point the model picked out of a screenshot. Clickaa hands the very
+   * captures the model saw to setClickCoordinateSpace, so those pixels map back
+   * onto the right monitor at the right scale.
+   */
+  private async clickAt(action: Extract<ClickaaAction, { type: "click_at" }>): Promise<ActionExecutionOutcome> {
+    const capturedDisplays = this.clickCoordinateSpace;
+    if (!capturedDisplays.length) {
+      return failedOutcome("I do not have a screenshot to place that click on.");
+    }
+
+    const targetDisplay = selectPointingDisplay(capturedDisplays, action.screenNumber);
+    if (!targetDisplay) {
+      return failedOutcome("I could not work out which screen that click belongs to.");
+    }
+
+    const screenPoint = mapImageCoordinateToWindowsDesktop({ x: action.x, y: action.y }, targetDisplay);
+    try {
+      await this.dependencies.bridge.clickAtScreenPoint(screenPoint);
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      return failedOutcome(`I could not click there: ${errorMessage}`);
+    }
+
+    return completedOutcome(`clicked ${action.label}`);
   }
 
   private saveSnippet(snippetName: string, snippetText: string): ActionExecutionOutcome {

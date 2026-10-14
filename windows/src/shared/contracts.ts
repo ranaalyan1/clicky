@@ -257,6 +257,24 @@ export interface ClipboardTransformAction {
   targetLanguage: string | null;
 }
 
+/**
+ * Clicks a point on screen, given in the pixel space of the screenshot the
+ * model was just shown (the same space as its [POINT:x,y] tags).
+ */
+export interface ClickAtAction {
+  type: "click_at";
+  x: number;
+  y: number;
+  screenNumber: number | null;
+  label: string;
+}
+
+/** "wait a second" — used between steps of a task so the screen can catch up. */
+export interface WaitAction {
+  type: "wait";
+  seconds: number;
+}
+
 /** "screenshot this area" — opens the snipping overlay and waits for a drag. */
 export interface ScreenshotRegionAction {
   type: "screenshot_region";
@@ -293,7 +311,9 @@ export type ClickaaAction =
   | SnippetSaveAction
   | SnippetInsertAction
   | ClipboardTransformAction
-  | ScreenshotRegionAction;
+  | ScreenshotRegionAction
+  | ClickAtAction
+  | WaitAction;
 
 export type ClickaaActionType =
   | "open_app"
@@ -321,7 +341,9 @@ export type ClickaaActionType =
   | "snippet_save"
   | "snippet_insert"
   | "clipboard_transform"
-  | "screenshot_region";
+  | "screenshot_region"
+  | "click_at"
+  | "wait";
 
 /** Canonical action list, kept in the shared contracts so both sides agree. */
 export const clickaaActionTypes: readonly ClickaaActionType[] = [
@@ -351,6 +373,8 @@ export const clickaaActionTypes: readonly ClickaaActionType[] = [
   "snippet_insert",
   "clipboard_transform",
   "screenshot_region",
+  "click_at",
+  "wait",
 ];
 
 export type ActionRisk = "safe" | "confirm";

@@ -22,6 +22,9 @@ export type BridgeCommand =
   | { command: "send_keys"; keys: string }
   | { command: "type_unicode"; text: string }
   | { command: "scroll"; direction: "up" | "down"; amount: number }
+  | { command: "move_mouse"; x: number; y: number }
+  | { command: "click"; x: number; y: number; button: "left" | "right" | "middle"; double: boolean }
+  | { command: "cursor_position" }
   | { command: "volume"; operation: "up" | "down" | "mute" | "unmute" | "set"; level?: number }
   | { command: "media"; operation: "play_pause" | "next" | "previous" | "stop" }
   | { command: "media_status" }
@@ -134,6 +137,32 @@ export class ClickaaWindowsBridge {
       appName: appName.replace(/\.exe$/iu, ""),
       isPlaying: mediaSession.isPlaying,
     };
+  }
+
+  /** Moves the real pointer and clicks, so hover states and focus behave. */
+  async clickAtScreenPoint(
+    screenPoint: { x: number; y: number },
+    options: { button?: "left" | "right" | "middle"; double?: boolean } = {},
+  ): Promise<void> {
+    await this.send({
+      command: "click",
+      x: Math.round(screenPoint.x),
+      y: Math.round(screenPoint.y),
+      button: options.button ?? "left",
+      double: options.double ?? false,
+    });
+  }
+
+  async moveMouseTo(screenPoint: { x: number; y: number }): Promise<void> {
+    await this.send({
+      command: "move_mouse",
+      x: Math.round(screenPoint.x),
+      y: Math.round(screenPoint.y),
+    });
+  }
+
+  async readCursorPosition(): Promise<{ x: number; y: number }> {
+    return this.send<{ x: number; y: number }>({ command: "cursor_position" });
   }
 
   async readForegroundWindow(): Promise<ForegroundWindowSnapshot> {
