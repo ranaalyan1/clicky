@@ -55,6 +55,13 @@ import {
 import { ShortcutId } from "./shortcut-registry";
 import { mapImageCoordinateToWindowsDesktop, parsePointingTag, selectPointingDisplay } from "./pointing";
 import { ScheduleStore } from "./schedule-store";
+import { PresenceStore } from "./presence-store";
+import {
+  describeNextPresenceCheckIn,
+  findDuePresenceCheckIns,
+  type DuePresenceCheckIn,
+} from "./presence-schedule";
+import { buildBriefingDigest } from "./briefing";
 import { AuditLogStore } from "./audit-log-store";
 import { JsonFileStore } from "./json-file-store";
 import { SkillStore } from "./skill-store";
@@ -117,6 +124,7 @@ export class ClickaaController {
   private readonly todoStore: TodoStore;
   private readonly memoryStore: MemoryStore;
   private readonly scheduleStore: ScheduleStore;
+  private readonly presenceStore: PresenceStore;
   private readonly snippetStore: SnippetStore;
   private readonly auditLogStore: AuditLogStore;
   private readonly skillStore: SkillStore;
@@ -185,6 +193,7 @@ export class ClickaaController {
     this.todoStore = new TodoStore(`${userDataDirectory}/todos.json`);
     this.memoryStore = new MemoryStore(`${userDataDirectory}/memory.json`);
     this.scheduleStore = new ScheduleStore(`${userDataDirectory}/schedules.json`);
+    this.presenceStore = new PresenceStore(`${userDataDirectory}/presence.json`);
     this.snippetStore = new SnippetStore(`${userDataDirectory}/snippets.json`);
     this.auditLogStore = new AuditLogStore(`${userDataDirectory}/audit-log.json`);
     this.skillStore = new SkillStore(`${userDataDirectory}/skills.json`);
@@ -2357,6 +2366,80 @@ export class ClickaaController {
   /* Scheduled tasks                                                        */
   /* ---------------------------------------------------------------------- */
 
+  /* ---------------------------------------------------------------------- */
+  /* Presence: the check-ins Clickaa starts by itself                        */
+  /* ---------------------------------------------------------------------- */
+
+  /**
+   * Runs any check-in that is owed right now.
+   *
+   * This is called from the same twenty-second timer as the scheduler and costs
+   * nothing when there is nothing to say: no model call, no file read, just a
+   * comparison against the clock and the date the last check-in ran. An idle
+   * Clickaa therefore stays idle.
+   */
+  private async runDuePresenceCheckIns(): Promise<void> {
+    const config = this.configStore.getConfig();
+    if (!config.abilities.presence || config.automationPaused) {
+      return;
+    }
+
+    const now = new Date();
+    const dueCheckIns = findDuePresenceCheckIns(config.presence, now, this.presenceStore.lastCompletedDateKeys());
+    for (const dueCheckIn of dueCheckIns) {
+      await this.deliverPresenceCheckIn(dueCheckIn, now);
+    }
+  }
+
+  /**
+   * The panel's "check in now" button.
+   *
+   * A manual run deliberately does not count as the day's scheduled check-in:
+   * asking to see one early is not the same as asking to skip it.
+   */
+  async runCheckInNow(): Promise<void> {
+    const now = new Date();
+    const kind = now.getHours() < 12 ? "morning" : "evening";
+    await this.deliverPresenceCheckIn({ kind, scheduledAt: now, minutesLate: 0, isLate: false }, now);
+  }
+
+  private async deliverPresenceCheckIn(dueCheckIn: DuePresenceCheckIn, now: Date): Promise<void> {
+    const config = this.configStore.getConfig();
+    const digest = buildBriefingDigest({
+      kind: dueCheckIn.kind,
+      now,
+      scheduledTasks: this.scheduleStore.list(),
+      todos: this.todoStore.list(),
+      activityFeed: this.activityFeed.list(40),
+      isLate: dueCheckIn.isLate,
+    });
+
+    const detailText = digest.lines.join(" ");
+    const notificationTitle = `Clickaa ${digest.title}`;
+
+    // Recorded first: if speaking or a notification throws, the check-in still
+    // counts as delivered rather than firing again every twenty seconds.
+    this.presenceStore.markCheckInDelivered(
+      {
+        kind: dueCheckIn.kind,
+        title: digest.title,
+        summary: digest.summary,
+        ranAtIso: now.toISOString(),
+      },
+      now,
+    );
+
+    this.activityFeed.record("automation", `check-in: ${digest.title}`, detailText, false);
+    this.desktopWindows.revealIsland();
+    this.desktopWindows.showNotification(notificationTitle, detailText);
+
+    if (config.presence.speakCheckIns) {
+      await this.speakResponse(this.activeInteractionId, `${digest.title}. ${detailText}`);
+    }
+
+    this.publishIslandState();
+  }
+
   private startScheduler(): void {
     if (this.schedulerTimer) {
       return;
@@ -2364,6 +2447,7 @@ export class ClickaaController {
 
     this.schedulerTimer = setInterval(() => {
       void this.runDueScheduledTasks();
+      void this.runDuePresenceCheckIns();
     }, schedulerTickMilliseconds);
   }
 
@@ -2631,6 +2715,10 @@ export class ClickaaController {
       todos: config.abilities.toDoList ? this.todoStore.list().slice(0, 30) : [],
       scheduledTasks: config.abilities.scheduling ? this.scheduleStore.list().slice(0, 20) : [],
       memoryFacts: config.abilities.memory ? this.memoryStore.list().slice(0, 20) : [],
+      presence: {
+        nextCheckInLabel: config.abilities.presence ? describeNextPresenceCheckIn(config.presence, now) : null,
+        lastCheckIn: this.presenceStore.lastCheckIn(),
+      },
       clipboardClips: config.clipboardHistoryEnabled ? this.clipboardHistoryStore.list().slice(0, 20) : [],
       quickLaunchApps: config.abilities.automation ? this.appIndex.quickLaunchApps(8) : [],
       brainLabel: this.brainRouter.getBrainLabel(config),

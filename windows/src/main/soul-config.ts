@@ -37,6 +37,7 @@ export const abilityDefinitions: AbilityDefinition[] = [
   { id: "memory", label: "memory", description: "remember facts you ask it to keep" },
   { id: "clipboardHistory", label: "clipboard history", description: "keep your recent copies in the island, on this pc only" },
   { id: "island", label: "the island", description: "show the notch at the top of the screen" },
+  { id: "presence", label: "presence", description: "wake up on its own with a morning brief and an evening recap" },
 ];
 
 export const defaultAbilitySettings: AbilitySettings = {
@@ -60,6 +61,10 @@ export const defaultAbilitySettings: AbilitySettings = {
   // and has to be switched on deliberately, with its own warning.
   systemAccessTier1: false,
   systemAccessTier2: false,
+  // On by default: a companion that only ever speaks when spoken to is a
+  // toolbar, not a presence. Both check-ins are individually switchable in the
+  // panel, and neither of them touches anything on the PC.
+  presence: true,
 };
 
 export interface PersonalityPresetDefinition {

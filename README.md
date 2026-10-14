@@ -15,6 +15,7 @@ This repository is **TypeScript end to end**: an Electron client in `windows/` a
 - **Snips (Ctrl + Alt + S).** Drag over any region; those pixels land on your clipboard and in `Pictures\Clickaa Snips`.
 - **Clipboard brain.** "fix what i copied", "summarize this", "translate my clipboard into Urdu" — rewritten in place, with one click to put the old text back.
 - **Timers and snippets.** "set a timer for 12 minutes" ticks in the island and ends with a notification; "insert my address" types a phrase you saved once.
+- **Presence.** It wakes up on its own: a morning brief at the time you pick — today's routines, open and overdue to-dos, what ran overnight — and an evening recap of what it did and what is still open. Written from what is already on your PC, so it works offline; **check in now** in the panel shows you one immediately.
 - **The island**, the notch at the top of every screen: now playing, to-do list, reminders and routines, memory, clipboard clips, launchable apps, wallpapers, timers, snippets and quick switches. It summons itself when your pointer touches the top edge, plays a microphone light while Clickaa is listening, and can be muted from the tray.
 - **System access**, two switches in *soul → abilities*, both off by default: read-only diagnostics, registry reads and files in your own folders; plus a separate opt-in switch for arbitrary commands. Every attempt lands in an audit log, and **Ctrl + Alt + Q** stops everything mid-task.
 

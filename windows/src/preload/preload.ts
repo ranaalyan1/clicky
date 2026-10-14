@@ -139,6 +139,7 @@ contextBridge.exposeInMainWorld("clickaa", {
     return ipcRenderer.invoke("panel:rename-skill", skillId, nextName);
   },
   removeSkill: (skillId: string): Promise<void> => ipcRenderer.invoke("panel:remove-skill", skillId),
+  runCheckInNow: (): Promise<void> => ipcRenderer.invoke("panel:run-check-in-now"),
   undoActivity: (activityEntryId: string): Promise<boolean> => {
     return ipcRenderer.invoke("island:undo-activity", activityEntryId);
   },

@@ -216,6 +216,12 @@ function registerIpcHandlers(): void {
     }
     clickaaController?.removeSkill(String(skillId));
   });
+  ipcMain.handle("panel:run-check-in-now", (event) => {
+    if (!panelSentEvent(event.sender.id)) {
+      throw new Error("IPC request rejected: sender is not the Clickaa panel.");
+    }
+    return clickaaController?.runCheckInNow();
+  });
   ipcMain.handle("island:undo-activity", (event, activityEntryId: string) => {
     if (!islandSentEvent(event.sender.id)) {
       throw new Error("IPC request rejected: sender is not the Clickaa island.");

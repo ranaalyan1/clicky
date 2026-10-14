@@ -7,6 +7,7 @@ Clickaa is the voice companion that lives on your Windows desktop: hold a key, a
 - Hold **Ctrl + Shift** and circle anything on screen with the mouse to ask about just that part.
 - Press **Ctrl + Alt + S** and drag over any part of the screen: those pixels land on your clipboard and in `Pictures\Clickaa Snips`.
 - **Skills** grow out of repetition: do the same task three times and Clickaa offers to save it by name ("save it as my morning videos?"). It only saves when you press the button, skills are renameable in **plans → skills**, and every run still checks the screen and asks before it clicks or types.
+- **Presence**: Clickaa wakes up on its own. A **morning brief** at the time you pick gathers today's routines and reminders, your open to-dos (overdue ones named) and what ran while you slept; an **evening recap** says what it did today, what is still open and what is coming tomorrow. The island's reminders card shows when the next one lands, the panel's **presence** card sets both times, and **check in now** delivers one on the spot. A brief is written from what is already on this PC — no model call, no network — so it works offline and cannot invent anything. A check-in whose moment passed while the PC was asleep is delivered late, and only within four hours: a morning brief at eight at night is not a brief.
 - **System access** is two switches in **soul → abilities**, both off until you ask. Tier 1 covers read-only diagnostics, registry reads and files inside your own six folders, each confirmed per action; Tier 2 covers arbitrary commands that change the PC, with its own warning. Clickaa refuses credential stores, browser password databases, elevation and anything that weakens Windows security whatever is switched on, and every attempt lands in an audit log in **memory → system access** with the raw command visible. **Ctrl + Alt + Q** stops everything mid-task.
 - Say **"clickaa"** (once switched on) and the island comes up with the microphone already open: keep talking, and Clickaa submits on its own when you stop. It listens with the speech recognizer Windows already ships, so no audio leaves the machine, and the tray can mute it instantly.
 - Give it a **task** rather than a single order — "go to youtube and play anything", "open my orders and check the last one" — and it works step by step: it clicks real buttons, looks at the screen to check what happened, and corrects itself when a step did not work. One approval covers the whole task; **Escape** stops it mid-task.
@@ -153,6 +154,9 @@ windows/
     system-access.ts           the whole safety policy: what may run, and why not
     system-access-runner.ts    runs one command or one file operation, isolated
     audit-log-store.ts         the on-disk record of everything that was attempted
+    presence-schedule.ts       when a check-in is due, and what the island says
+    presence-store.ts          which check-ins already ran today, so none repeats
+    briefing.ts                the morning brief and evening recap, built from local data
     skill-store.ts             tasks the user saved by name
     skill-suggestions.ts       when repeating a task becomes an offer to save it
     wake-word-listener.ts      the offline "clickaa" listener and its lifecycle

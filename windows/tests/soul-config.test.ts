@@ -13,7 +13,7 @@ import {
 } from "../src/main/soul-config";
 
 test("every ability is enabled by default and unknown stored values are ignored", () => {
-  assert.equal(abilityDefinitions.length, 12);
+  assert.equal(abilityDefinitions.length, 13);
   for (const abilityDefinition of abilityDefinitions) {
     assert.equal(defaultAbilitySettings[abilityDefinition.id], true, abilityDefinition.id);
   }

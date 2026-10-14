@@ -33,6 +33,7 @@ const abilityCopy: Array<{ id: AbilityId; label: string; description: string }> 
   { id: "memory", label: "memory", description: "remember facts you ask it to keep" },
   { id: "clipboardHistory", label: "clipboard history", description: "keep your recent copies in the island, on this pc only" },
   { id: "island", label: "the island", description: "show the notch at the top of the screen" },
+  { id: "presence", label: "presence", description: "wake up on its own with a morning brief and an evening recap" },
   { id: "wakeWord", label: "wake word", description: "listen for \"clickaa\" on this pc, and open the island when you say it" },
   { id: "systemAccessTier1", label: "system access", description: "read-only diagnostics, registry reads, and files in your own folders — each one asks first" },
   { id: "systemAccessTier2", label: "arbitrary commands", description: "let clickaa run commands that change your pc. leave this off unless you want that, and read every card it shows" },
@@ -147,6 +148,13 @@ const element = {
   auditList: requireElement<HTMLElement>("audit-list"),
   auditClearButton: requireElement<HTMLButtonElement>("audit-clear-button"),
   skillsCard: requireElement<HTMLElement>("skills-card"),
+  presenceStatus: requireElement<HTMLElement>("presence-status"),
+  morningBriefToggle: requireElement<HTMLInputElement>("morning-brief-toggle"),
+  morningBriefTime: requireElement<HTMLInputElement>("morning-brief-time"),
+  eveningRecapToggle: requireElement<HTMLInputElement>("evening-recap-toggle"),
+  eveningRecapTime: requireElement<HTMLInputElement>("evening-recap-time"),
+  speakCheckInsToggle: requireElement<HTMLInputElement>("speak-check-ins-toggle"),
+  checkInNowButton: requireElement<HTMLButtonElement>("check-in-now-button"),
   skillList: requireElement<HTMLElement>("skill-list"),
   islandMusicToggle: requireElement<HTMLInputElement>("island-music-toggle"),
   islandClipboardToggle: requireElement<HTMLInputElement>("island-clipboard-toggle"),
@@ -206,6 +214,7 @@ function renderState(state: ClickaaPublicState): void {
   element.brainLabel.textContent = `brain: ${state.brainLabel}`;
 
   renderSoul(config);
+  renderPresence(config);
   renderScheduleHint(state);
   renderSetup(state);
 }
@@ -412,6 +421,27 @@ function describeWakeWordStatus(state: ClickaaPublicState, config: ClickaaUserCo
 }
 
 /** Skills are editable here: rename one inline, or delete it for good. */
+function renderPresence(config: ClickaaUserConfig): void {
+  element.morningBriefToggle.checked = config.presence.morningBriefEnabled;
+  element.morningBriefTime.value = config.presence.morningBriefTime;
+  element.eveningRecapToggle.checked = config.presence.eveningRecapEnabled;
+  element.eveningRecapTime.value = config.presence.eveningRecapTime;
+  element.speakCheckInsToggle.checked = config.presence.speakCheckIns;
+
+  void window.clickaa
+    .getIslandState()
+    .then((islandState) => {
+      const { nextCheckInLabel, lastCheckIn } = islandState.presence;
+      const lastCheckInText = lastCheckIn
+        ? `last check-in: ${lastCheckIn.title}, ${lastCheckIn.summary}`
+        : "no check-in yet.";
+      element.presenceStatus.textContent = nextCheckInLabel
+        ? `next: ${nextCheckInLabel}. ${lastCheckInText}`
+        : `${lastCheckInText} both check-ins are off.`;
+    })
+    .catch(() => undefined);
+}
+
 function renderSkills(islandState: IslandState): void {
   element.skillsCard.hidden = !islandState.skills.length && !islandState.skillSuggestion;
   const skillRows = islandState.skills.map((skill) => {
@@ -879,6 +909,36 @@ element.launchToggle.addEventListener("change", () => void saveSettings({ launch
 element.islandSummonToggle.addEventListener("change", () => {
   void saveSettings({ islandSummonEnabled: element.islandSummonToggle.checked });
 });
+function savePresenceSettings(presenceUpdates: Partial<ClickaaUserConfig["presence"]>): void {
+  const currentPresence = latestState?.config.presence;
+  if (!currentPresence) {
+    return;
+  }
+  void saveSettings({ presence: { ...currentPresence, ...presenceUpdates } });
+}
+
+element.morningBriefToggle.addEventListener("change", () => {
+  savePresenceSettings({ morningBriefEnabled: element.morningBriefToggle.checked });
+});
+element.morningBriefTime.addEventListener("change", () => {
+  savePresenceSettings({ morningBriefTime: element.morningBriefTime.value });
+});
+element.eveningRecapToggle.addEventListener("change", () => {
+  savePresenceSettings({ eveningRecapEnabled: element.eveningRecapToggle.checked });
+});
+element.eveningRecapTime.addEventListener("change", () => {
+  savePresenceSettings({ eveningRecapTime: element.eveningRecapTime.value });
+});
+element.speakCheckInsToggle.addEventListener("change", () => {
+  savePresenceSettings({ speakCheckIns: element.speakCheckInsToggle.checked });
+});
+element.checkInNowButton.addEventListener("click", () => {
+  element.checkInNowButton.textContent = "writing…";
+  void window.clickaa.runCheckInNow().then(() => {
+    element.checkInNowButton.textContent = "check in now";
+  });
+});
+
 element.auditClearButton.addEventListener("click", () => {
   window.clickaa.clearAuditLog();
 });

@@ -58,6 +58,7 @@ const element = {
   todoCount: requireElement<HTMLElement>("todo-count"),
   todoList: requireElement<HTMLElement>("todo-list"),
   scheduleList: requireElement<HTMLElement>("schedule-list"),
+  presenceNote: requireElement<HTMLElement>("presence-note"),
   memoryList: requireElement<HTMLElement>("memory-list"),
   clipList: requireElement<HTMLElement>("clip-list"),
   appGrid: requireElement<HTMLElement>("app-grid"),
@@ -379,6 +380,11 @@ function renderPlans(islandState: IslandState): void {
   element.memoryList.replaceChildren(...(islandState.memoryFacts.length
     ? islandState.memoryFacts.map(buildMemoryRow)
     : [createEmptyRow("say \"remember my wifi password is …\" and clickaa keeps it.")]));
+
+  // The whole point of presence is that it is visible before it happens: the
+  // chip says when Clickaa will speak up next without the user asking.
+  element.presenceNote.textContent = islandState.presence.nextCheckInLabel ?? "";
+  element.presenceNote.hidden = !islandState.presence.nextCheckInLabel;
 }
 
 function buildTodoRow(todoItem: TodoItem): HTMLElement {

@@ -78,6 +78,7 @@ export const abilityIds = [
   "wakeWord",
   "systemAccessTier1",
   "systemAccessTier2",
+  "presence",
 ] as const;
 export type AbilityId = (typeof abilityIds)[number];
 export type AbilitySettings = Record<AbilityId, boolean>;
@@ -467,6 +468,9 @@ export interface ClickaaUserConfig {
 
   soul: SoulSettings;
   abilities: AbilitySettings;
+
+  /** When Clickaa speaks up on its own, without being asked. */
+  presence: PresenceSettings;
 }
 
 export const dictationShortcutIds = ["ctrl+windows", "ctrl+shift+space", "capslock"] as const;
@@ -536,6 +540,34 @@ export interface ClipboardClip {
 }
 
 export type ActivityKind = "action" | "automation" | "system" | "confirmation";
+
+export const presenceCheckInIds = ["morning", "evening"] as const;
+export type PresenceCheckInKind = (typeof presenceCheckInIds)[number];
+
+/**
+ * When Clickaa wakes up on its own. Times are local "HH:MM" strings so the
+ * panel's time inputs round-trip exactly what the user typed.
+ */
+export interface PresenceSettings {
+  morningBriefEnabled: boolean;
+  morningBriefTime: string;
+  eveningRecapEnabled: boolean;
+  eveningRecapTime: string;
+  speakCheckIns: boolean;
+}
+
+/** The last time Clickaa spoke up unprompted, so the island can show it. */
+export interface PresenceCheckInRecord {
+  kind: PresenceCheckInKind;
+  title: string;
+  summary: string;
+  ranAtIso: string;
+}
+
+export interface PresenceSurfaceState {
+  nextCheckInLabel: string | null;
+  lastCheckIn: PresenceCheckInRecord | null;
+}
 
 export interface ActivityFeedEntry {
   id: string;
@@ -667,6 +699,7 @@ export interface IslandState {
   todos: TodoItem[];
   scheduledTasks: ScheduledTask[];
   memoryFacts: MemoryFact[];
+  presence: PresenceSurfaceState;
   clipboardClips: ClipboardClip[];
   quickLaunchApps: LaunchableAppView[];
   brainLabel: string;

@@ -70,6 +70,7 @@ declare global {
       dismissSkillSuggestion(): Promise<void>;
       renameSkill(skillId: string, nextName: string): Promise<void>;
       removeSkill(skillId: string): Promise<void>;
+      runCheckInNow(): Promise<void>;
       undoActivity(activityEntryId: string): Promise<boolean>;
       launchApp(appName: string): Promise<void>;
       mediaControl(operation: "play_pause" | "next" | "previous"): Promise<void>;

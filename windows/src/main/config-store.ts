@@ -24,6 +24,7 @@ import {
   sanitizeConfirmationMode,
   sanitizeSoulSettings,
 } from "./soul-config";
+import { defaultPresenceSettings, sanitizePresenceSettings } from "./presence-schedule";
 
 export const defaultClickaaUserConfig: ClickaaUserConfig = {
   workerBaseUrl: "",
@@ -48,6 +49,7 @@ export const defaultClickaaUserConfig: ClickaaUserConfig = {
   wakeWordProvider: "offline",
   soul: { ...defaultSoulSettings },
   abilities: { ...defaultAbilitySettings },
+  presence: { ...defaultPresenceSettings },
 };
 
 export function normalizeWorkerBaseUrl(rawWorkerBaseUrl: string): string {
@@ -211,6 +213,7 @@ export function sanitizeStoredConfig(storedConfig: unknown): ClickaaUserConfig {
     ),
     soul: sanitizeSoulSettings(possibleConfig.soul),
     abilities: sanitizeAbilitySettings(possibleConfig.abilities),
+    presence: sanitizePresenceSettings(possibleConfig.presence),
   };
 }
 
@@ -225,7 +228,12 @@ export class ClickaaConfigStore {
   }
 
   getConfig(): ClickaaUserConfig {
-    return { ...this.currentConfig, soul: { ...this.currentConfig.soul }, abilities: { ...this.currentConfig.abilities } };
+    return {
+      ...this.currentConfig,
+      soul: { ...this.currentConfig.soul },
+      abilities: { ...this.currentConfig.abilities },
+      presence: { ...this.currentConfig.presence },
+    };
   }
 
   updateConfig(configUpdates: Partial<ClickaaUserConfig>): ClickaaUserConfig {
@@ -238,6 +246,11 @@ export class ClickaaConfigStore {
       abilities: configUpdates.abilities
         ? { ...this.currentConfig.abilities, ...configUpdates.abilities }
         : this.currentConfig.abilities,
+      // Merged field by field so the panel can send just "the morning time
+      // changed" without wiping the rest of the check-in settings.
+      presence: configUpdates.presence
+        ? { ...this.currentConfig.presence, ...configUpdates.presence }
+        : this.currentConfig.presence,
     };
 
     // Values that arrive from the panel are validated strictly so the user sees

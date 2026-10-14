@@ -226,6 +226,50 @@
           <p id="schedule-hint" class="field-hint">say it out loud instead and clickaa will set it up: "every morning at nine, open unity and spotify".</p>
           <div id="schedule-list" class="list"></div>
         </section>
+
+        <section class="card" id="presence-card">
+          <div class="section-heading-row">
+            <div>
+              <p class="eyebrow">presence</p>
+              <h2>check-ins clickaa starts</h2>
+            </div>
+            <button id="check-in-now-button" class="ghost-button" type="button">check in now</button>
+          </div>
+          <p class="field-hint">a brief in the morning and a recap at night, written from your own schedule, to-dos and what clickaa did. check-ins never touch anything on this pc.</p>
+          <div class="setting-row">
+            <div>
+              <strong>morning brief</strong>
+              <span>what today holds, and what ran while you slept</span>
+            </div>
+            <input id="morning-brief-time" class="text-field presence-time-field" type="time" aria-label="morning brief time">
+            <label class="toggle-control">
+              <input id="morning-brief-toggle" type="checkbox">
+              <span></span>
+            </label>
+          </div>
+          <div class="setting-row">
+            <div>
+              <strong>evening recap</strong>
+              <span>what clickaa did today, and what is still open</span>
+            </div>
+            <input id="evening-recap-time" class="text-field presence-time-field" type="time" aria-label="evening recap time">
+            <label class="toggle-control">
+              <input id="evening-recap-toggle" type="checkbox">
+              <span></span>
+            </label>
+          </div>
+          <div class="setting-row">
+            <div>
+              <strong>say them out loud</strong>
+              <span>speak each check-in instead of only showing it</span>
+            </div>
+            <label class="toggle-control">
+              <input id="speak-check-ins-toggle" type="checkbox">
+              <span></span>
+            </label>
+          </div>
+          <p id="presence-status" class="field-hint"></p>
+        </section>
       </section>
 
       <!-- ------------------------------------------------------------------ -->
