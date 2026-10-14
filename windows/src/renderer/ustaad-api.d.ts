@@ -72,6 +72,9 @@ declare global {
       resolveConfirmation(confirmationId: string, decision: "approve" | "reject"): Promise<string>;
       saveSkillSuggestion(): Promise<string>;
       dismissSkillSuggestion(): Promise<void>;
+      workOutSkillRepair(): Promise<string>;
+      saveSkillRepair(): Promise<string>;
+      dismissSkillRepair(): Promise<void>;
       renameSkill(skillId: string, nextName: string): Promise<void>;
       removeSkill(skillId: string): Promise<void>;
       runCheckInNow(): Promise<void>;

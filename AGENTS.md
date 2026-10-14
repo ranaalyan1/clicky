@@ -62,6 +62,8 @@ Worker vars: `ELEVENLABS_VOICE_ID`
 
 **System Access Tiers**: Two separate abilities, both off by default. Tier 1 is read-only diagnostics, registry reads, and files inside the user's own six folders. Tier 2 is arbitrary commands that change the PC, with its own warning wording and its own confirmation. Credentials, elevation, and anything that weakens Windows security are refused whatever is switched on.
 
+**Skill Repair**: A saved skill that fails recovers by being replaced, never by being widened. The store keeps a failure streak per skill; two failures in a row (a run the user stopped themselves never counts) produce an offer, and the offered streak is remembered so "not now" is respected until two more failures. The fix is one ordinary model call whose prompt carries the same rules as the parser expects, the proposed aim is shown before it is saved, and saving it resets the health while keeping the name, the id and every run-time confirmation. Nothing about a repair grants an ability.
+
 **Phone Window**: `phone-bridge-server.ts` is a plain `node:http` server — no framework, no dependency — that speaks three routes (`GET /` for the one-page window, `GET /api/status` for what is already on the PC, `POST /api/ask` for a typed question). Everything else is 404, and **no route can act**: a phone question is answered through the same capture, prompt and parse path as a spoken one, with actions stripped, so the read-only promise is a property of the routes rather than a rule the model is asked to respect. The pairing token is compared with `timingSafeEqual`, the address is bound to the LAN, each source address gets 60 requests a minute, bodies are capped at 4 KB, and the page carries a `default-src 'none'` CSP so it loads nothing from anywhere. It starts only while the `phoneWindow` ability is on and stops when the ability is switched off or the app quits.
 
 ## Key Files
@@ -89,8 +91,9 @@ Worker vars: `ELEVENLABS_VOICE_ID`
 | `windows/src/main/island-presentation.ts` | ~208 | The island's pure summon/dismiss state machine. |
 | `windows/src/main/shortcut-registry.ts` | ~248 | Shortcut definitions, chord supersession, and the physical-key state machine behind push-to-talk. |
 | `windows/src/main/global-shortcut-monitor.ts` | ~107 | The `uiohook-napi` listener that feeds physical key events to the state machine and reports Escape. |
-| `windows/src/main/skill-store.ts` | ~163 | Tasks the user saved by name, with rename, remove and run counts. |
+| `windows/src/main/skill-store.ts` | ~250 | Tasks the user saved by name, with rename, remove, run counts and the health of each skill (last outcome, failure streak, how often it has been repaired). |
 | `windows/src/main/skill-suggestions.ts` | ~131 | When repeating a task becomes an offer to save it, including how a "no thanks" is respected. |
+| `windows/src/main/skill-repair.ts` | ~115 | When a saved skill that keeps failing deserves a second chance: the failure rule (a run the user stopped is not a failure), the offer threshold, the repair prompt, and the parser for the new aim. |
 | `windows/src/main/snippet-store.ts` | ~174 | Saved phrases that can be typed into any window. |
 | `windows/src/main/clipboard-history-store.ts` | ~95 | Recent clipboard text, on this PC only. |
 | `windows/src/main/memory-store.ts` | ~170 | Remembered facts and the island's activity feed. |

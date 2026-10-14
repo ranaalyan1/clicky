@@ -20,7 +20,9 @@ import {
   PhoneBridgeStatus,
   RunHistoryEntry,
   RunHistorySearchResult,
+  RunOutcome,
   Skill,
+  SkillRepairSurface,
   WakeWordSurfaceState,
 } from "../shared/contracts";
 import {
@@ -73,6 +75,12 @@ import { buildBriefingDigest } from "./briefing";
 import { AuditLogStore } from "./audit-log-store";
 import { JsonFileStore } from "./json-file-store";
 import { SkillStore } from "./skill-store";
+import {
+  buildSkillRepairPrompt,
+  isSkillFailure,
+  parseSkillRepairReply,
+  shouldOfferSkillRepair,
+} from "./skill-repair";
 import { SnippetStore } from "./snippet-store";
 import {
   SkillSuggestion,
@@ -177,6 +185,8 @@ export class UstaadController {
   /** Signatures the user said no to, and how often the task had succeeded then. */
   private readonly declinedSkillSignatures = new Map<string, number>();
   private currentSkillSuggestion: SkillSuggestion | null = null;
+  /** A failed skill waiting on a repair, from the offer to the saved fix. */
+  private currentSkillRepair: SkillRepairSurface | null = null;
   private skillSuggestionHistoryStore: JsonFileStore<SkillSuggestionMemory> | null = null;
   private readonly wakeWordListener: WakeWordListener;
   private wakeWordState: WakeWordSurfaceState = "off";
@@ -2121,6 +2131,166 @@ export class UstaadController {
     this.publishIslandState();
   }
 
+  /**
+   * Called after a saved skill runs. Records how it went and, once the same
+   * skill has failed twice in a row, offers to work out a different way. The
+   * offer is only ever an offer: nothing about the skill changes yet.
+   */
+  private noteSavedSkillOutcome(skillId: string, outcome: RunOutcome, note: string): void {
+    const updatedSkill = this.skillStore.noteRun(skillId, {
+      outcome,
+      note,
+      countsAsFailure: isSkillFailure(outcome),
+    });
+    if (!updatedSkill) {
+      return;
+    }
+
+    // Working again is the end of the matter, however the repair was going.
+    if (outcome === "completed") {
+      if (this.currentSkillRepair?.skillId === skillId) {
+        this.currentSkillRepair = null;
+        this.activityFeed.record("system", `the "${updatedSkill.name}" skill worked this time`, "nothing to fix", false);
+        this.publishIslandState();
+      }
+      return;
+    }
+
+    if (this.currentSkillRepair?.skillId === skillId) {
+      return;
+    }
+    if (!shouldOfferSkillRepair(updatedSkill)) {
+      return;
+    }
+
+    this.skillStore.noteRepairOffered(updatedSkill.id, updatedSkill.failureStreak);
+    this.currentSkillRepair = {
+      stage: "offered",
+      skillId: updatedSkill.id,
+      skillName: updatedSkill.name,
+      failureStreak: updatedSkill.failureStreak,
+      lastOutcomeNote: updatedSkill.lastOutcomeNote,
+      proposedGoal: null,
+      proposedActions: [],
+      explanation: "",
+    };
+    this.activityFeed.record(
+      "system",
+      `the "${updatedSkill.name}" skill has not worked ${updatedSkill.failureStreak} times in a row`,
+      "want me to work out a different way?",
+      false,
+    );
+    this.desktopWindows.openIsland();
+    this.publishIslandState();
+  }
+
+  /** The island's "work out a fix" button. One model call, and still no action. */
+  async workOutSkillRepair(): Promise<string> {
+    const repair = this.currentSkillRepair;
+    if (!repair || repair.stage !== "offered") {
+      return "there is nothing to fix right now.";
+    }
+
+    const skill = this.skillStore.findById(repair.skillId);
+    if (!skill) {
+      this.currentSkillRepair = null;
+      this.publishIslandState();
+      return "that skill is not saved any more.";
+    }
+
+    const config = this.configStore.getConfig();
+    if (!this.brainRouter.isConfigured(config)) {
+      return this.brainRouter.configurationHint(config);
+    }
+
+    this.currentSkillRepair = { ...repair, stage: "working" };
+    this.publishIslandState();
+
+    try {
+      const modelResponseText = await this.brainRouter.streamResponse(config, {
+        systemPrompt: buildSkillRepairPrompt(skill, config.abilities),
+        userPrompt: `Work out a better way to do "${skill.name}".`,
+        images: [],
+        conversationHistory: [],
+        signal: new AbortController().signal,
+      });
+      const parsedRepair = parseSkillRepairReply(modelResponseText);
+      if (!parsedRepair) {
+        this.currentSkillRepair = { ...repair, stage: "offered" };
+        this.activityFeed.record("system", `could not work out a fix for "${skill.name}"`, "the old steps still stand", false);
+        this.publishIslandState();
+        return "I could not work out a fix for that one.";
+      }
+
+      this.currentSkillRepair = {
+        stage: "proposed",
+        skillId: skill.id,
+        skillName: skill.name,
+        failureStreak: skill.failureStreak,
+        lastOutcomeNote: skill.lastOutcomeNote,
+        proposedGoal: parsedRepair.goal,
+        proposedActions: parsedRepair.actions,
+        explanation: parsedRepair.explanation,
+      };
+      this.publishIslandState();
+      return `I worked out a different way to do "${skill.name}" — press "save the fix" to keep it.`;
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      this.currentSkillRepair = { ...repair, stage: "offered" };
+      this.activityFeed.record("system", `could not work out a fix for "${skill.name}"`, errorMessage, false);
+      this.publishIslandState();
+      return `I could not work that one out: ${errorMessage}`;
+    }
+  }
+
+  /**
+   * The island's "save the fix" button. This is the only path that changes a
+   * saved skill, it keeps the name and the id, and it resets the health rather
+   * than granting anything: the repaired skill is confirmed per run like any
+   * other.
+   */
+  saveSkillRepair(): string {
+    const repair = this.currentSkillRepair;
+    if (!repair || repair.stage !== "proposed" || !repair.proposedGoal) {
+      return "there is no fix to save.";
+    }
+
+    const repairedSkill = this.skillStore.applyRepair(repair.skillId, {
+      goal: repair.proposedGoal,
+      seedActions: repair.proposedActions,
+    });
+    if (!repairedSkill) {
+      return "that skill is not saved any more.";
+    }
+
+    this.currentSkillRepair = null;
+    this.activityFeed.record(
+      "system",
+      `"${repairedSkill.name}" now works a different way`,
+      repairedSkill.goal,
+      false,
+    );
+    this.publishState();
+    this.publishIslandState();
+    return `saved the new way to do "${repairedSkill.name}".`;
+  }
+
+  /** "keep the old one": nothing changes, and the offer is not repeated yet. */
+  dismissSkillRepair(): void {
+    const repair = this.currentSkillRepair;
+    if (!repair) {
+      return;
+    }
+
+    this.currentSkillRepair = null;
+    if (repair.stage === "proposed") {
+      this.activityFeed.record("system", `kept the old "${repair.skillName}" skill`, "I will not ask again for a while", false);
+    } else {
+      this.activityFeed.record("system", `kept the old "${repair.skillName}" skill`, "", false);
+    }
+    this.publishIslandState();
+  }
+
   renameSkill(skillId: string, nextName: string): UstaadPublicState | void {
     const renamedSkill = this.skillStore.rename(skillId, nextName);
     if (!renamedSkill) {
@@ -2156,13 +2326,16 @@ export class UstaadController {
       );
     }
 
-    this.skillStore.noteRun(skill.id);
-    void this.runAgentTask(skill.goal, skill.seedActions);
+    void this.runAgentTask(skill.goal, skill.seedActions, skill.id);
     return completedActionOutcome(`starting ${skill.name}`, skill.goal);
   }
 
   /** Runs the loop and reports where it ended up. */
-  private async runAgentTask(goal: string, initialActions: UstaadAction[]): Promise<void> {
+  private async runAgentTask(
+    goal: string,
+    initialActions: UstaadAction[],
+    skillId: string | null = null,
+  ): Promise<void> {
     if (this.isAgentTaskRunning) {
       return;
     }
@@ -2190,6 +2363,9 @@ export class UstaadController {
         stepsTaken: taskResult.stepsTaken,
         response: this.publicState.responseText,
       });
+      if (skillId) {
+        this.noteSavedSkillOutcome(skillId, taskResult.outcome, taskResult.note);
+      }
       if (taskResult.outcome === "completed") {
         this.noteSuccessfulTask(goal, initialActions);
       } else {
@@ -2206,6 +2382,9 @@ export class UstaadController {
         stepsTaken: 0,
         response: "",
       });
+      if (skillId) {
+        this.noteSavedSkillOutcome(skillId, "failed", errorMessage);
+      }
     } finally {
       this.isAgentTaskRunning = false;
       this.agentTaskCancelled = true;
@@ -2931,6 +3110,7 @@ export class UstaadController {
       wakeWordMessage: this.wakeWordMessage,
       skills: this.skillStore.list(),
       skillSuggestion: this.currentSkillSuggestion,
+      skillRepair: this.currentSkillRepair,
       cursorEnabled: config.cursorEnabled,
       automationPaused: config.automationPaused,
       status: {

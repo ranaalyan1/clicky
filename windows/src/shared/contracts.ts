@@ -497,6 +497,36 @@ export interface Skill {
   createdAtIso: string;
   runCount: number;
   lastRunAtIso: string | null;
+  /** How the most recent run ended, or null before the skill has been run. */
+  lastOutcome: RunOutcome | null;
+  /** The one-line account of that run, kept so a repair can be proposed from it. */
+  lastOutcomeNote: string;
+  /** Runs that did not finish in a row; the first one that finishes resets it. */
+  failureStreak: number;
+  /** The streak a repair was last offered at, so "not now" is not asked twice. */
+  repairOfferedStreak: number;
+  /** How many times the user accepted a new way of doing this skill. */
+  repairCount: number;
+  /** When that new way was accepted, or null if the skill has never been repaired. */
+  repairedAtIso: string | null;
+}
+
+/**
+ * A saved skill that keeps failing, and the alternative Ustaad worked out for
+ * it. Offered and saved, never applied on its own: the only thing that changes
+ * without the user is `stage`.
+ */
+export interface SkillRepairSurface {
+  stage: "offered" | "working" | "proposed";
+  skillId: string;
+  skillName: string;
+  failureStreak: number;
+  lastOutcomeNote: string;
+  /** Filled in once the model has answered with a new way of doing it. */
+  proposedGoal: string | null;
+  proposedActions: UstaadAction[];
+  /** The model's one line on why this should work better. */
+  explanation: string;
 }
 
 /** The island's "save that as a skill?" card, when it is offered. */
@@ -525,12 +555,20 @@ export interface MemoryFact {
  * answered, whether it got there, and how much work it took. Stored as plain
  * JSON the user can read, and searched in memory rather than in a database.
  */
+export type RunOutcome =
+  | "completed"
+  | "gave_up"
+  | "ran_out_of_steps"
+  | "ran_out_of_time"
+  | "stopped"
+  | "failed";
+
 export interface RunHistoryEntry {
   id: string;
   createdAtIso: string;
   request: string;
   kind: "reply" | "task" | "routine" | "check-in";
-  outcome: "completed" | "gave_up" | "ran_out_of_steps" | "ran_out_of_time" | "stopped" | "failed";
+  outcome: RunOutcome;
   /** The one-line account of where the run ended up. */
   note: string;
   stepsTaken: number;
@@ -749,6 +787,7 @@ export interface IslandState {
   wakeWordMuted: boolean;
   skills: Skill[];
   skillSuggestion: SkillSuggestionPrompt | null;
+  skillRepair: SkillRepairSurface | null;
   /** Why the wake word is in that state, shown as the indicator's tooltip. */
   wakeWordMessage: string;
   todos: TodoItem[];

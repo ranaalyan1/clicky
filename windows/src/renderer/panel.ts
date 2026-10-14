@@ -12,6 +12,7 @@ import type {
   ResponseLengthId,
   RunHistoryEntry,
   RunHistorySearchResult,
+  Skill,
   SpeechProviderId,
 } from "../shared/contracts";
 import { createUstaadIcon, setIconButton } from "./icons.js";
@@ -524,8 +525,31 @@ function renderPresence(config: UstaadUserConfig): void {
     .catch(() => undefined);
 }
 
+/**
+ * One short line about how a saved skill is doing. The renderer keeps its own
+ * copy rather than importing from the main process: main code is CommonJS and
+ * the renderer is browser-native ES modules, and that boundary is worth more
+ * than saving four lines.
+ */
+function describeSkillHealth(skill: Skill): string {
+  if (!skill.lastOutcome) {
+    return "";
+  }
+  if (skill.lastOutcome === "completed") {
+    return "last run worked";
+  }
+  if (skill.lastOutcome === "stopped") {
+    return "last run was stopped";
+  }
+  return skill.failureStreak > 1
+    ? `has not worked ${skill.failureStreak} times in a row`
+    : "the last run did not finish";
+}
+
 function renderSkills(islandState: IslandState): void {
-  element.skillsCard.hidden = !islandState.skills.length && !islandState.skillSuggestion;
+  element.skillsCard.hidden = !islandState.skills.length
+    && !islandState.skillSuggestion
+    && !islandState.skillRepair;
   const skillRows = islandState.skills.map((skill) => {
     const row = document.createElement("div");
     row.className = "list-row";
@@ -543,9 +567,12 @@ function renderSkills(islandState: IslandState): void {
     });
 
     const meta = document.createElement("span");
-    meta.textContent = skill.runCount
-      ? `${skill.goal} · used ${skill.runCount} ${skill.runCount === 1 ? "time" : "times"}`
-      : skill.goal;
+    const health = describeSkillHealth(skill);
+    const usage = skill.runCount
+      ? `used ${skill.runCount} ${skill.runCount === 1 ? "time" : "times"}`
+      : "not used yet";
+    meta.textContent = `${skill.goal} · ${usage}${health ? ` · ${health}` : ""}`
+      + (skill.repairCount ? ` · repaired ${skill.repairCount} time${skill.repairCount === 1 ? "" : "s"}` : "");
 
     copy.append(nameInput, meta);
 
@@ -560,6 +587,25 @@ function renderSkills(islandState: IslandState): void {
     row.append(copy, removeButton);
     return row;
   });
+
+  if (islandState.skillRepair) {
+    const repair = islandState.skillRepair;
+    const repairRow = document.createElement("div");
+    repairRow.className = "list-row";
+    const copy = document.createElement("div");
+    copy.className = "list-row-copy";
+    const title = document.createElement("strong");
+    title.textContent = repair.stage === "proposed"
+      ? `ready to fix: "${repair.skillName}"`
+      : `needs a fix: "${repair.skillName}"`;
+    const meta = document.createElement("span");
+    meta.textContent = repair.stage === "proposed"
+      ? `new aim: ${repair.proposedGoal ?? ""} — offered in the island`
+      : `has not worked ${repair.failureStreak} times in a row — offered in the island`;
+    copy.append(title, meta);
+    repairRow.append(copy);
+    skillRows.unshift(repairRow);
+  }
 
   if (islandState.skillSuggestion) {
     const suggestionRow = document.createElement("div");

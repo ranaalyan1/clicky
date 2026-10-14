@@ -141,6 +141,9 @@ contextBridge.exposeInMainWorld("ustaad", {
   },
   saveSkillSuggestion: (): Promise<string> => ipcRenderer.invoke("island:save-skill-suggestion"),
   dismissSkillSuggestion: (): Promise<void> => ipcRenderer.invoke("island:dismiss-skill-suggestion"),
+  workOutSkillRepair: (): Promise<string> => ipcRenderer.invoke("island:work-out-skill-repair"),
+  saveSkillRepair: (): Promise<string> => ipcRenderer.invoke("island:save-skill-repair"),
+  dismissSkillRepair: (): Promise<void> => ipcRenderer.invoke("island:dismiss-skill-repair"),
   renameSkill: (skillId: string, nextName: string): Promise<void> => {
     return ipcRenderer.invoke("panel:rename-skill", skillId, nextName);
   },

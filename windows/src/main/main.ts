@@ -204,6 +204,24 @@ function registerIpcHandlers(): void {
     }
     ustaadController?.dismissSuggestedSkill();
   });
+  ipcMain.handle("island:work-out-skill-repair", (event) => {
+    if (!islandSentEvent(event.sender.id)) {
+      throw new Error("IPC request rejected: sender is not the Ustaad island.");
+    }
+    return ustaadController?.workOutSkillRepair() ?? "there is nothing to fix right now.";
+  });
+  ipcMain.handle("island:save-skill-repair", (event) => {
+    if (!islandSentEvent(event.sender.id)) {
+      throw new Error("IPC request rejected: sender is not the Ustaad island.");
+    }
+    return ustaadController?.saveSkillRepair() ?? "there is no fix to save.";
+  });
+  ipcMain.handle("island:dismiss-skill-repair", (event) => {
+    if (!islandSentEvent(event.sender.id)) {
+      throw new Error("IPC request rejected: sender is not the Ustaad island.");
+    }
+    ustaadController?.dismissSkillRepair();
+  });
   ipcMain.handle("panel:rename-skill", (event, skillId: string, nextName: string) => {
     if (!panelSentEvent(event.sender.id)) {
       throw new Error("IPC request rejected: sender is not the Ustaad panel.");

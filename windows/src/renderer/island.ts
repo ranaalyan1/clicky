@@ -605,6 +605,102 @@ function renderControlToggles(islandState: IslandState): void {
 
 /* -------------------------------------------------------------------------- */
 /* Rendering                                                                  */
+/**
+ * The repair card for a saved skill that keeps failing. It has three faces:
+ * the offer, the wait while the model thinks, and the proposed new way. Only
+ * "save the fix" changes the skill, and even then every run is confirmed.
+ */
+function renderSkillRepair(islandState: IslandState): void {
+  const repair = islandState.skillRepair;
+  if (!repair) {
+    return;
+  }
+
+  const card = document.createElement("div");
+  card.className = "confirmation-card skill-repair-card";
+
+  const title = document.createElement("p");
+  title.className = "confirmation-title";
+  const reason = document.createElement("p");
+  reason.className = "confirmation-reason";
+  const buttonRow = document.createElement("div");
+  buttonRow.className = "confirmation-buttons";
+
+  if (repair.stage === "offered") {
+    title.textContent = `the "${repair.skillName}" skill is not working`;
+    reason.textContent = `it has not worked ${repair.failureStreak} times in a row`
+      + (repair.lastOutcomeNote ? ` — ${repair.lastOutcomeNote}` : "")
+      + ". want me to work out a different way?";
+    card.append(title, reason, buttonRow);
+
+    const fixButton = document.createElement("button");
+    fixButton.type = "button";
+    fixButton.className = "confirmation-button approve";
+    fixButton.textContent = "work out a fix";
+    const keepButton = document.createElement("button");
+    keepButton.type = "button";
+    keepButton.className = "confirmation-button";
+    keepButton.textContent = "not now";
+
+    fixButton.addEventListener("click", () => {
+      fixButton.disabled = true;
+      keepButton.disabled = true;
+      reason.textContent = "working out a different way…";
+      void window.ustaad.workOutSkillRepair().then((message) => {
+        reason.textContent = message;
+      });
+    });
+    keepButton.addEventListener("click", () => {
+      void window.ustaad.dismissSkillRepair();
+    });
+
+    buttonRow.append(fixButton, keepButton);
+    element.confirmationStack.append(card);
+    return;
+  }
+
+  if (repair.stage === "working") {
+    title.textContent = `working out a new way to do "${repair.skillName}"`;
+    reason.textContent = "one moment — this is only thinking, nothing on this pc is being changed.";
+    card.append(title, reason);
+    element.confirmationStack.append(card);
+    return;
+  }
+
+  title.textContent = `a different way to do "${repair.skillName}"`;
+  const stepSummary = repair.proposedActions.length
+    ? `it starts with ${repair.proposedActions.length} step${repair.proposedActions.length === 1 ? "" : "s"}.`
+    : "no starting steps — I will look at the screen instead.";
+  reason.textContent = `new aim: ${repair.proposedGoal ?? repair.skillName}.`
+    + (repair.explanation ? ` ${repair.explanation}` : "")
+    + ` ${stepSummary}`;
+  card.append(title, reason, buttonRow);
+
+  const saveButton = document.createElement("button");
+  saveButton.type = "button";
+  saveButton.className = "confirmation-button approve";
+  saveButton.textContent = "save the fix";
+  const oldButton = document.createElement("button");
+  oldButton.type = "button";
+  oldButton.className = "confirmation-button";
+  oldButton.textContent = "keep the old one";
+
+  saveButton.addEventListener("click", () => {
+    saveButton.disabled = true;
+    oldButton.disabled = true;
+    reason.textContent = "saving…";
+    void window.ustaad.saveSkillRepair().then((message) => {
+      reason.textContent = message;
+    });
+  });
+  oldButton.addEventListener("click", () => {
+    void window.ustaad.dismissSkillRepair();
+  });
+
+  buttonRow.append(saveButton, oldButton);
+  element.confirmationStack.append(card);
+}
+
 /* -------------------------------------------------------------------------- */
 
 function renderIsland(islandState: IslandState): void {
@@ -616,6 +712,7 @@ function renderIsland(islandState: IslandState): void {
   renderWakeIndicator(islandState);
   renderConfirmations(islandState);
   renderSkillSuggestion(islandState);
+  renderSkillRepair(islandState);
   renderTimers(islandState);
   renderSnippets(islandState);
   renderActivityFeed(islandState.activityFeed);
