@@ -46,7 +46,7 @@ If both are configured, the provider selected in **setup** wins; if that provide
 - A Gemini API key **or** a deployed Clickaa Cloudflare Worker
 - Microphone access when Windows asks on the first interaction
 
-Windows does not require the macOS Accessibility or Screen Recording permissions. Clickaa captures the desktop through Electron's Windows capture API and only sends a screenshot while an interaction you started is running.
+Clickaa needs no Accessibility or Screen Recording permission: it captures the desktop through Electron's Windows capture API, and only sends a screenshot while an interaction you started is running.
 
 ## Run from source
 

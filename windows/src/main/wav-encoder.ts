@@ -1,6 +1,6 @@
 /**
- * WAV encoding for providers that take an audio file rather than a live stream
- * (Gemini transcription, and the OpenAI upload fallback in the Swift client).
+ * WAV encoding for providers that take an audio file rather than a live stream,
+ * which is how Gemini transcription is fed.
  */
 
 const wavHeaderByteCount = 44;

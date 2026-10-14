@@ -5,45 +5,37 @@
 
 ## Overview
 
-Cross-platform desktop companion with native clients for Windows and macOS. It lives in the Windows system tray or macOS menu bar and opens a floating control panel. Global push-to-talk captures voice input and sends the transcript plus multi-monitor screenshots to the configured model. The model responds with streamed text and speech. A blue cursor overlay can fly to UI elements the model references on any connected monitor.
+Clickaa is a Windows desktop companion written entirely in TypeScript: an Electron system-tray client in `windows/` and a Cloudflare Worker proxy in `worker/`. It lives in the Windows notification area and opens a floating control panel plus a notch ("the island") at the top of every screen. Global push-to-talk captures voice input and sends the transcript plus multi-monitor screenshots to the configured model. The model responds with streamed text and speech, can point at UI elements, and can act on the PC through a typed action protocol.
 
-The macOS client uses SwiftUI/AppKit. The Windows client lives in `windows/` and uses Electron with TypeScript, sandboxed renderers, a context-isolated preload bridge, and Windows-capable native hooks. The Windows client can think with **either** a user-supplied Gemini API key stored on that PC (`%APPDATA%\Clickaa\settings.json`) **or** the Cloudflare Worker proxy, which keeps the long-lived provider keys off the device.
+There is **no Swift code and no macOS client** in this repository. The original open-source Clicky macOS client was removed; it remains in this repository's history at commit `629c868` if it is ever needed for reference.
+
+The client can think with **either** a user-supplied Gemini API key stored on that PC (`%APPDATA%\Clickaa\settings.json`) **or** the Cloudflare Worker proxy, which keeps the long-lived provider keys off the device.
 
 ## Architecture
 
-### macOS client
-
-- **App Type**: Menu bar-only (`LSUIElement=true`), no dock icon or main window
-- **Framework**: SwiftUI (macOS native) with AppKit bridging for menu bar panel and cursor overlay
-- **Pattern**: MVVM with `@StateObject` / `@Published` state management
-- **AI Chat**: Claude (Sonnet 4.6 default, Opus 4.6 optional) via Cloudflare Worker proxy with SSE streaming
-- **Speech-to-Text**: AssemblyAI real-time streaming (`u3-rt-pro` model) via websocket, with OpenAI and Apple Speech as fallbacks
-- **Text-to-Speech**: ElevenLabs (`eleven_flash_v2_5` model) via Cloudflare Worker proxy
-- **Screen Capture**: ScreenCaptureKit (macOS 14.2+), multi-monitor support
-- **Voice Input**: Push-to-talk via `AVAudioEngine` + pluggable transcription-provider layer. System-wide keyboard shortcut via listen-only CGEvent tap.
-- **Element Pointing**: Claude embeds `[POINT:x,y:label:screenN]` tags in responses. The overlay parses these, maps coordinates to the correct monitor, and animates the blue cursor along a bezier arc to the target.
-- **Concurrency**: `@MainActor` isolation, async/await throughout
-- **Analytics**: PostHog via `ClickyAnalytics.swift`
-
-### Windows client
+### Windows client (`windows/`)
 
 - **App Type**: Electron system-tray app, with no taskbar window
 - **Framework**: Electron 44 + TypeScript; Chromium renderers for UI, microphone capture, audio playback, and overlay animation
 - **Security Boundary**: sandboxed renderers, context isolation enabled, Node integration disabled, narrow IPC API exposed through `src/preload/preload.ts`
 - **State Management**: `ClickaaController` is the main-process state machine and publishes an immutable public state snapshot to the panel, the island, and the overlays
 - **Brain**: `BrainRouter` picks Gemini (user's own key) or the Cloudflare Worker; if the selected provider has no key or URL yet, it uses the other one instead of failing
-- **Global Shortcuts**: `uiohook-napi` tracks physical key-down and key-up. Talk is **Ctrl + Alt** (left Alt only, to avoid Windows AltGr), dictation is **Ctrl + Windows** (configurable: Ctrl + Shift + Space, or Caps Lock), circling is **Ctrl + Shift**, and **Escape** cancels circling
+- **Global Shortcuts**: `uiohook-napi` tracks physical key-down and key-up. Talk is **Ctrl + Alt** (left Alt only, to avoid Windows AltGr), dictation is **Ctrl + Windows** (configurable: Ctrl + Shift + Space, or Caps Lock), circling is **Ctrl + Shift**, snip is **Ctrl + Alt + S**, panic is **Ctrl + Alt + Q**, and **Escape** cancels circling, closes a snip, and stops a running task
 - **Speech-to-Text**: Gemini (single-shot WAV upload) or the AssemblyAI v3 websocket, fed 16 kHz little-endian PCM by the hidden panel renderer
-- **Screen Capture**: Electron `desktopCapturer`, with the pointer display sorted first and all images constrained to 1280 pixels; circling crops the drawn region instead of the whole display
+- **Screen Capture**: Electron `desktopCapturer`, with the pointer display sorted first and all images constrained to 1280 pixels; circling and snips crop the drawn region instead of the whole display
 - **Element Pointing**: one transparent, click-through, capture-protected `BrowserWindow` per display; Windows uses top-left global desktop coordinates, including negative monitor origins
 - **Text-to-Speech**: Gemini TTS or ElevenLabs audio plays in the persistent panel renderer; Windows `speechSynthesis` is the fallback and needs no key at all
-- **Windows Actions**: the model replies with one `<actions>[…]</actions>` block; `action-protocol.ts` parses it and decides what must be confirmed, `system-actions.ts` performs it through the PowerShell/C# bridge, and `windows/src/renderer/island.*` shows the confirmation card and the undo button
-- **Island**: a click-through notch at the top of every screen (now playing, to-do list, reminders and routines, memory, clipboard, launchable apps, wallpapers, quick switches)
+- **Actions**: the model replies with one `<actions>[…]</actions>` block; `action-protocol.ts` parses it and decides what must be confirmed, `system-actions.ts` performs it through the PowerShell/C# bridge, and `windows/src/renderer/island.*` shows the confirmation card and the undo button
+- **Multi-step tasks**: a reply may also carry a `<task>goal</task>` block. `agent-loop.ts` then runs one step, screenshots every display, and asks the model for `DONE` / `NEXT` / `GIVE_UP`. The loop is bounded (8 steps, 2 re-plans per step, 75 seconds), skipping the vision check entirely for playback goals by asking Windows what is playing
+- **System access**: `system-access.ts` is the single policy for `run_command`, `manage_file` and `read_registry`. Blocked beats tier 2 beats tier 1, anything unrecognised is tier 2, and files are confined to the user's own folders. `audit-log-store.ts` records every attempt
+- **Skills**: `skill-store.ts` keeps tasks the user saved by name; `skill-suggestions.ts` decides when to offer one. A skill is a memory aid, never a permission: running one goes through the same approval and screen checks as a spoken task
+- **Wake word**: `wake-word-listener.ts` runs the `wake-word-script.ts` System.Speech helper, which hears only the wake phrases. Off by default, muteable from the tray, and never leaves the machine
+- **Island**: a click-through notch at the top of every screen that summons itself when the pointer touches the top edge (now playing, to-do list, reminders and routines, memory, clipboard, launchable apps, wallpapers, timers, snippets, skills, quick switches, microphone light)
 - **Distribution**: `electron-builder` creates per-user NSIS installers for x64 and ARM64; `.github/workflows/windows.yml` validates, launches the packaged x64 app, uploads artifacts, and can publish version-matched Windows releases
 
 ### API Proxy (Cloudflare Worker)
 
-Long-lived provider API keys never ship in either client. Claude and ElevenLabs requests go through a Cloudflare Worker (`worker/src/index.ts`); the clients fetch a short-lived AssemblyAI token from the Worker and use that temporary token for the realtime websocket.
+Long-lived provider API keys never ship in the client. Claude and ElevenLabs requests go through a Cloudflare Worker (`worker/src/index.ts`); the client fetches a short-lived AssemblyAI token from the Worker and uses that temporary token for the realtime websocket.
 
 | Route | Upstream | Purpose |
 |-------|----------|---------|
@@ -56,66 +48,68 @@ Worker vars: `ELEVENLABS_VOICE_ID`
 
 ### Key Architecture Decisions
 
-**Menu Bar Panel Pattern**: The companion panel uses `NSStatusItem` for the menu bar icon and a custom borderless `NSPanel` for the floating control panel. This gives full control over appearance (dark, rounded corners, custom shadow) and avoids the standard macOS menu/popover chrome. The panel is non-activating so it doesn't steal focus. A global event monitor auto-dismisses it on outside clicks.
-
-**Cursor Overlay**: A full-screen transparent `NSPanel` hosts the blue cursor companion. It's non-activating, joins all Spaces, and never steals focus. The cursor position, response text, waveform, and pointing animations all render in this overlay via SwiftUI through `NSHostingView`.
-
-**Global Push-To-Talk Shortcut**: Background push-to-talk uses a listen-only `CGEvent` tap instead of an AppKit global monitor so modifier-based shortcuts like `ctrl + option` are detected more reliably while the app is running in the background.
-
-**Shared URLSession for AssemblyAI**: A single long-lived `URLSession` is shared across all AssemblyAI streaming sessions (owned by the provider, not the session). Creating and invalidating a URLSession per session corrupts the OS connection pool and causes "Socket is not connected" errors after a few rapid reconnections.
-
-**Transient Cursor Mode**: When "Show Clickaa" is off, pressing the hotkey fades in the cursor overlay for the duration of the interaction (recording → response → TTS → optional pointing), then fades it out automatically after 1 second of inactivity.
-
 **Windows Main/Renderer Split**: Provider calls, configuration, global hooks, screen capture, and lifecycle state stay in Electron's main process. The renderer receives only the minimum APIs needed for UI, microphone PCM, audio playback, and overlay drawing. Do not enable Node integration or expose `ipcRenderer` directly.
 
 **Windows Overlay Pattern**: Each display gets its own non-focusable, click-through BrowserWindow. The windows are content-protected so Clickaa's own cursor and panel do not appear in screenshots. Main-process coordinates are translated into display-local top-left coordinates before an overlay animates.
 
 **Windows Audio Host**: The panel BrowserWindow is created once and hidden rather than destroyed. Its renderer remains the audio host while the panel is closed, allowing `getUserMedia`, provider speech playback, and the Windows speech fallback to continue in the tray.
 
+**Island Presentation**: `island-presentation.ts` is a pure state machine (`hidden → revealed → open`) with hover, idle, and interaction-grace timers. It exists so summoning behaviour can be unit-tested instead of eyeballed, and `applyIslandPresentation` in `desktop-windows.ts` is the only place that shows, hides, or resizes the island.
+
+**Shortcut Chords**: `shortcut-registry.ts` declares, per shortcut, which shorter shortcuts it supersedes (`Ctrl+Alt+S` and `Ctrl+Alt+Q` both start life as the `Ctrl+Alt` talk chord). Supersession is declared rather than inferred: an accidental keypress must never silently cancel something the user is holding.
+
+**Bounded Agent Loop**: `agent-loop.ts` owns no Electron, network, or clock of its own; everything is injected, which is what makes every branch testable. A model that asks for the identical step twice is treated as stuck and handed back to the user rather than looping.
+
+**System Access Tiers**: Two separate abilities, both off by default. Tier 1 is read-only diagnostics, registry reads, and files inside the user's own six folders. Tier 2 is arbitrary commands that change the PC, with its own warning wording and its own confirmation. Credentials, elevation, and anything that weakens Windows security are refused whatever is switched on.
+
 ## Key Files
 
 | File | Lines | Purpose |
 |------|-------|---------|
-| `leanring_buddyApp.swift` | ~89 | Menu bar app entry point. Uses `@NSApplicationDelegateAdaptor` with `CompanionAppDelegate` which creates `MenuBarPanelManager` and starts `CompanionManager`. No main window — the app lives entirely in the status bar. |
-| `CompanionManager.swift` | ~1026 | Central state machine. Owns dictation, shortcut monitoring, screen capture, Claude API, ElevenLabs TTS, and overlay management. Tracks voice state (idle/listening/processing/responding), conversation history, model selection, and cursor visibility. Coordinates the full push-to-talk → screenshot → Claude → TTS → pointing pipeline. |
-| `MenuBarPanelManager.swift` | ~243 | NSStatusItem + custom NSPanel lifecycle. Creates the menu bar icon, manages the floating companion panel (show/hide/position), installs click-outside-to-dismiss monitor. |
-| `CompanionPanelView.swift` | ~761 | SwiftUI panel content for the menu bar dropdown. Shows companion status, push-to-talk instructions, model picker (Sonnet/Opus), permissions UI, DM feedback button, and quit button. Dark aesthetic using `DS` design system. |
-| `OverlayWindow.swift` | ~881 | Full-screen transparent overlay hosting the blue cursor, response text, waveform, and spinner. Handles cursor animation, element pointing with bezier arcs, multi-monitor coordinate mapping, and fade-out transitions. |
-| `CompanionResponseOverlay.swift` | ~217 | SwiftUI view for the response text bubble and waveform displayed next to the cursor in the overlay. |
-| `CompanionScreenCaptureUtility.swift` | ~132 | Multi-monitor screenshot capture using ScreenCaptureKit. Returns labeled image data for each connected display. |
-| `BuddyDictationManager.swift` | ~866 | Push-to-talk voice pipeline. Handles microphone capture via `AVAudioEngine`, provider-aware permission checks, keyboard/button dictation sessions, transcript finalization, shortcut parsing, contextual keyterms, and live audio-level reporting for waveform feedback. |
-| `BuddyTranscriptionProvider.swift` | ~100 | Protocol surface and provider factory for voice transcription backends. Resolves provider based on `VoiceTranscriptionProvider` in Info.plist — AssemblyAI, OpenAI, or Apple Speech. |
-| `AssemblyAIStreamingTranscriptionProvider.swift` | ~478 | Streaming transcription provider. Fetches temp tokens from the Cloudflare Worker, opens an AssemblyAI v3 websocket, streams PCM16 audio, tracks turn-based transcripts, and delivers finalized text on key-up. Shares a single URLSession across all sessions. |
-| `OpenAIAudioTranscriptionProvider.swift` | ~317 | Upload-based transcription provider. Buffers push-to-talk audio locally, uploads as WAV on release, returns finalized transcript. |
-| `AppleSpeechTranscriptionProvider.swift` | ~147 | Local fallback transcription provider backed by Apple's Speech framework. |
-| `BuddyAudioConversionSupport.swift` | ~108 | Audio conversion helpers. Converts live mic buffers to PCM16 mono audio and builds WAV payloads for upload-based providers. |
-| `GlobalPushToTalkShortcutMonitor.swift` | ~132 | System-wide push-to-talk monitor. Owns the listen-only `CGEvent` tap and publishes press/release transitions. |
-| `ClaudeAPI.swift` | ~291 | Claude vision API client with streaming (SSE) and non-streaming modes. TLS warmup optimization, image MIME detection, conversation history support. |
-| `OpenAIAPI.swift` | ~142 | OpenAI GPT vision API client. |
-| `ElevenLabsTTSClient.swift` | ~81 | ElevenLabs TTS client. Sends text to the Worker proxy, plays back audio via `AVAudioPlayer`. Exposes `isPlaying` for transient cursor scheduling. |
-| `ElementLocationDetector.swift` | ~335 | Detects UI element locations in screenshots for cursor pointing. |
-| `DesignSystem.swift` | ~880 | Design system tokens — colors, corner radii, shared styles. All UI references `DS.Colors`, `DS.CornerRadius`, etc. |
-| `ClickyAnalytics.swift` | ~121 | PostHog analytics integration for usage tracking. |
-| `WindowPositionManager.swift` | ~262 | Window placement logic, Screen Recording permission flow, and accessibility permission helpers. |
-| `AppBundleConfiguration.swift` | ~28 | Runtime configuration reader for keys stored in the app bundle Info.plist. |
-| `windows/src/main/main.ts` | ~330 | Windows Electron entry point, secure permission policy, sender-checked IPC registration, single-instance lifecycle, and display-change handling. |
-| `windows/src/main/clickaa-controller.ts` | ~1,700 | Windows interaction state machine: talk, dictation, circle-to-ask, the action loop, confirmations, undo, the scheduler, clipboard and now-playing watchers, island state. |
-| `windows/src/main/desktop-windows.ts` | ~700 | Windows tray, floating panel, island, per-display transparent overlays and region selectors, cursor polling, and renderer messaging. |
-| `windows/src/main/brain-router.ts` | ~200 | Picks Gemini or the Worker for chat and speech, falls back to the offline Windows voice, and reports configuration hints. |
-| `windows/src/main/gemini-client.ts` | ~400 | Gemini chat streaming, TTS, single-shot transcription, dictation cleanup, and API-key checks. |
-| `windows/src/main/claude-client.ts` | ~155 | Claude vision SSE, ElevenLabs TTS, and AssemblyAI token clients for the Worker path. |
-| `windows/src/main/system-actions.ts` | ~600 | Every Windows action (apps, typing, keys, clipboard, volume, media, windows, wallpaper, to-dos, schedules, memory) with undo where possible. |
-| `windows/src/main/windows-bridge.ts` | ~300 | JSON-line bridge to a PowerShell helper that drives SendInput, media, volume, wallpaper, and the Start menu index. |
-| `windows/src/main/action-protocol.ts` | ~600 | `<actions>` parsing, risk classification, ability filtering, and the action section of the system prompt. |
-| `windows/src/main/screen-capture.ts` | ~200 | Electron multi-display capture, pointer-display ordering, labels, and circled-region crops. |
-| `windows/src/main/pointing.ts` | ~80 | Pure `[POINT:...]` parser, display selection, and top-left Windows coordinate mapping. |
-| `windows/src/preload/preload.ts` | ~300 | Context-isolated IPC surface shared by the Windows panel, island, overlays, and region selectors. |
-| `windows/src/renderer/panel.ts` | ~790 | Panel UI bindings and persistent renderer host for microphone capture and response audio. |
-| `windows/src/renderer/island.ts` | ~600 | The notch: now playing, activity with undo, plans, memory, clips, apps, wallpapers, and quick switches. |
-| `windows/src/renderer/overlay.ts` | ~170 | Windows cursor following, response bubble, waveform, and bezier pointing animation. |
-| `windows/src/renderer/selection.ts` | ~120 | Circle-to-ask lasso drawn over every display, reporting the region to the main process. |
+| `windows/src/main/main.ts` | ~430 | Electron entry point, secure permission policy, sender-checked IPC registration, single-instance lifecycle, display-change handling. |
+| `windows/src/main/clickaa-controller.ts` | ~2,800 | The orchestrator: talk, dictation, circle-to-ask, snips, timers, snippets, the task loop, confirmations, undo, the scheduler, wake-word lifecycle, skills, audit log, island state. |
+| `windows/src/main/desktop-windows.ts` | ~840 | Tray (with mute), floating panel, island presentation, per-display overlays and region selectors, cursor polling, renderer messaging. |
+| `windows/src/main/action-protocol.ts` | ~960 | `<actions>` and `<task>` parsing, risk classification, ability filtering, and the action section of the system prompt. |
+| `windows/src/main/agent-loop.ts` | ~340 | Plan, act, look, correct: the bounded task runner, its look protocol, and the playback shortcut. |
+| `windows/src/main/system-access.ts` | ~370 | The whole safety policy for `run_command`, `manage_file` and `read_registry`, plus the tier decisions and refusal reasons. |
+| `windows/src/main/system-access-runner.ts` | ~130 | Runs one PowerShell command in its own short-lived process, and reads or writes a single file. |
+| `windows/src/main/audit-log-store.ts` | ~95 | The on-disk record of every system-access attempt: allowed, refused, blocked or failed, with the raw request. |
+| `windows/src/main/system-actions.ts` | ~680 | Every action (apps, typing, keys, clicks, clipboard, volume, media, windows, wallpaper, files, registry, to-dos, schedules, memory) with undo where possible. |
+| `windows/src/main/windows-bridge.ts` | ~283 | JSON-line bridge to a PowerShell helper that drives SendInput (including the mouse), media, volume, wallpaper, and the Start menu index. |
+| `windows/src/main/windows-bridge-script.ts` | ~760 | The helper script itself: ASCII-only, written with a UTF-8 BOM because PowerShell 5.1 reads un-BOM'd files as ANSI. |
+| `windows/src/main/wake-word-listener.ts` | ~264 | Starts, restarts and stops the offline wake-word listener, and parses its event lines. |
+| `windows/src/main/wake-word-script.ts` | ~115 | The System.Speech helper that hears only the wake phrases, with a stricter confidence threshold for phrases that hide inside typing. |
+| `windows/src/main/brain-router.ts` | ~222 | Picks Gemini or the Worker for chat and speech, falls back to the offline Windows voice, and reports configuration hints. |
+| `windows/src/main/gemini-client.ts` | ~290 | Gemini chat streaming, TTS, single-shot transcription, dictation cleanup, and API-key checks. |
+| `windows/src/main/claude-client.ts` | ~170 | Claude vision SSE, ElevenLabs TTS, and AssemblyAI token clients for the Worker path. |
+| `windows/src/main/screen-capture.ts` | ~200 | Electron multi-display capture, pointer-display ordering, labels, and region crops for circling and snips. |
+| `windows/src/main/pointing.ts` | ~81 | Pure `[POINT:...]` parser, display selection, and top-left Windows coordinate mapping (shared with `click_at`). |
+| `windows/src/main/island-presentation.ts` | ~208 | The island's pure summon/dismiss state machine. |
+| `windows/src/main/shortcut-registry.ts` | ~248 | Shortcut definitions, chord supersession, and the physical-key state machine behind push-to-talk. |
+| `windows/src/main/global-shortcut-monitor.ts` | ~107 | The `uiohook-napi` listener that feeds physical key events to the state machine and reports Escape. |
+| `windows/src/main/skill-store.ts` | ~163 | Tasks the user saved by name, with rename, remove and run counts. |
+| `windows/src/main/skill-suggestions.ts` | ~131 | When repeating a task becomes an offer to save it, including how a "no thanks" is respected. |
+| `windows/src/main/snippet-store.ts` | ~174 | Saved phrases that can be typed into any window. |
+| `windows/src/main/clipboard-history-store.ts` | ~95 | Recent clipboard text, on this PC only. |
+| `windows/src/main/memory-store.ts` | ~170 | Remembered facts and the island's activity feed. |
+| `windows/src/main/schedule-store.ts` | ~237 | Reminders and routines, their next-run maths, and overdue handling. |
+| `windows/src/main/todo-store.ts` | ~166 | The spoken to-do list. |
+| `windows/src/main/config-store.ts` | ~286 | Validated, atomic persistence of user settings, including what is rejected when the panel sends nonsense. |
+| `windows/src/main/soul-config.ts` | ~209 | The soul, personality and ability defaults. |
+| `windows/src/main/system-prompt.ts` | ~151 | Builds the system prompt from the soul, abilities, memory, to-dos, schedules, snippets and saved skills. |
+| `windows/src/main/transcription-session.ts` | ~314 | The AssemblyAI websocket session used by dictation and circling. |
+| `windows/src/preload/preload.ts` | ~174 | Context-isolated IPC surface shared by the panel, island, overlays, and region selectors. |
+| `windows/src/shared/contracts.ts` | ~758 | Every shared type: actions, abilities, config, island state, skills, audit entries. |
+| `windows/src/renderer/panel.ts` | ~971 | Panel UI bindings and the persistent renderer host for microphone capture and response audio. |
+| `windows/src/renderer/island.ts` | ~728 | The notch: now playing, activity with undo, confirmations, timers, snippets, skills offers, plans, memory, clips, apps, wallpapers, quick switches. |
+| `windows/src/renderer/overlay.ts` | ~179 | Cursor following, response bubble, waveform, and bezier pointing animation. |
+| `windows/src/renderer/selection.ts` | ~111 | The circle-to-ask lasso and the snip overlay, sharing one region-selector window. |
+| `windows/src/renderer/audio-capture.ts` | ~160 | Microphone capture, PCM16 conversion, and the audio power level that drives the waveform and the wake-word silence detector. |
+| `windows/src/renderer/tokens.css` | ~150 | The design system: type scale, spacing, radii, colour, elevation, motion, focus ring. Everything else references these. |
+| `windows/src/renderer/icons.ts` | ~139 | The SVG icon set that replaced emoji across the UI. |
+| `windows/src/renderer/brand.css` | ~15 | The Clickaa mark as an inline data URI, used by the tray, panel, island and selection UI. |
 | `windows/package.json` | ~75 | TypeScript, tests, Electron runtime, and x64/ARM64 NSIS packaging configuration. |
-| `worker/src/index.ts` | ~142 | Cloudflare Worker proxy. Three routes: `/chat` (Claude), `/tts` (ElevenLabs), `/transcribe-token` (AssemblyAI temp token). |
+| `worker/src/index.ts` | ~141 | Cloudflare Worker proxy. Three routes: `/chat` (Claude), `/tts` (ElevenLabs), `/transcribe-token` (AssemblyAI temp token). |
 
 ## Build & Run
 
@@ -134,21 +128,9 @@ The Windows client needs **either** a user-supplied Gemini API key (paste it in 
 
 The Windows client requires Node.js 22.12+ for the pinned build toolchain. Run packaging on Windows; CI uses `windows-latest`.
 
-### macOS
+Use `./node_modules/.bin/tsc` (or the npm scripts) rather than a bare `npx tsc`, which can install an unrelated package named `tsc`.
 
-```bash
-# Open in Xcode
-open leanring-buddy.xcodeproj
-
-# Select the leanring-buddy scheme, set signing team, Cmd+R to build and run
-
-# Known non-blocking warnings: Swift 6 concurrency warnings,
-# deprecated onChange warning in OverlayWindow.swift. Do NOT attempt to fix these.
-```
-
-**Do NOT run `xcodebuild` from the terminal** — it invalidates TCC (Transparency, Consent, and Control) permissions and the app will need to re-request screen recording, accessibility, etc.
-
-## Cloudflare Worker
+### Cloudflare Worker
 
 ```bash
 cd worker
@@ -185,35 +167,25 @@ IMPORTANT: Follow these naming rules strictly. Clarity is the top priority.
 - Make things so clear that someone with zero context would completely understand the variable names, method names, what things do, and why they exist
 - When a variable or method name alone cannot fully explain something, add a comment explaining what is happening and why
 
-### Swift/SwiftUI Conventions
-
-- Use SwiftUI for all UI unless a feature is only supported in AppKit (e.g., `NSPanel` for floating windows)
-- All UI state updates must be on `@MainActor`
-- Use async/await for all asynchronous operations
-- Comments should explain "why" not just "what", especially for non-obvious AppKit bridging
-- AppKit `NSPanel`/`NSWindow` bridged into SwiftUI via `NSHostingView`
-- All buttons must show a pointer cursor on hover
-- For any interactive element, explicitly think through its hover behavior (cursor, visual feedback, and whether hover should communicate clickability)
-
 ### Electron/TypeScript Conventions
 
-- Keep Windows provider networking and native desktop integrations in the main process
+- Keep provider networking and native desktop integrations in the main process
 - Keep `contextIsolation: true`, `sandbox: true`, and `nodeIntegration: false` for every renderer
 - Add renderer capabilities through typed, narrow preload methods; never expose Electron's `ipcRenderer` object
 - Treat display coordinates as top-left-origin Windows desktop coordinates and test negative monitor origins
 - The panel window is the persistent audio host; hide it instead of destroying it
 - Keep renderer code as browser-native ES modules and main/preload code as CommonJS; the build intentionally compiles them into separate intermediate outputs
+- Keep the PowerShell helper scripts ASCII-only and written with a UTF-8 BOM: PowerShell 5.1 reads un-BOM'd files as ANSI, and a smart quote would silently break a user's install. `tests/windows-scripts.test.ts` enforces this
+- Prefer pure modules with injected dependencies for anything with rules (policy, parsing, state machines, the agent loop). It is what makes the behaviour testable without a Windows machine
 - Run both `npm test` and `npm run typecheck` after Windows changes
 
 ### Do NOT
 
-- Do not add features, refactor code, or make "improvements" beyond what was asked
+- Do not make unrelated refactors or "improvements" while fixing something else
 - Do not add docstrings, comments, or type annotations to code you did not change
-- Do not try to fix the known non-blocking warnings (Swift 6 concurrency, deprecated onChange)
-- Do not rename the project directory or scheme (the "leanring" typo is intentional/legacy)
-- Do not run `xcodebuild` from the terminal — it invalidates TCC permissions
 - Do not enable Electron Node integration, disable renderer sandboxing, or send provider API keys to a renderer
 - Do not build Windows installers on macOS/Linux and assume they work; use the Windows CI job or a Windows machine
+- Do not let anything run on the PC without passing through `system-access.ts`, and do not write to a path outside the user's own folders
 
 ## Git Workflow
 

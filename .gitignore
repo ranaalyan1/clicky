@@ -5,7 +5,6 @@ windows/dist/
 windows/.renderer-build/
 windows/release/
 .DS_Store
-*.xcuserstate
 build/
 releases/
 .claude/
