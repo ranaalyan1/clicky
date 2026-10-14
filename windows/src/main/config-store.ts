@@ -35,6 +35,7 @@ export const defaultUstaadUserConfig: UstaadUserConfig = {
   localBrainBaseUrl: defaultLocalBrainBaseUrl,
   localBrainModel: defaultLocalBrainModel,
   localBrainSeesScreen: false,
+  offlineMode: false,
   geminiApiKey: "",
   geminiChatModel: "gemini-2.5-flash",
   selectedClaudeModel: "claude-sonnet-4-6",
@@ -188,6 +189,7 @@ export function sanitizeStoredConfig(storedConfig: unknown): UstaadUserConfig {
       possibleConfig.localBrainSeesScreen,
       defaultUstaadUserConfig.localBrainSeesScreen,
     ),
+    offlineMode: readBoolean(possibleConfig.offlineMode, defaultUstaadUserConfig.offlineMode),
     geminiApiKey,
     geminiChatModel: isSupportedGeminiModel(possibleConfig.geminiChatModel)
       ? possibleConfig.geminiChatModel

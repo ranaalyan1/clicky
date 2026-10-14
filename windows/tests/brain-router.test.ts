@@ -106,3 +106,41 @@ test("a brain on this pc is chosen on purpose, and it never pretends to be the c
   assert.equal(testResult.ok, false);
   assert.equal(testResult.message.includes("own network"), true);
 });
+
+test("offline mode is a promise: the local brain answers, and the cloud is not asked", async () => {
+  const offlineConfig = sanitizeStoredConfig({
+    ...defaultUstaadUserConfig,
+    brainProvider: "gemini",
+    geminiApiKey: "AIzaSyUstaadTestKey0000000000000000",
+    offlineMode: true,
+  });
+
+  // The gemini key is still on disk, and is not used for anything.
+  assert.equal(brainRouter.resolveActiveProvider(offlineConfig), "local");
+  assert.equal(brainRouter.getBrainLabel(offlineConfig), `on this pc (${offlineConfig.localBrainModel})`);
+  assert.equal(brainRouter.resolveSpeechProvider(offlineConfig), "windows");
+
+  await assert.rejects(
+    () => brainRouter.drawPicture(offlineConfig, "a panda"),
+    /offline mode is on/u,
+  );
+  await assert.rejects(
+    () => brainRouter.transcribeRecordedAudio(offlineConfig, Buffer.from("wav"), new AbortController().signal),
+    /offline mode is on/u,
+  );
+
+  // Nothing to tidy dictated words with: they are pasted as they were spoken.
+  const untouched = await brainRouter.cleanDictationTranscript(
+    { ...offlineConfig, localBrainBaseUrl: "" },
+    "so um i think we should ship it",
+    new AbortController().signal,
+  );
+  assert.equal(untouched, "so um i think we should ship it");
+
+  // And with no model on this pc, offline mode says exactly that.
+  const withoutAnyBrain = { ...offlineConfig, localBrainBaseUrl: "" };
+  assert.equal(brainRouter.resolveActiveProvider(withoutAnyBrain), null);
+  assert.equal(brainRouter.isConfigured(withoutAnyBrain), false);
+  assert.equal(brainRouter.getBrainLabel(withoutAnyBrain), "offline (no local brain yet)");
+  assert.equal(brainRouter.configurationHint(withoutAnyBrain).includes("Offline mode is on"), true);
+});

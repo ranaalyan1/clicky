@@ -141,6 +141,7 @@ const element = {
   geminiModel: requireElement<HTMLSelectElement>("gemini-model"),
   geminiSaveButton: requireElement<HTMLButtonElement>("gemini-save-button"),
   geminiTestButton: requireElement<HTMLButtonElement>("gemini-test-button"),
+  offlineModeToggle: requireElement<HTMLInputElement>("offline-mode-toggle"),
   localSetup: requireElement<HTMLElement>("local-setup"),
   localBrainUrl: requireElement<HTMLInputElement>("local-brain-url"),
   localBrainModel: requireElement<HTMLInputElement>("local-brain-model"),
@@ -398,6 +399,7 @@ function renderSetup(state: UstaadPublicState): void {
     element.localBrainModel.value = config.localBrainModel;
   }
   element.localBrainSeesScreenToggle.checked = config.localBrainSeesScreen;
+  element.offlineModeToggle.checked = config.offlineMode;
 
   if (!hasInitializedFields || document.activeElement !== element.geminiKey) {
     element.geminiKey.value = config.geminiApiKey;
@@ -1144,6 +1146,10 @@ element.geminiSaveButton.addEventListener("click", () => void saveSettings({ gem
 element.geminiTestButton.addEventListener("click", () => void testBrain({ geminiApiKey: element.geminiKey.value }));
 element.workerSaveButton.addEventListener("click", () => void saveSettings({ workerBaseUrl: element.workerUrl.value }));
 element.workerTestButton.addEventListener("click", () => void testBrain({ workerBaseUrl: element.workerUrl.value }));
+element.offlineModeToggle.addEventListener("change", () => {
+  void saveSettings({ offlineMode: element.offlineModeToggle.checked });
+});
+
 element.localBrainSaveButton.addEventListener("click", () => void saveSettings({
   localBrainBaseUrl: element.localBrainUrl.value,
   localBrainModel: element.localBrainModel.value,

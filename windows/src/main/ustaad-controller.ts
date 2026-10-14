@@ -1633,7 +1633,15 @@ export class UstaadController {
    * close the socket rather than hiding a running server.
    */
   private async syncPhoneBridge(): Promise<void> {
-    const shouldRun = this.configStore.getConfig().abilities.phoneWindow;
+    const config = this.configStore.getConfig();
+    const shouldRun = config.abilities.phoneWindow && !config.offlineMode;
+    if (config.offlineMode && config.abilities.phoneWindow) {
+      // The window answers on the local network, and offline mode means no
+      // socket Ustaad opened is answering anybody.
+      this.phoneBridgeErrorMessage = "offline mode is on, so the phone window is off.";
+    } else if (!config.offlineMode && this.phoneBridgeErrorMessage?.startsWith("offline mode is on")) {
+      this.phoneBridgeErrorMessage = null;
+    }
 
     if (!shouldRun) {
       if (this.phoneBridgeServer) {
@@ -1791,7 +1799,10 @@ export class UstaadController {
     const previousConfig = this.configStore.getConfig();
     const updatedConfig = this.configStore.updateConfig(settingsUpdates);
 
-    if (previousConfig.abilities.phoneWindow !== updatedConfig.abilities.phoneWindow) {
+    if (
+      previousConfig.abilities.phoneWindow !== updatedConfig.abilities.phoneWindow
+      || previousConfig.offlineMode !== updatedConfig.offlineMode
+    ) {
       void this.syncPhoneBridge();
     }
 
@@ -3389,11 +3400,17 @@ export class UstaadController {
   }
 
   private describeIslandDetail(config: UstaadUserConfig, now: Date): string {
+    if (config.offlineMode && !this.publicState.configured) {
+      return "offline — point it at a model on this pc to talk";
+    }
     if (!this.publicState.configured) {
       return "add a brain in the panel to get started";
     }
     if (config.automationPaused) {
       return "actions are paused";
+    }
+    if (config.offlineMode) {
+      return "offline — nothing leaves this pc";
     }
 
     const nextScheduledTask = this.scheduleStore.list()

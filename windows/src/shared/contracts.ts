@@ -463,6 +463,12 @@ export interface UstaadUserConfig {
   localBrainModel: string;
   /** Whether that model can look at screenshots. Off unless the user says so. */
   localBrainSeesScreen: boolean;
+  /**
+   * The user's promise that Ustaad itself never reaches the internet: the
+   * brain must be local, and speech, transcription, pictures, the phone window
+   * and the cloud wake word all stop.
+   */
+  offlineMode: boolean;
   geminiApiKey: string;
   geminiChatModel: GeminiChatModel;
   selectedClaudeModel: SupportedClaudeModel;

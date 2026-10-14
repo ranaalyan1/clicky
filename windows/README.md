@@ -68,6 +68,10 @@ Ustaad needs a model to think with. Pick any of these, in the panel's **setup** 
 
 If several are configured, the provider selected in **setup** wins; if that provider has no key or URL yet, Ustaad uses another one instead of failing.
 
+### Offline mode
+
+**setup → offline mode — nothing leaves this pc** is the switch for the days the connection is gone, or when it should not be used at all. It is a promise, not a preference, so it is enforced in one place instead of hoped for: with it on, the only brain that can answer is one on this PC, whatever Gemini key or Worker URL sits in the settings; speaking uses the offline Windows voice; and hearing, transcription, picture drawing, the phone window and the cloud wake word all stop, with a sentence saying why rather than a silence. The island says **offline** next to the notch so the state is never a guess, and the browser is still yours — a link you ask for still opens.
+
 ### What a local brain can and cannot do
 
 A small model on the PC is the privacy answer and the cheapest one, but it is not a Gemini key in every respect, and Ustaad says so rather than pretending:

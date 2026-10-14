@@ -33,6 +33,12 @@ export class BrainRouter {
    * but pasted a Worker URL still gets a working Ustaad instead of an error.
    */
   resolveActiveProvider(config: UstaadUserConfig): "gemini" | "worker" | "local" | null {
+    // Offline mode is a promise, not a preference: with it on the only brain
+    // that can answer is one on the user's own machine, whatever else is set.
+    if (config.offlineMode) {
+      return config.localBrainBaseUrl ? "local" : null;
+    }
+
     if (config.brainProvider === "local" && config.localBrainBaseUrl) {
       return "local";
     }
@@ -51,6 +57,12 @@ export class BrainRouter {
   getBrainLabel(config: UstaadUserConfig): string {
     const activeProvider = this.resolveActiveProvider(config);
     if (!activeProvider) {
+      if (config.offlineMode) {
+        return "offline (no local brain yet)";
+      }
+      if (config.brainProvider === "local") {
+        return "on this pc (nothing answered yet)";
+      }
       return config.brainProvider === "gemini" ? "Gemini (key needed)" : "Worker (url needed)";
     }
 
@@ -73,6 +85,9 @@ export class BrainRouter {
     if (this.isConfigured(config)) {
       return "";
     }
+    if (config.offlineMode) {
+      return "Offline mode is on, so Ustaad needs a model on this pc: start one in the setup tab, or switch offline mode off.";
+    }
     if (config.brainProvider === "local") {
       return "Start your local model server (ollama serve, or LM Studio) and check the address in the setup tab.";
     }
@@ -83,6 +98,10 @@ export class BrainRouter {
 
   /** Which engine should read this reply aloud. */
   resolveSpeechProvider(config: UstaadUserConfig): ResolvedSpeechProvider {
+    if (config.offlineMode) {
+      return "windows";
+    }
+
     const geminiIsAvailable = Boolean(config.geminiApiKey);
     const elevenLabsIsAvailable = Boolean(config.workerBaseUrl);
 
@@ -162,6 +181,11 @@ export class BrainRouter {
    * failing somewhere deeper down.
    */
   async drawPicture(config: UstaadUserConfig, prompt: string): Promise<GeneratedPicturePayload> {
+    if (config.offlineMode) {
+      throw new Error(
+        "offline mode is on, so there is no way to reach the model that draws. switch offline mode off in the setup tab when you want a picture.",
+      );
+    }
     if (!config.geminiApiKey) {
       throw new Error(
         "drawing pictures needs your own Gemini key, because the worker brain cannot draw. paste one in the setup tab and ask again.",
@@ -197,6 +221,11 @@ export class BrainRouter {
     wavAudio: Buffer,
     signal: AbortSignal,
   ): Promise<string> {
+    if (config.offlineMode) {
+      throw new Error(
+        "offline mode is on, so Ustaad is not listening: hearing runs on Google's servers. type instead, or switch offline mode off.",
+      );
+    }
     if (!config.geminiApiKey) {
       throw new Error(
         this.resolveActiveProvider(config) === "local"
@@ -226,6 +255,12 @@ export class BrainRouter {
     const activeProvider = this.resolveActiveProvider(config);
 
     try {
+      if (!activeProvider) {
+        // Offline with no local model: dictated words are pasted as spoken
+        // rather than sent anywhere to be tidied.
+        return rawTranscript;
+      }
+
       if (activeProvider === "local") {
         return await this.localBrainClient.streamChat(
           {
@@ -268,7 +303,7 @@ export class BrainRouter {
 
   /** The panel's connection test, for whichever brain is selected. */
   async testConnection(config: UstaadUserConfig): Promise<BrainConnectionTestResult> {
-    if (config.brainProvider === "local") {
+    if (config.offlineMode || config.brainProvider === "local") {
       return this.testLocalConnection(config);
     }
     if (config.brainProvider === "gemini" && config.geminiApiKey) {

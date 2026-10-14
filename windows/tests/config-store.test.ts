@@ -76,3 +76,10 @@ test("the local brain keeps an address on this machine and nothing that points a
   assert.equal(nonsenseModelConfig.localBrainModel, "llama3.2");
   assert.equal(sanitizeStoredConfig({}).localBrainSeesScreen, false);
 });
+
+test("offline mode is off until the user asks, and only a real boolean turns it on", () => {
+  assert.equal(defaultUstaadUserConfig.offlineMode, false);
+  assert.equal(sanitizeStoredConfig({}).offlineMode, false);
+  assert.equal(sanitizeStoredConfig({ offlineMode: true }).offlineMode, true);
+  assert.equal(sanitizeStoredConfig({ offlineMode: "yes" }).offlineMode, false);
+});
