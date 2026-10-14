@@ -291,6 +291,12 @@ export interface ManageFileAction {
   content: string;
 }
 
+/** "do my morning videos" — runs a task the user saved by name. */
+export interface RunSkillAction {
+  type: "run_skill";
+  name: string;
+}
+
 /** Reads one registry key, values only, and changes nothing. */
 export interface ReadRegistryAction {
   type: "read_registry";
@@ -345,7 +351,8 @@ export type ClickaaAction =
   | WaitAction
   | RunCommandAction
   | ManageFileAction
-  | ReadRegistryAction;
+  | ReadRegistryAction
+  | RunSkillAction;
 
 export type ClickaaActionType =
   | "open_app"
@@ -378,7 +385,8 @@ export type ClickaaActionType =
   | "wait"
   | "run_command"
   | "manage_file"
-  | "read_registry";
+  | "read_registry"
+  | "run_skill";
 
 /** Canonical action list, kept in the shared contracts so both sides agree. */
 export const clickaaActionTypes: readonly ClickaaActionType[] = [
@@ -413,6 +421,7 @@ export const clickaaActionTypes: readonly ClickaaActionType[] = [
   "run_command",
   "manage_file",
   "read_registry",
+  "run_skill",
 ];
 
 export type ActionRisk = "safe" | "confirm";
@@ -469,6 +478,28 @@ export interface TodoItem {
   dueAt: string | null;
   isDone: boolean;
   createdAtIso: string;
+}
+
+/**
+ * A task the user saved by name. The seed actions are a memory aid for Clickaa,
+ * never a permission: every run is checked and confirmed again.
+ */
+export interface Skill {
+  id: string;
+  name: string;
+  goal: string;
+  seedActions: ClickaaAction[];
+  createdAtIso: string;
+  runCount: number;
+  lastRunAtIso: string | null;
+}
+
+/** The island's "save that as a skill?" card, when it is offered. */
+export interface SkillSuggestionPrompt {
+  signature: string;
+  goal: string;
+  proposedName: string;
+  successCount: number;
 }
 
 export interface Snippet {
@@ -629,6 +660,8 @@ export interface IslandState {
   snippets: Snippet[];
   wakeWordState: WakeWordSurfaceState;
   wakeWordMuted: boolean;
+  skills: Skill[];
+  skillSuggestion: SkillSuggestionPrompt | null;
   /** Why the wake word is in that state, shown as the indicator's tooltip. */
   wakeWordMessage: string;
   todos: TodoItem[];

@@ -18,6 +18,8 @@ export interface SystemPromptContext {
   clipboardPreview: string;
   /** Names of the phrases the user saved, so insertions use real names. */
   savedSnippetNames: string[];
+  /** Tasks the user saved by name, so a request for one becomes run_skill. */
+  savedSkills: Array<{ name: string; goal: string }>;
   /** True when screenshots are attached to this request. */
   hasScreenshots: boolean;
   /** True when the request is a cropped region the user circled. */
@@ -64,6 +66,10 @@ function describeLiveContext(context: SystemPromptContext): string[] {
 
   if (context.upcomingSchedules.length) {
     contextLines.push(`scheduled tasks coming up: ${context.upcomingSchedules.join("; ")}`);
+  }
+
+  if (context.savedSkills.length) {
+    contextLines.push(`tasks the user saved as skills: ${context.savedSkills.map((skill) => `"${skill.name}" (${skill.goal})`).join(", ")}. when they ask for one by name, use run_skill with that exact name instead of building the steps again.`);
   }
 
   if (context.savedSnippetNames.length) {

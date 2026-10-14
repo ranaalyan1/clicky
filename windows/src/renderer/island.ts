@@ -179,6 +179,49 @@ function renderConfirmations(islandState: IslandState): void {
   }));
 }
 
+/** The "save that as a skill?" offer, which only ever appears after a task has
+    worked a few times and only ever saves when the user presses the button. */
+function renderSkillSuggestion(islandState: IslandState): void {
+  const suggestion = islandState.skillSuggestion;
+  if (!suggestion) {
+    return;
+  }
+
+  const card = document.createElement("div");
+  card.className = "confirmation-card skill-suggestion-card";
+
+  const title = document.createElement("p");
+  title.className = "confirmation-title";
+  title.textContent = `that worked ${suggestion.successCount} times`;
+
+  const reason = document.createElement("p");
+  reason.className = "confirmation-reason";
+  reason.textContent = `save it as "${suggestion.proposedName}"? then you can just ask for it by name.`;
+
+  const buttonRow = document.createElement("div");
+  buttonRow.className = "confirmation-buttons";
+
+  const saveButton = document.createElement("button");
+  saveButton.type = "button";
+  saveButton.className = "confirmation-button approve";
+  saveButton.textContent = "save it";
+  saveButton.addEventListener("click", () => {
+    void window.clickaa.saveSkillSuggestion();
+  });
+
+  const dismissButton = document.createElement("button");
+  dismissButton.type = "button";
+  dismissButton.className = "confirmation-button";
+  dismissButton.textContent = "no thanks";
+  dismissButton.addEventListener("click", () => {
+    void window.clickaa.dismissSkillSuggestion();
+  });
+
+  buttonRow.append(saveButton, dismissButton);
+  card.append(title, reason, buttonRow);
+  element.confirmationStack.append(card);
+}
+
 function renderActivityFeed(activityEntries: ActivityFeedEntry[]): void {
   if (!activityEntries.length) {
     element.activityList.replaceChildren(createEmptyRow("nothing yet. hold ctrl + alt and just talk."));
@@ -566,6 +609,7 @@ function renderIsland(islandState: IslandState): void {
   renderNotch(islandState);
   renderWakeIndicator(islandState);
   renderConfirmations(islandState);
+  renderSkillSuggestion(islandState);
   renderTimers(islandState);
   renderSnippets(islandState);
   renderActivityFeed(islandState.activityFeed);

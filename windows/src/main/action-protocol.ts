@@ -595,6 +595,18 @@ const actionDefinitions: Record<ClickaaActionType, ActionDefinition> = {
       };
     },
   },
+  run_skill: {
+    type: "run_skill",
+    risk: "confirm",
+    requiredAbility: "automation",
+    describe: (action) => `do ${(action as { name: string }).name}`,
+    normalize: (rawAction) => {
+      const skillName = readRequiredText(rawAction, "name");
+      return skillName
+        ? { action: { type: "run_skill", name: skillName.slice(0, 60) }, problem: null }
+        : { action: null, problem: "run_skill needs the skill's name" };
+    },
+  },
   click_at: {
     type: "click_at",
     risk: "confirm",

@@ -133,6 +133,12 @@ contextBridge.exposeInMainWorld("clickaa", {
   resolveConfirmation: (confirmationId: string, decision: "approve" | "reject"): Promise<string> => {
     return ipcRenderer.invoke("island:resolve-confirmation", confirmationId, decision);
   },
+  saveSkillSuggestion: (): Promise<string> => ipcRenderer.invoke("island:save-skill-suggestion"),
+  dismissSkillSuggestion: (): Promise<void> => ipcRenderer.invoke("island:dismiss-skill-suggestion"),
+  renameSkill: (skillId: string, nextName: string): Promise<void> => {
+    return ipcRenderer.invoke("panel:rename-skill", skillId, nextName);
+  },
+  removeSkill: (skillId: string): Promise<void> => ipcRenderer.invoke("panel:remove-skill", skillId),
   undoActivity: (activityEntryId: string): Promise<boolean> => {
     return ipcRenderer.invoke("island:undo-activity", activityEntryId);
   },

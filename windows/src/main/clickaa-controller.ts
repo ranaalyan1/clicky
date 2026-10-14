@@ -15,6 +15,7 @@ import {
   IslandToggleKey,
   NowPlayingInfo,
   RegionSelectorSelection,
+  Skill,
   WakeWordSurfaceState,
 } from "../shared/contracts";
 import {
@@ -55,7 +56,16 @@ import { ShortcutId } from "./shortcut-registry";
 import { mapImageCoordinateToWindowsDesktop, parsePointingTag, selectPointingDisplay } from "./pointing";
 import { ScheduleStore } from "./schedule-store";
 import { AuditLogStore } from "./audit-log-store";
+import { JsonFileStore } from "./json-file-store";
+import { SkillStore } from "./skill-store";
 import { SnippetStore } from "./snippet-store";
+import {
+  SkillSuggestion,
+  suggestSkill,
+  taskSignature,
+  TaskHistoryEntry,
+  trimTaskHistory,
+} from "./skill-suggestions";
 import { SystemAccessRunner } from "./system-access-runner";
 import { captureAllWindowsDisplays, captureWindowsDesktopRegion } from "./screen-capture";
 import { describeScheduledTask } from "./schedule-time";
@@ -77,6 +87,12 @@ const confirmationTimeoutMilliseconds = 45_000;
  * number is generous enough for "Clickaa ..." pauses, and the last two stop
  * Clickaa from holding the microphone open when the name was a false start.
  */
+/** What Clickaa remembers between runs in order to offer skills at the right time. */
+interface SkillSuggestionMemory {
+  history: TaskHistoryEntry[];
+  declinedSignatures: Record<string, number>;
+}
+
 const wakeFollowUpSilenceWindows = {
   speechLevel: 0.08,
   afterSpeech: 1_800,
@@ -103,6 +119,7 @@ export class ClickaaController {
   private readonly scheduleStore: ScheduleStore;
   private readonly snippetStore: SnippetStore;
   private readonly auditLogStore: AuditLogStore;
+  private readonly skillStore: SkillStore;
   private readonly systemAccessRunner: SystemAccessRunner;
   private readonly clipboardHistoryStore: ClipboardHistoryStore;
   private readonly activityFeed = new ActivityFeed();
@@ -135,6 +152,12 @@ export class ClickaaController {
   private lastClipboardText = "";
   private activeTimers: ActiveTimer[] = [];
   private isSnipInFlight = false;
+  /** Successful tasks, so Clickaa can notice when the user keeps asking for one. */
+  private taskHistory: TaskHistoryEntry[] = [];
+  /** Signatures the user said no to, and how often the task had succeeded then. */
+  private readonly declinedSkillSignatures = new Map<string, number>();
+  private currentSkillSuggestion: SkillSuggestion | null = null;
+  private skillSuggestionHistoryStore: JsonFileStore<SkillSuggestionMemory> | null = null;
   private readonly wakeWordListener: WakeWordListener;
   private wakeWordState: WakeWordSurfaceState = "off";
   private wakeWordMessage = "";
@@ -164,6 +187,21 @@ export class ClickaaController {
     this.scheduleStore = new ScheduleStore(`${userDataDirectory}/schedules.json`);
     this.snippetStore = new SnippetStore(`${userDataDirectory}/snippets.json`);
     this.auditLogStore = new AuditLogStore(`${userDataDirectory}/audit-log.json`);
+    this.skillStore = new SkillStore(`${userDataDirectory}/skills.json`);
+    this.skillSuggestionHistoryStore = new JsonFileStore<SkillSuggestionMemory>(
+      `${userDataDirectory}/skill-suggestions.json`,
+      (storedValue) => {
+        const source = storedValue && typeof storedValue === "object"
+          ? storedValue as Partial<SkillSuggestionMemory>
+          : {};
+        return {
+          history: Array.isArray(source.history) ? source.history.slice(-200) : [],
+          declinedSignatures: source.declinedSignatures && typeof source.declinedSignatures === "object"
+            ? source.declinedSignatures
+            : {},
+        };
+      },
+    );
     this.systemAccessRunner = new SystemAccessRunner();
     this.clipboardHistoryStore = new ClipboardHistoryStore(
       `${userDataDirectory}/clipboard-history.json`,
@@ -265,6 +303,7 @@ export class ClickaaController {
     });
     void this.refreshAppIndex();
     this.synchronizeWakeWordListener();
+    this.loadSkillSuggestionMemory();
   }
 
   stop(): void {
@@ -732,6 +771,7 @@ export class ClickaaController {
       upcomingSchedules: config.abilities.scheduling ? this.scheduleStore.listNextRunsDescription(5) : [],
       clipboardPreview: this.buildClipboardPreview(config),
       savedSnippetNames: config.abilities.automation ? this.snippetStore.summarizeSnippetNames(12) : [],
+      savedSkills: config.abilities.automation ? this.skillStore.summarizeNames(12) : [],
       hasScreenshots,
       isCircledRegion: interactionKind === "circle",
       isScheduledTask: interactionKind === "scheduled",
@@ -908,6 +948,8 @@ export class ClickaaController {
         outcome = await this.runTimerAction(action);
       } else if (action.type === "clipboard_transform") {
         outcome = await this.runClipboardTransform(action.operation, action.targetLanguage);
+      } else if (action.type === "run_skill") {
+        outcome = await this.runSavedSkill(action.name);
       } else if (action.type === "screenshot_region") {
         this.beginSnip();
         outcome = completedActionOutcome(
@@ -1730,6 +1772,164 @@ export class ClickaaController {
     return `working on: ${goal}`;
   }
 
+  /* ---------------------------------------------------------------------- */
+  /* Skills: tasks the user saved by name                                   */
+  /* ---------------------------------------------------------------------- */
+
+  private loadSkillSuggestionMemory(): void {
+    const memory = this.skillSuggestionHistoryStore?.read();
+    if (!memory) {
+      return;
+    }
+    this.taskHistory = trimTaskHistory(memory.history);
+    for (const [signature, declineCount] of Object.entries(memory.declinedSignatures)) {
+      this.declinedSkillSignatures.set(signature, declineCount);
+    }
+  }
+
+  private persistSkillSuggestionMemory(): void {
+    this.skillSuggestionHistoryStore?.write({
+      history: trimTaskHistory(this.taskHistory),
+      declinedSignatures: Object.fromEntries(this.declinedSkillSignatures),
+    });
+  }
+
+  /**
+   * Called after a task finishes well. Clickaa counts repeats in the background
+   * and, once the same task has worked a few times, offers to save it — it never
+   * saves anything by itself.
+   */
+  private noteSuccessfulTask(goal: string, seedActions: ClickaaAction[]): void {
+    if (!this.configStore.getConfig().abilities.automation) {
+      return;
+    }
+
+    const signature = taskSignature(goal);
+    if (!signature) {
+      return;
+    }
+
+    this.taskHistory = trimTaskHistory([
+      ...this.taskHistory,
+      {
+        id: randomUUID(),
+        goal,
+        signature,
+        seedActions: seedActions.slice(0, 12),
+        succeededAtIso: new Date().toISOString(),
+      },
+    ]);
+    this.persistSkillSuggestionMemory();
+
+    const savedSignatures = new Set(this.skillStore.list().map((skill) => taskSignature(skill.goal)));
+    const suggestion = suggestSkill({
+      history: this.taskHistory,
+      savedSignatures,
+      declinedSignatures: Object.fromEntries(this.declinedSkillSignatures),
+    });
+
+    if (!suggestion) {
+      return;
+    }
+    if (this.currentSkillSuggestion?.signature === suggestion.signature) {
+      return;
+    }
+
+    this.currentSkillSuggestion = suggestion;
+    this.activityFeed.record(
+      "system",
+      `that worked ${suggestion.successCount} times`,
+      `save it as "${suggestion.proposedName}" so you can just ask for it?`,
+      false,
+    );
+    this.desktopWindows.openIsland();
+    this.publishIslandState();
+  }
+
+  /** The island's "save it" button. Only ever runs because the user pressed it. */
+  saveSuggestedSkill(): Skill | null {
+    const suggestion = this.currentSkillSuggestion;
+    if (!suggestion) {
+      return null;
+    }
+
+    const savedSkill = this.skillStore.save({
+      name: suggestion.proposedName,
+      goal: suggestion.goal,
+      seedActions: suggestion.seedActions,
+    });
+
+    this.currentSkillSuggestion = null;
+    this.declinedSkillSignatures.delete(suggestion.signature);
+    this.persistSkillSuggestionMemory();
+
+    this.activityFeed.record(
+      "system",
+      `saved the "${savedSkill.name}" skill`,
+      `say "do ${savedSkill.name}" any time, or rename it in the plans tab`,
+      false,
+    );
+    this.publishState();
+    this.publishIslandState();
+    return savedSkill;
+  }
+
+  dismissSuggestedSkill(): void {
+    const suggestion = this.currentSkillSuggestion;
+    if (!suggestion) {
+      return;
+    }
+
+    // Remembering the count at refusal is what makes "no" stick for a while,
+    // instead of asking again the very next time the user does the thing.
+    this.declinedSkillSignatures.set(suggestion.signature, suggestion.successCount);
+    this.currentSkillSuggestion = null;
+    this.persistSkillSuggestionMemory();
+
+    this.activityFeed.record("system", "no skill saved", "I will not ask again for a while", false);
+    this.publishIslandState();
+  }
+
+  renameSkill(skillId: string, nextName: string): ClickaaPublicState | void {
+    const renamedSkill = this.skillStore.rename(skillId, nextName);
+    if (!renamedSkill) {
+      return;
+    }
+    this.publishIslandState();
+    this.publishState();
+  }
+
+  removeSkill(skillId: string): void {
+    const skill = this.skillStore.findById(skillId);
+    if (!this.skillStore.remove(skillId)) {
+      return;
+    }
+    this.activityFeed.record("system", `removed the "${skill?.name ?? "saved"}" skill`, "", false);
+    this.publishIslandState();
+    this.publishState();
+  }
+
+  /**
+   * Runs a saved skill. It goes through beginModelTask like any other task, so
+   * the ability checks, the task approval and the agent loop all still apply —
+   * a skill can never do something the user would not have agreed to out loud.
+   */
+  private async runSavedSkill(skillName: string): Promise<ActionExecutionOutcome> {
+    const skill = this.skillStore.findByName(skillName);
+    if (!skill) {
+      const availableNames = this.skillStore.summarizeNames(3).map((candidate) => `"${candidate.name}"`);
+      return failedActionOutcome(
+        availableNames.length
+          ? `I do not have a "${skillName}" skill. I do have ${availableNames.join(", ")}.`
+          : `I do not have a "${skillName}" skill yet.`,
+      );
+    }
+
+    this.skillStore.noteRun(skill.id);
+    void this.runAgentTask(skill.goal, skill.seedActions);
+    return completedActionOutcome(`starting ${skill.name}`, skill.goal);
+  }
+
   /** Runs the loop and reports where it ended up. */
   private async runAgentTask(goal: string, initialActions: ClickaaAction[]): Promise<void> {
     if (this.isAgentTaskRunning) {
@@ -1751,7 +1951,9 @@ export class ClickaaController {
         false,
       );
       this.publicState.lastActionSummary = taskResult.note;
-      if (taskResult.outcome !== "completed") {
+      if (taskResult.outcome === "completed") {
+        this.noteSuccessfulTask(goal, initialActions);
+      } else {
         this.desktopWindows.showNotification("Clickaa", `${goal}: ${taskResult.note}`);
       }
     } catch (error) {
@@ -2405,6 +2607,8 @@ export class ClickaaController {
       wakeWordState: this.wakeWordState,
       wakeWordMuted: this.wakeWordMuted,
       wakeWordMessage: this.wakeWordMessage,
+      skills: this.skillStore.list(),
+      skillSuggestion: this.currentSkillSuggestion,
       cursorEnabled: config.cursorEnabled,
       automationPaused: config.automationPaused,
       status: {

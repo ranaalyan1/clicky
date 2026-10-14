@@ -6,6 +6,7 @@ import type {
   ConfirmationMode,
   DictationShortcutId,
   GeminiChatModel,
+  IslandState,
   GeminiVoiceName,
   PersonalityPresetId,
   ResponseLengthId,
@@ -145,6 +146,8 @@ const element = {
   auditSummary: requireElement<HTMLElement>("audit-summary"),
   auditList: requireElement<HTMLElement>("audit-list"),
   auditClearButton: requireElement<HTMLButtonElement>("audit-clear-button"),
+  skillsCard: requireElement<HTMLElement>("skills-card"),
+  skillList: requireElement<HTMLElement>("skill-list"),
   islandMusicToggle: requireElement<HTMLInputElement>("island-music-toggle"),
   islandClipboardToggle: requireElement<HTMLInputElement>("island-clipboard-toggle"),
   refreshAppsButton: requireElement<HTMLButtonElement>("refresh-apps-button"),
@@ -365,6 +368,7 @@ function renderSetup(state: ClickaaPublicState): void {
   element.wakeWordStateChip.textContent = describeWakeWordState(state, config);
   element.wakeWordStatus.textContent = describeWakeWordStatus(state, config);
   renderAuditLog(state);
+  void window.clickaa.getIslandState().then(renderSkills).catch(() => undefined);
   element.islandMusicToggle.checked = config.islandShowNowPlaying;
   element.islandClipboardToggle.checked = config.islandShowClipboard;
 
@@ -405,6 +409,73 @@ function describeWakeWordStatus(state: ClickaaPublicState, config: ClickaaUserCo
   return config.abilities.wakeWord
     ? "waiting for you to say the name."
     : "switched off, so the microphone is closed.";
+}
+
+/** Skills are editable here: rename one inline, or delete it for good. */
+function renderSkills(islandState: IslandState): void {
+  element.skillsCard.hidden = !islandState.skills.length && !islandState.skillSuggestion;
+  const skillRows = islandState.skills.map((skill) => {
+    const row = document.createElement("div");
+    row.className = "list-row";
+
+    const copy = document.createElement("div");
+    copy.className = "list-row-copy";
+
+    const nameInput = document.createElement("input");
+    nameInput.className = "text-field skill-name-field";
+    nameInput.type = "text";
+    nameInput.value = skill.name;
+    nameInput.setAttribute("aria-label", `name of the ${skill.name} skill`);
+    nameInput.addEventListener("change", () => {
+      void window.clickaa.renameSkill(skill.id, nameInput.value);
+    });
+
+    const meta = document.createElement("span");
+    meta.textContent = skill.runCount
+      ? `${skill.goal} · used ${skill.runCount} ${skill.runCount === 1 ? "time" : "times"}`
+      : skill.goal;
+
+    copy.append(nameInput, meta);
+
+    const removeButton = document.createElement("button");
+    removeButton.type = "button";
+    removeButton.className = "ghost-button";
+    removeButton.textContent = "remove";
+    removeButton.addEventListener("click", () => {
+      void window.clickaa.removeSkill(skill.id);
+    });
+
+    row.append(copy, removeButton);
+    return row;
+  });
+
+  if (islandState.skillSuggestion) {
+    const suggestionRow = document.createElement("div");
+    suggestionRow.className = "list-row";
+    const copy = document.createElement("div");
+    copy.className = "list-row-copy";
+    const title = document.createElement("strong");
+    title.textContent = `ready to save: "${islandState.skillSuggestion.proposedName}"`;
+    const meta = document.createElement("span");
+    meta.textContent = `${islandState.skillSuggestion.goal} — offered in the island`;
+    copy.append(title, meta);
+    suggestionRow.append(copy);
+    skillRows.unshift(suggestionRow);
+  }
+
+  element.skillList.replaceChildren(...(skillRows.length
+    ? skillRows
+    : [(() => {
+      const emptyRow = document.createElement("div");
+      emptyRow.className = "list-row";
+      const emptyCopy = document.createElement("div");
+      emptyCopy.className = "list-row-copy";
+      const emptyText = document.createElement("span");
+      emptyText.textContent = "nothing saved yet. do something twice and clickaa will offer to save it.";
+      emptyCopy.append(emptyText);
+      emptyRow.append(emptyCopy);
+      return emptyRow;
+    })()]));
 }
 
 const auditOutcomeLabels: Record<ClickaaPublicState["auditLog"][number]["outcome"], string> = {

@@ -66,6 +66,10 @@ declare global {
       setIslandPointerOver(isPointerOverIsland: boolean): void;
       setIslandExpanded(isExpanded: boolean): void;
       resolveConfirmation(confirmationId: string, decision: "approve" | "reject"): Promise<string>;
+      saveSkillSuggestion(): Promise<string>;
+      dismissSkillSuggestion(): Promise<void>;
+      renameSkill(skillId: string, nextName: string): Promise<void>;
+      removeSkill(skillId: string): Promise<void>;
       undoActivity(activityEntryId: string): Promise<boolean>;
       launchApp(appName: string): Promise<void>;
       mediaControl(operation: "play_pause" | "next" | "previous"): Promise<void>;

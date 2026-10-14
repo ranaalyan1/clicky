@@ -6,6 +6,8 @@ Clickaa is the voice companion that lives on your Windows desktop: hold a key, a
 - Hold **Ctrl + Windows** to dictate: talk however you like, and cleaned, punctuated text lands in the app you are already typing in.
 - Hold **Ctrl + Shift** and circle anything on screen with the mouse to ask about just that part.
 - Press **Ctrl + Alt + S** and drag over any part of the screen: those pixels land on your clipboard and in `Pictures\Clickaa Snips`.
+- **Skills** grow out of repetition: do the same task three times and Clickaa offers to save it by name ("save it as my morning videos?"). It only saves when you press the button, skills are renameable in **plans → skills**, and every run still checks the screen and asks before it clicks or types.
+- **System access** is two switches in **soul → abilities**, both off until you ask. Tier 1 covers read-only diagnostics, registry reads and files inside your own six folders, each confirmed per action; Tier 2 covers arbitrary commands that change the PC, with its own warning. Clickaa refuses credential stores, browser password databases, elevation and anything that weakens Windows security whatever is switched on, and every attempt lands in an audit log in **memory → system access** with the raw command visible. **Ctrl + Alt + Q** stops everything mid-task.
 - Say **"clickaa"** (once switched on) and the island comes up with the microphone already open: keep talking, and Clickaa submits on its own when you stop. It listens with the speech recognizer Windows already ships, so no audio leaves the machine, and the tray can mute it instantly.
 - Give it a **task** rather than a single order — "go to youtube and play anything", "open my orders and check the last one" — and it works step by step: it clicks real buttons, looks at the screen to check what happened, and corrects itself when a step did not work. One approval covers the whole task; **Escape** stops it mid-task.
 - Ask Clickaa to **summarise, tighten, grammar-check or translate** whatever you copied, and the clipboard is rewritten in place with one click to put the old text back.
@@ -120,6 +122,11 @@ windows/
     windows-bridge.ts          PowerShell/C# helper for keys, media, wallpaper
     action-protocol.ts         <actions> and <task> parsing, risk rules, ability filtering
     agent-loop.ts              plan, act, look, correct: the bounded task runner
+    system-access.ts           the whole safety policy: what may run, and why not
+    system-access-runner.ts    runs one command or one file operation, isolated
+    audit-log-store.ts         the on-disk record of everything that was attempted
+    skill-store.ts             tasks the user saved by name
+    skill-suggestions.ts       when repeating a task becomes an offer to save it
     wake-word-listener.ts      the offline "clickaa" listener and its lifecycle
     wake-word-script.ts        the System.Speech helper that hears its own name
     screen-capture.ts          multi-monitor capture and circled-region crops

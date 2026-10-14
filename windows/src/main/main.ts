@@ -191,6 +191,31 @@ function registerIpcHandlers(): void {
     }
     return clickaaController?.runConfirmationDecision(confirmationId, decision);
   });
+  ipcMain.handle("island:save-skill-suggestion", (event) => {
+    if (!islandSentEvent(event.sender.id)) {
+      throw new Error("IPC request rejected: sender is not the Clickaa island.");
+    }
+    const savedSkill = clickaaController?.saveSuggestedSkill();
+    return savedSkill ? `saved the ${savedSkill.name} skill.` : "there was nothing to save.";
+  });
+  ipcMain.handle("island:dismiss-skill-suggestion", (event) => {
+    if (!islandSentEvent(event.sender.id)) {
+      throw new Error("IPC request rejected: sender is not the Clickaa island.");
+    }
+    clickaaController?.dismissSuggestedSkill();
+  });
+  ipcMain.handle("panel:rename-skill", (event, skillId: string, nextName: string) => {
+    if (!panelSentEvent(event.sender.id)) {
+      throw new Error("IPC request rejected: sender is not the Clickaa panel.");
+    }
+    clickaaController?.renameSkill(String(skillId), String(nextName));
+  });
+  ipcMain.handle("panel:remove-skill", (event, skillId: string) => {
+    if (!panelSentEvent(event.sender.id)) {
+      throw new Error("IPC request rejected: sender is not the Clickaa panel.");
+    }
+    clickaaController?.removeSkill(String(skillId));
+  });
   ipcMain.handle("island:undo-activity", (event, activityEntryId: string) => {
     if (!islandSentEvent(event.sender.id)) {
       throw new Error("IPC request rejected: sender is not the Clickaa island.");

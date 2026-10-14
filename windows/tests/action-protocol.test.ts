@@ -216,6 +216,24 @@ test("a malformed system access action is refused with a usable reason", () => {
   assert.equal(parsedResponse.problems[1]?.includes("read, write or list"), true);
 });
 
+test("a saved skill runs by name, and asks before it starts", () => {
+  const parsedResponse = parseModelResponse(
+    '<actions>[{"type":"run_skill","name":"my morning videos"}]</actions>',
+  );
+  assert.deepEqual(parsedResponse.actions, [{ type: "run_skill", name: "my morning videos" }]);
+  assert.equal(getActionRequiredAbility("run_skill"), "automation");
+  assert.equal(getActionRisk("run_skill"), "confirm");
+  assert.equal(
+    actionNeedsConfirmation({ type: "run_skill", name: "my morning videos" }, "risky", []),
+    true,
+  );
+
+  // A skill with no name is refused rather than guessed at.
+  const missingName = parseModelResponse('<actions>[{"type":"run_skill"}]</actions>');
+  assert.deepEqual(missingName.actions, []);
+  assert.equal(missingName.problems[0]?.includes("name"), true);
+});
+
 test("a snip action parses, stays safe, and needs screen vision", () => {
   const parsedResponse = parseModelResponse(
     'sure. <actions>[{"type":"screenshot_region"}]</actions>',
