@@ -200,7 +200,7 @@ npm test
 npm run typecheck
 ```
 
-The tests cover configuration and key validation, to-do, memory and schedule stores, action-protocol parsing and risk rules, spoken confirmation answers, dictation cleanup prompts, search targets, text matching, audio buffering and WAV encoding, chunked SSE parsing, skill health and repair, global modifier transitions (including AltGr avoidance), point-tag parsing, and coordinate mapping for monitors with negative desktop origins.
+The tests cover configuration and key validation, to-do, memory and schedule stores, action-protocol parsing and risk rules, spoken confirmation answers, dictation cleanup prompts, search targets, text matching, audio buffering and WAV encoding, chunked SSE parsing, skill health and repair, picture naming and refusal copy, global modifier transitions (including AltGr avoidance), point-tag parsing, and coordinate mapping for monitors with negative desktop origins.
 
 ## Architecture
 
