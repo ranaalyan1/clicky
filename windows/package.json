@@ -20,8 +20,8 @@
     "validate:installers": "node scripts/validate-installers.mjs",
     "dev": "npm run build && electron .",
     "start": "electron .",
-    "package:win": "npm run build && electron-builder --win nsis --x64 --arm64",
-    "package:win:dir": "npm run build && electron-builder --win dir --x64 --arm64"
+    "package:win": "npm run build && electron-builder --win nsis --x64 --arm64 --config electron-builder.signing.js",
+    "package:win:dir": "npm run build && electron-builder --win dir --x64 --arm64 --config electron-builder.signing.js"
   },
   "dependencies": {
     "uiohook-napi": "1.5.5",

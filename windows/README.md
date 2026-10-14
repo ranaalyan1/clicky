@@ -108,24 +108,63 @@ Windows refuses an unsigned installer in two different ways, and they are not th
 - **SmartScreen** shows "Windows protected your PC", and **More info → Run anyway** clears it. That is a speed bump.
 - **Smart App Control**, on by default on clean Windows 11 installs (22H2 and later), blocks unsigned apps outright. Its dialog offers **Okay** and **Get apps from the Store** and nothing else: there is no per-app exception, and adding Clickaa to Defender exclusions does not help because Smart App Control is a separate feature. It allows an app when Microsoft's cloud intelligence already recognizes it, or when the app is signed with a certificate from a CA in the Microsoft Trusted Root Program.
 
-To sign releases, add two repository secrets:
+Two signing providers are wired up. Set up one, or neither.
+
+#### A `.pfx` certificate
 
 ```bash
 gh secret set WINDOWS_CODE_SIGNING_CERTIFICATE < certificate.pfx.base64
 gh secret set WINDOWS_CODE_SIGNING_CERTIFICATE_PASSWORD
 ```
 
-`WINDOWS_CODE_SIGNING_CERTIFICATE` holds the base64 of your `.pfx` (electron-builder accepts base64, an https URL, or a file path); the workflow passes both secrets to electron-builder as `CSC_LINK` and `CSC_KEY_PASSWORD`. When they are set, electron-builder signs the app executable, the uninstaller and the generated installer, and `build.win.signExts` also signs the bundled `.node` native module — an unsigned module loaded by a signed app is its own Smart App Control refusal ("blocked part of this app"). CI then checks every one of those files with `Get-AuthenticodeSignature` and fails the build if a signature is missing or invalid, so a silently unsigned release cannot ship.
+`WINDOWS_CODE_SIGNING_CERTIFICATE` holds the base64 of your `.pfx` (electron-builder accepts base64, an https URL, or a file path); the workflow passes both secrets to electron-builder as `CSC_LINK` and `CSC_KEY_PASSWORD`.
 
-Obtaining a certificate:
+When signing is configured, electron-builder signs the app executable, the uninstaller and the generated installer, and `build.win.signExts` also signs the bundled `.node` native module — an unsigned module loaded by a signed app is its own Smart App Control refusal ("blocked part of this app"). CI then checks every one of those files with `Get-AuthenticodeSignature` and fails the build if a signature is missing or invalid, so a silently unsigned release cannot ship.
 
-- **Azure Trusted Signing** (formerly Azure Code Signing) is the cheapest route at roughly $9.99/month, but it is limited by region: individuals in the United States and Canada, organizations in the United States, Canada, the EU and the UK. From anywhere else it is not an option.
-- A traditional **OV code-signing certificate** from a CA in the Microsoft Trusted Root Program (DigiCert, Sectigo, SSL.com and similar) costs roughly $150–300/year and is sold worldwide. Since June 2023 these are issued onto a hardware token or a cloud HSM, which matters for CI: a certificate that exists only on a USB token cannot sign on a GitHub-hosted runner. Either sign on a Windows machine and upload the signed installers, or pick a CA that offers HSM-backed signing reachable from CI.
-- **Microsoft Store** distribution needs no certificate at all, because Store installs are exempt from the Smart App Control refusal. It does mean MSIX packaging and Store review.
+This only works for a certificate you can actually export as a `.pfx`. Since June 2023 code-signing certificates are issued onto a hardware token or a cloud HSM, and a token that never exports its key cannot sign on a GitHub-hosted runner. If yours is token-only, either sign on a Windows machine and upload the installers to the release yourself, or use a provider below.
+
+#### Azure Artifact Signing (formerly Trusted Signing)
+
+Electron-builder drives it through the `TrustedSigning` PowerShell module, and it authenticates with Azure's `EnvironmentCredential`, so CI needs seven secrets:
+
+```bash
+gh secret set AZURE_TENANT_ID
+gh secret set AZURE_CLIENT_ID
+gh secret set AZURE_CLIENT_SECRET
+gh secret set AZURE_CODE_SIGNING_ENDPOINT            # e.g. https://eus.codesigning.azure.net/
+gh secret set AZURE_CODE_SIGNING_ACCOUNT_NAME
+gh secret set AZURE_CODE_SIGNING_CERTIFICATE_PROFILE_NAME
+gh secret set AZURE_CODE_SIGNING_PUBLISHER_NAME      # must match the certificate's subject exactly
+```
+
+`electron-builder.signing.js` adds the Azure block to the packaging config only when those four `AZURE_CODE_SIGNING_*` values are present, which is how the config stays in `package.json` while signing stays optional. **Setting some of them but not all fails the build on purpose**: a half-configured signing setup would otherwise ship installers that look signed in the CI log and are not, which is precisely the "we could not verify its publisher" dialog users see. The `publisherName` also has to match the certificate subject exactly, or Windows reports the signature as invalid even though signing succeeded.
+
+Eligibility is the catch, and it is about where the **signing account** is, not where your users are:
+
+| Applicant | Eligible locations |
+|---|---|
+| Organization | United States, Canada, the European Union, the United Kingdom, Australia, New Zealand, Japan, South Korea, Singapore, Switzerland, Norway, Israel |
+| Individual | United States and Canada only |
+
+Basic is $9.99/month for 5,000 signatures with one certificate profile. Certificates are short-lived and timestamped by Microsoft, which keeps the signature valid after they expire.
+
+#### If you are outside those locations
+
+Azure is not available to an individual outside the United States and Canada, so pick one of these instead. All are sold worldwide:
+
+| Route | Roughly | CI-ready? |
+|---|---|---|
+| **SSL.com OV + eSigner** | $129/year + from $15/month (Tier 1: 240 signings) | Yes — cloud HSM, and SSL.com ships an official GitHub Action |
+| **DigiCert OV + KeyLocker** | $370–440/year | Yes, via `smctl` in the workflow. KeyLocker is capped at 1,000 signings per certificate-year, and hitting the cap fails the build until you buy more |
+| **Sectigo OV/EV + CodeGuard** | From ~$220/year | Yes — lower priced than DigiCert for the same cloud-HSM model |
+| **A token-based certificate from any CA** | ~$150–300/year | No. Sign on a Windows PC and upload the installers to the release by hand |
+| **Microsoft Store** | Store account fee | Not needed — Store installs are exempt from the Smart App Control refusal, at the cost of MSIX packaging and Store review |
+
+Whichever you choose, the cheaper tiers are per-signature or capped, which matters because a two-architecture release signs several files per build: the installer, the app executable, and the bundled `.node` native module.
 
 One caveat on reputation: a valid signature gets past SmartScreen immediately, but Smart App Control also weighs Microsoft's app intelligence. A brand-new certificate with no download history can still be held back for a while, and reputation accumulates with installs over time.
 
-None of this has been exercised end to end yet — no signed build has been produced, because producing one needs a certificate.
+None of this has been exercised end to end yet: no signed build of any kind has been produced, because every route needs something paid. The Azure wiring is tested for its three configurations (none, complete, partial) and the CI step verifies signatures with `Get-AuthenticodeSignature`, but the signing call itself has never run — the first build after the secrets exist will either sign correctly or fail loudly.
 
 ## Test and type-check
 
@@ -187,6 +226,12 @@ If the global listener cannot start, the tray panel remains usable through its *
 ## Troubleshooting
 
 - **"Smart App Control blocked an app that may be unsafe" while installing:** this is Smart App Control, not SmartScreen, and it has no **Run anyway** option to click. Check **Windows Security → App & browser control → Smart App Control settings**. On Windows 11 with the April 2026 update (24H2/25H2, build 26100.8116 or later) it can be switched off and back on freely; on older builds, switching it off is one-way until Windows is reinstalled, so decide with that in mind. Adding Clickaa to Defender exclusions will not help — Smart App Control is a separate feature with no per-app exception. Before running an unsigned installer, confirm it is the file CI built with `Get-FileHash .\Clickaa-Setup-1.1.0-x64.exe -Algorithm SHA256` and compare it against the digest on the release page. Running from source (`npm run dev`) may or may not be allowed, since Smart App Control judges every unsigned binary it loads. Signing the builds is the real fix; see **Code signing** above.
+- **The Smart App Control toggle is greyed out:** the registry is the same switch by a different door. Set `HKLM\SYSTEM\CurrentControlSet\Control\CI\Policy` → `VerifiedAndReputablePolicyState` to `0` (off), `1` (on/enforced) or `2` (evaluation), then run `CiTool.exe -r` to refresh the policy:
+  ```powershell
+  reg add "HKLM\SYSTEM\CurrentControlSet\Control\CI\Policy" /v VerifiedAndReputablePolicyState /t REG_DWORD /d 0 /f
+  CiTool.exe -r
+  ```
+  Check `winver` first: builds 26100.8116+ and 26200.8116+ (Windows 11 24H2/25H2 with the April 2026 update) have the reversible in-app toggle, and on those the registry edit is unnecessary. On older builds the registry route is known to revert on reboot, and turning it back on afterwards is unreliable — so make a restore point and treat it as a decision, not a tweak. This is machine-wide: it switches the guard off for every unknown unsigned program, not just Clickaa. Windows Defender keeps scanning regardless.
 - **The panel says the brain is not connected:** paste a full Gemini key (it starts with `AIza`), or a Worker base URL without `/chat` or another route.
 - **Gemini rejects the key:** make sure the key is from <https://aistudio.google.com/api-keys> and, if you are in the EEA, UK or Switzerland, that the project has billing enabled.
 - **No microphone prompt appeared:** open **Settings → Privacy & security → Microphone** and allow desktop apps to access the microphone.

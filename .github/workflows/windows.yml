@@ -34,6 +34,17 @@ jobs:
       # WINDOWS_CODE_SIGNING_CERTIFICATE_PASSWORD to its password.
       CSC_LINK: ${{ secrets.WINDOWS_CODE_SIGNING_CERTIFICATE }}
       CSC_KEY_PASSWORD: ${{ secrets.WINDOWS_CODE_SIGNING_CERTIFICATE_PASSWORD }}
+      # Or sign with Azure Artifact Signing instead. The credentials come from
+      # Azure's EnvironmentCredential; the four option values are read by
+      # windows/electron-builder.signing.js, which fails the build when only
+      # some of them are set rather than shipping a look-alike unsigned release.
+      AZURE_TENANT_ID: ${{ secrets.AZURE_TENANT_ID }}
+      AZURE_CLIENT_ID: ${{ secrets.AZURE_CLIENT_ID }}
+      AZURE_CLIENT_SECRET: ${{ secrets.AZURE_CLIENT_SECRET }}
+      AZURE_CODE_SIGNING_ENDPOINT: ${{ secrets.AZURE_CODE_SIGNING_ENDPOINT }}
+      AZURE_CODE_SIGNING_ACCOUNT_NAME: ${{ secrets.AZURE_CODE_SIGNING_ACCOUNT_NAME }}
+      AZURE_CODE_SIGNING_CERTIFICATE_PROFILE_NAME: ${{ secrets.AZURE_CODE_SIGNING_CERTIFICATE_PROFILE_NAME }}
+      AZURE_CODE_SIGNING_PUBLISHER_NAME: ${{ secrets.AZURE_CODE_SIGNING_PUBLISHER_NAME }}
 
     steps:
       - name: Check out repository
@@ -59,7 +70,7 @@ jobs:
         run: npm run package:win
 
       - name: Verify the signature when signing is configured
-        if: ${{ env.CSC_LINK != '' }}
+        if: ${{ env.CSC_LINK != '' || env.AZURE_CODE_SIGNING_ACCOUNT_NAME != '' }}
         shell: pwsh
         run: |
           # A signature that is merely present is not enough: only a valid,
@@ -147,7 +158,7 @@ jobs:
           # Say what is actually true of this build rather than assuming it is
           # unsigned, so the notes never promise a warning that will not appear
           # or stay silent about one that will.
-          $signingNote = if ($env:CSC_LINK) {
+          $signingNote = if ($env:CSC_LINK -or $env:AZURE_CODE_SIGNING_ACCOUNT_NAME) {
             "The installers are code-signed and timestamped, so Windows should accept them without an unknown-publisher warning. Smart App Control may still withhold judgement until the signature has built up reputation in Microsoft's app intelligence service."
           } else {
             "The installers are currently unsigned, and Windows treats unknown publishers two different ways. SmartScreen shows an unrecognized-app warning that **More info → Run anyway** clears. Smart App Control, which is on by default on clean Windows 11 installs, blocks unsigned apps outright and offers no way to allow a single one, so those machines cannot install this build. See windows/README.md for the certificate situation."
