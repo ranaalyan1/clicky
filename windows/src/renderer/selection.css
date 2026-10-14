@@ -1,3 +1,9 @@
+/*
+ * Region selection: the screen dims, and the part being kept is lifted out of
+ * it. The rectangle is a pressed well with a lit rim, so it reads as the one
+ * live thing on a surface that has gone quiet.
+ */
+
 * { box-sizing: border-box; }
 
 html, body {
@@ -13,7 +19,7 @@ html, body {
 .dim-layer {
   position: fixed;
   inset: 0;
-  background: rgba(6, 10, 9, 0.28);
+  background: rgba(8, 10, 12, 0.32);
   animation: dim-in 0.12s ease;
 }
 
@@ -21,22 +27,27 @@ html, body {
 
 .selection-rect {
   position: fixed;
-  border: 1.5px solid #6fb0ff;
-  border-radius: 6px;
-  background: rgba(111, 176, 255, 0.09);
+  border: 1.5px solid var(--ustaad-accent);
+  border-radius: var(--ustaad-radius-xs);
+  background: rgba(182, 232, 0, 0.07);
   box-shadow:
+    var(--ustaad-neu-inset-sm),
     0 0 0 1px rgba(0, 0, 0, 0.35),
-    0 0 22px rgba(111, 176, 255, 0.45);
+    0 0 24px rgba(182, 232, 0, 0.35);
   pointer-events: none;
 }
 
+/* Corner handles are raised dots, not squares: at this size a circle holds its
+   shape on any background, and the dark ring keeps it off light content. */
 .corner-handle {
   position: absolute;
-  width: 7px;
-  height: 7px;
-  border-radius: 2px;
-  background: #cfe4ff;
-  box-shadow: 0 0 6px rgba(111, 176, 255, 0.7);
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--ustaad-accent-bright);
+  box-shadow: var(--ustaad-neu-raised-sm), 0 0 6px rgba(182, 232, 0, 0.6);
+  outline: 1px solid rgba(0, 0, 0, 0.4);
+  outline-offset: -1px;
 }
 .corner-top-left { top: -4px; left: -4px; }
 .corner-top-right { top: -4px; right: -4px; }
@@ -46,15 +57,18 @@ html, body {
 .selection-size-label {
   position: absolute;
   right: 0;
-  bottom: -22px;
-  padding: 2px 6px;
-  border-radius: 5px;
-  background: rgba(9, 14, 12, 0.9);
-  color: #cfe4ff;
-  font-size: 10px;
+  bottom: -24px;
+  padding: 3px 8px;
+  border-radius: var(--ustaad-radius-xs);
+  background: var(--ustaad-canvas);
+  box-shadow: var(--ustaad-neu-raised-sm), var(--ustaad-shadow-soft);
+  color: var(--ustaad-accent-bright);
+  font: var(--ustaad-weight-medium) 10px/1.4 var(--ustaad-font-mono);
   font-variant-numeric: tabular-nums;
 }
 
+/* The banner floats over live screen content, so it keeps the drop shadow that
+   makes it read as being above the dim layer, and is moulded inside it. */
 .hint-banner {
   position: fixed;
   left: 50%;
@@ -62,14 +76,13 @@ html, body {
   transform: translateX(-50%);
   display: flex;
   align-items: center;
-  gap: 9px;
-  padding: 8px 13px;
-  border: 1px solid rgba(255, 255, 255, 0.09);
-  border-radius: 40px;
-  background: rgba(10, 15, 13, 0.92);
-  box-shadow: 0 12px 30px rgba(0, 0, 0, 0.45);
-  color: #e9f1ed;
-  font-size: 11.5px;
+  gap: var(--ustaad-space-4);
+  padding: 9px 14px;
+  border-radius: var(--ustaad-radius-pill);
+  background: var(--ustaad-canvas);
+  box-shadow: var(--ustaad-neu-raised-lg), var(--ustaad-shadow-floating);
+  color: var(--ustaad-ink);
+  font: var(--ustaad-text-sm)/1.2 var(--ustaad-font-ui);
   white-space: nowrap;
 }
 
@@ -80,44 +93,47 @@ html, body {
   background-repeat: no-repeat;
   background-position: center;
   background-size: contain;
-  filter: drop-shadow(0 0 6px rgba(90, 162, 255, 0.45));
+  filter: drop-shadow(0 0 6px rgba(182, 232, 0, 0.45));
 }
 
-.hint-text { font-weight: 600; }
+.hint-text { font-weight: var(--ustaad-weight-medium); }
 
+/* A separator pressed into the banner rather than drawn on it. */
 .hint-escape {
-  color: #7f8d86;
-  font-size: 10px;
-  padding-left: 8px;
-  border-left: 1px solid rgba(255, 255, 255, 0.09);
+  color: var(--ustaad-ink-faint);
+  font-size: var(--ustaad-text-2xs);
+  padding-left: var(--ustaad-space-5);
+  box-shadow: inset 1px 0 0 var(--ustaad-line);
+  padding-top: var(--ustaad-space-2);
+  padding-bottom: var(--ustaad-space-2);
 }
 
 kbd {
   display: inline-block;
-  padding: 1px 5px 2px;
-  border: 1px solid rgba(255, 255, 255, 0.13);
-  border-radius: 4px;
-  background: rgba(255, 255, 255, 0.055);
-  color: #ced8d2;
-  font: 10px "Segoe UI", sans-serif;
+  padding: 2px 6px 3px;
+  border-radius: var(--ustaad-radius-xs);
+  background: var(--ustaad-canvas);
+  box-shadow: var(--ustaad-neu-raised-sm);
+  color: var(--ustaad-ink-muted);
+  font: 10px var(--ustaad-font-ui);
 }
 
 /* A snip copies pixels rather than asking a question, so the overlay dims less
    and the region is drawn with the accent that means "this goes to clipboard". */
-body[data-purpose="snip"] .dim-layer { background: rgba(6, 10, 9, 0.16); }
+body[data-purpose="snip"] .dim-layer { background: rgba(8, 10, 12, 0.18); }
 
 body[data-purpose="snip"] .selection-rect {
   border-color: var(--ustaad-accent);
-  background: rgba(69, 150, 255, 0.1);
+  background: rgba(182, 232, 0, 0.1);
 }
-
-body[data-purpose="snip"] .corner-handle { border-color: var(--ustaad-accent); }
-
-body[data-purpose="snip"] .selection-size-label { color: var(--ustaad-accent); }
 
 body[data-purpose="snip"] .hint-cursor {
   background-image: none;
   border: 1px solid var(--ustaad-accent);
   border-radius: 3px;
   filter: none;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .dim-layer { animation: none; }
 }

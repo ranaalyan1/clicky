@@ -10,7 +10,7 @@ Renamed in 1.2, along with the interface: soft, neumorphic surfaces, a three-ste
 
 ## What it does
 
-- **Hold Ctrl + Alt** anywhere and talk about whatever is on your screen. Ustaad sees every display, answers in speech, and flies a blue cursor to the thing it mentions.
+- **Hold Ctrl + Alt** anywhere and talk about whatever is on your screen. Ustaad sees every display, answers in speech, and flies its cursor to the thing it mentions.
 - **Multi-step tasks.** "go to youtube and play anything" is not a search result: Ustaad opens the page, looks at the screen, clicks the right spot, checks whether it worked, and corrects itself when it did not. One approval covers the task, **Escape** stops it.
 - **Wake word.** Say "ustaad" and the island comes up with the microphone already open. It listens with the speech recognizer Windows ships, so no audio leaves the machine. Off until you switch it on.
 - **Skills.** Do the same task a few times and Ustaad offers to save it by name. It only saves when you say yes, and every run still checks the screen and asks before it clicks or types.

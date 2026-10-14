@@ -14,7 +14,7 @@ Ustaad is the voice companion that lives on your Windows desktop: hold a key, as
 - Ask Ustaad to **summarise, tighten, grammar-check or translate** whatever you copied, and the clipboard is rewritten in place with one click to put the old text back.
 - **Timers** ("set a timer for 12 minutes") tick down in the island and end with a notification, a chime-free spoken line, and a stop button.
 - **Snippets** ("save this as my address", then "insert my address") type a saved phrase into whatever window has focus.
-- Keep a transparent, click-through blue cursor next to the pointer that flies to the screen element it mentions.
+- Keep a transparent, click-through cursor next to the pointer that flies to the screen element it mentions.
 - Jump to a spoken answer with the **island**, the notch at the top of every screen: now playing, to-do list, reminders and routines, clipboard, launchable apps, wallpapers and quick switches.
 - Say "remember my brother's birthday is 4 March", "every morning at 9 open Unity and Spotify", or "search how to cook spaghetti on YouTube" and Ustaad keeps it and does it.
 - Anything that touches your PC (**open apps, type text, press keys, change the wallpaper**) waits for a quick yes — in the island, or by saying "yes" out loud. Reminders, routines, to-dos and memory never interrupt.
@@ -24,6 +24,12 @@ Ustaad is the voice companion that lives on your Windows desktop: hold a key, as
 The app was **Clickaa**, and **Clicky** before that. Nothing about how it works changed with the name: on first launch Ustaad copies your settings, to-do list, schedules, memory, clipboard history, saved skills and snippets out of the older folder (`%APPDATA%\Clickaa`, then `%APPDATA%\Clicky`) and leaves the old folder in place. An existing file always wins, so the import can never overwrite newer settings.
 
 Because the Windows installer keys off the app id, an older Clickaa install should be uninstalled before installing Ustaad.
+
+## The mark
+
+One shape, one colour: a folded, faceted "U" with a lit blade held in its counter, and the blade's lime is the accent the whole interface is built around. It is drawn as vector art in `assets/ustaad-mark.svg` (for light backgrounds) and `assets/ustaad-mark-light.svg` (for dark ones), and **everything else is rendered from those**: `tray.svg` and `tray.png` for the notification area, `icon.png` and the seven sizes inside `icon.ico` for the installer and the taskbar, `ustaad-mark-64.png` for the mark inlined into the interface, and `ustaad-mark-transparent.png` for documentation.
+
+The tray and the app tile are deliberately different renders. A bare dark mark vanishes into a dark Windows 11 taskbar, so the tile carries the high-key mark on a graphite slab; the tray keeps a dark hairline so it holds up on a light taskbar, and its blade is deepened one step so the colour survives being reduced to a handful of pixels.
 
 ## The interface
 

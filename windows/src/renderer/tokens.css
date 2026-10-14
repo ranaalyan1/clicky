@@ -63,10 +63,10 @@
   --ustaad-ink-muted: #9aa3ae;
   --ustaad-ink-faint: #6d7681;
 
-  --ustaad-accent: #4596ff;
-  --ustaad-accent-bright: #7db8ff;
-  --ustaad-accent-deep: #2f7ae0;
-  --ustaad-accent-soft: rgba(69, 150, 255, 0.16);
+  --ustaad-accent: #b6e800;
+  --ustaad-accent-bright: #d8ff4d;
+  --ustaad-accent-deep: #8fb800;
+  --ustaad-accent-soft: rgba(182, 232, 0, 0.16);
   --ustaad-positive: #69d99f;
   --ustaad-caution: #ffc56a;
   --ustaad-danger: #ff8a8a;
@@ -113,8 +113,8 @@
 
   /* Focus has to stay visible on a soft surface, so it is a ring *and* a
      glow rather than a colour change alone. */
-  --ustaad-focus-ring: 0 0 0 2px rgba(69, 150, 255, 0.75);
-  --ustaad-focus-shadow: 0 0 0 2px rgba(69, 150, 255, 0.7), 0 0 14px rgba(69, 150, 255, 0.35);
+  --ustaad-focus-ring: 0 0 0 2px rgba(182, 232, 0, 0.75);
+  --ustaad-focus-shadow: 0 0 0 2px rgba(182, 232, 0, 0.7), 0 0 14px rgba(182, 232, 0, 0.35);
 
   /* Elevation, kept for anything that genuinely floats above the panel. */
   --ustaad-shadow-soft: 0 6px 18px rgba(0, 0, 0, 0.28);

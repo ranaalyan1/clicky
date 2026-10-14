@@ -182,6 +182,15 @@ IMPORTANT: Follow these naming rules strictly. Clarity is the top priority.
 - Prefer pure modules with injected dependencies for anything with rules (policy, parsing, state machines, the agent loop). It is what makes the behaviour testable without a Windows machine
 - Run both `npm test` and `npm run typecheck` after Windows changes
 
+### The Mark and the Accent
+
+Ustaad's identity is one shape and one colour.
+
+- The mark is a folded, faceted "U" with a lit blade in its counter: `windows/assets/ustaad-mark.svg` (low key, for light backgrounds) and `ustaad-mark-light.svg` (high key, for dark surfaces). `tray.svg`, `icon.png`, `icon.ico`, `tray.png` and the inlined mark in `brand.css` are all **rendered from those two files** — edit the SVG and re-render, never hand-edit a PNG or the base64 blob.
+- The app tile and the tray icon are separate renders on purpose: a bare dark mark disappears into a dark Windows 11 taskbar, so the tile carries the high-key mark on a graphite slab, and the tray keeps a dark hairline so it holds on a light taskbar too. Every size in `icon.ico` (16 → 256) comes from that one tile.
+- The blade's lime is the interface's accent: `--ustaad-accent: #b6e800`, with `--ustaad-accent-bright: #d8ff4d` for glows and hover. It is the only colour in the product. Anything that used to be blue — links, focus rings, the listening glow, the active tab — is the accent now, and the aliases (`--blue`, `--island-blue`) point at it, so do not introduce a second hue.
+- Text that sits on the accent, or on an accent-tinted surface, uses an ink measured against the lime rather than a neutral: `#e6ff9c` for accent-proximate copy.
+
 ### Neumorphic Interface Conventions
 
 The interface is soft UI (neumorphism), and two rules keep it from falling apart:

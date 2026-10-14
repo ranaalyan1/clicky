@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128" width="512" height="512">
+  <!-- Ustaad's mark, high key: a folded, faceted "U" with a slim lit blade held
+       in its counter. Light planes carry the silhouette so it survives a
+       16-pixel tray, and the blade is the only colour in the identity. -->
+  <path d="M22 10 L12 20 L12 76 L64 108 L116 76 L116 20 L106 10 L98 10 L98 68 L64 90 L30 68 L30 10 Z" fill="#c9d1da"/>
+  <path d="M98 10 L106 10 L116 20 L116 76 L64 108 L64 90 L98 68 Z" fill="#78818d"/>
+  <path d="M116 76 L64 108 L64 90 L98 68 Z" fill="#667079"/>
+  <path d="M12 76 L64 108 L64 90 L30 68 Z" fill="#aab3be"/>
+  <path d="M12 20 L12 76 L64 108 L64 100 L20 72 L20 20 Z" fill="#ffffff" opacity="0.45"/>
+  <path d="M64 78 L53 26 L64 26 Z" fill="#a9d800"/>
+  <path d="M64 78 L75 26 L64 26 Z" fill="#d8ff4d"/>
+</svg>

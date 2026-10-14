@@ -65,7 +65,7 @@ body[data-voice-state="listening"] .notch-cursor { animation: notch-pulse 1s eas
 body[data-voice-state="processing"] .notch-cursor { animation: notch-think 1.1s ease-in-out infinite; }
 body[data-voice-state="responding"] .notch-cursor { animation: notch-talk 0.5s ease-in-out infinite alternate; }
 
-@keyframes notch-pulse { 50% { filter: drop-shadow(0 0 13px rgba(90, 162, 255, 0.95)); transform: scale(1.12); } }
+@keyframes notch-pulse { 50% { filter: drop-shadow(0 0 13px rgba(182, 232, 0, 0.95)); transform: scale(1.12); } }
 @keyframes notch-think { 50% { transform: scale(0.9); opacity: 0.75; } }
 @keyframes notch-talk { to { transform: translateY(-1px) scale(1.06); } }
 
@@ -120,8 +120,8 @@ body[data-presentation="revealed"]:hover .notch-row::after {
 }
 body[data-presentation="revealed"] .notch-cursor { animation: notch-breathe 2.6s ease-in-out infinite; }
 @keyframes notch-breathe {
-  0%, 100% { filter: drop-shadow(0 0 6px rgba(90, 162, 255, 0.45)); }
-  50% { filter: drop-shadow(0 0 11px rgba(90, 162, 255, 0.9)); }
+  0%, 100% { filter: drop-shadow(0 0 6px rgba(182, 232, 0, 0.45)); }
+  50% { filter: drop-shadow(0 0 11px rgba(182, 232, 0, 0.9)); }
 }
 
 .notch-close {
@@ -164,7 +164,7 @@ body[data-voice-state="listening"] .notch-wave i:nth-child(5) { animation-delay:
   flex: 0 0 7px;
   border-radius: 50%;
   background: var(--ustaad-accent);
-  box-shadow: 0 0 7px rgba(69, 150, 255, 0.7);
+  box-shadow: 0 0 7px rgba(182, 232, 0, 0.7);
 }
 
 .wake-indicator[data-wake-state="starting"] { animation: wake-breathe 1.6s ease-in-out infinite; }
@@ -342,7 +342,7 @@ body[data-media-playing="false"] .music-art span { animation-play-state: paused;
 }
 .media-button:hover { color: var(--island-text); box-shadow: var(--ustaad-neu-raised); }
 .media-button:active { box-shadow: var(--ustaad-neu-inset-sm); }
-.media-button.primary { color: #cfe4ff; box-shadow: var(--ustaad-neu-raised), inset 0 0 0 1px rgba(90,162,255,.25); }
+.media-button.primary { color: #e6ff9c; box-shadow: var(--ustaad-neu-raised), inset 0 0 0 1px rgba(182,232,0,.25); }
 
 /* ------------------------------------------------------ confirmations ---- */
 
@@ -444,8 +444,8 @@ body[data-media-playing="false"] .music-art span { animation-play-state: paused;
   border: 0;
   border-radius: var(--ustaad-radius-pill);
   background: var(--island-surface);
-  box-shadow: var(--ustaad-neu-raised-sm), inset 0 0 0 1px rgba(90,162,255,.22);
-  color: #cfe4ff;
+  box-shadow: var(--ustaad-neu-raised-sm), inset 0 0 0 1px rgba(182,232,0,.22);
+  color: #e6ff9c;
   font-size: 9px;
   font-weight: 620;
   cursor: pointer;
@@ -471,7 +471,7 @@ body[data-media-playing="false"] .music-art span { animation-play-state: paused;
   text-overflow: ellipsis;
   transition: box-shadow var(--ustaad-duration-fast) var(--ustaad-ease-out);
 }
-.app-tile:hover { box-shadow: var(--ustaad-neu-raised), inset 0 0 0 1px rgba(90,162,255,.22); }
+.app-tile:hover { box-shadow: var(--ustaad-neu-raised), inset 0 0 0 1px rgba(182,232,0,.22); }
 .app-tile:active { box-shadow: var(--ustaad-neu-inset-sm); }
 
 /* -------------------------------------------------------- wallpapers ----- */
@@ -485,7 +485,7 @@ body[data-media-playing="false"] .music-art span { animation-play-state: paused;
   cursor: pointer;
   transition: box-shadow var(--ustaad-duration-fast) var(--ustaad-ease-out);
 }
-.wallpaper-swatch:hover { box-shadow: var(--ustaad-neu-raised), 0 0 0 2px rgba(90, 162, 255, 0.45); }
+.wallpaper-swatch:hover { box-shadow: var(--ustaad-neu-raised), 0 0 0 2px rgba(182, 232, 0, 0.45); }
 .wallpaper-swatch:active { box-shadow: var(--ustaad-neu-inset-sm); }
 
 /* --------------------------------------------------------- toggles ------- */
@@ -514,10 +514,10 @@ body[data-media-playing="false"] .music-art span { animation-play-state: paused;
   box-shadow: var(--ustaad-neu-raised-sm);
   transition: transform var(--ustaad-duration-base) var(--ustaad-ease-out);
 }
-.switch-control input:checked + i { box-shadow: var(--ustaad-neu-inset-sm), inset 0 0 0 1px rgba(90,162,255,.32); }
+.switch-control input:checked + i { box-shadow: var(--ustaad-neu-inset-sm), inset 0 0 0 1px rgba(182,232,0,.32); }
 .switch-control input:checked + i::after {
   transform: translateX(16px);
-  background: linear-gradient(160deg, #5ea6ff, #2f7ae0);
-  box-shadow: var(--ustaad-neu-raised-sm), 0 0 10px rgba(90, 162, 255, 0.4);
+  background: linear-gradient(160deg, #d8ff4d, #8fb800);
+  box-shadow: var(--ustaad-neu-raised-sm), 0 0 10px rgba(182, 232, 0, 0.4);
 }
 .switch-control input:focus-visible + i { box-shadow: var(--ustaad-neu-inset-sm), var(--ustaad-focus-ring); }
