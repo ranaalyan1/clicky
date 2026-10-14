@@ -222,6 +222,24 @@ function registerIpcHandlers(): void {
     }
     ustaadController?.dismissSkillRepair();
   });
+  ipcMain.handle("island:open-drawn-picture", (event) => {
+    if (!islandSentEvent(event.sender.id)) {
+      throw new Error("IPC request rejected: sender is not the Ustaad island.");
+    }
+    return ustaadController?.openDrawnPicture() ?? "there is no picture to open.";
+  });
+  ipcMain.handle("island:reveal-drawn-picture", (event) => {
+    if (!islandSentEvent(event.sender.id)) {
+      throw new Error("IPC request rejected: sender is not the Ustaad island.");
+    }
+    return ustaadController?.revealDrawnPicture() ?? "there is no picture to show.";
+  });
+  ipcMain.handle("island:dismiss-drawn-picture", (event) => {
+    if (!islandSentEvent(event.sender.id)) {
+      throw new Error("IPC request rejected: sender is not the Ustaad island.");
+    }
+    ustaadController?.dismissDrawnPicture();
+  });
   ipcMain.handle("island:run-task-queue", (event) => {
     if (!islandSentEvent(event.sender.id)) {
       throw new Error("IPC request rejected: sender is not the Ustaad island.");

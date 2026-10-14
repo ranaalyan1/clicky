@@ -7,6 +7,7 @@ import { BrainStreamRequest, SynthesizedSpeech } from "./brain-types";
 import { ClaudeClient } from "./claude-client";
 import { buildDictationCleanupUserPrompt, dictationCleanupSystemPrompt } from "./dictation-prompts";
 import { GeminiClient } from "./gemini-client";
+import { GeneratedPicturePayload } from "./image-generation";
 import { normalizeWorkerBaseUrl } from "./config-store";
 
 export type ResolvedSpeechProvider = "gemini" | "elevenlabs" | "windows";
@@ -99,6 +100,21 @@ export class BrainRouter {
       config.workerBaseUrl,
       config.selectedClaudeModel,
     );
+  }
+
+  /**
+   * Draws one picture on the user's own Google key.
+   *
+   * Pictures are Gemini-only: the Worker proxy speaks for Claude, which cannot
+   * draw, so this asks for the missing key here instead of failing deeper down.
+   */
+  async drawPicture(config: UstaadUserConfig, prompt: string): Promise<GeneratedPicturePayload> {
+    if (!config.geminiApiKey) {
+      throw new Error(
+        "drawing pictures needs your own Gemini key, because the worker brain cannot draw. paste one in the setup tab and ask again.",
+      );
+    }
+    return new GeminiClient(config.geminiApiKey).generatePicture(prompt);
   }
 
   async synthesizeSpeech(

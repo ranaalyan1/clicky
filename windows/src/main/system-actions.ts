@@ -55,6 +55,22 @@ export function failedActionOutcome(message: string): ActionExecutionOutcome {
   return failedOutcome(message);
 }
 
+/**
+ * A completed action the user can take back.
+ *
+ * Drawing a picture belongs here rather than behind a confirmation: it is
+ * additive, it is what they just asked for, and the undo chip removes the file
+ * it wrote.
+ */
+export function completedActionOutcomeWithUndo(
+  message: string,
+  detail: string,
+  undoLabel: string,
+  undo: () => Promise<void> | void,
+): ActionExecutionOutcome {
+  return { status: "completed", message, detail, undoLabel, undo, choices: [] };
+}
+
 function completedOutcome(message: string, detail = ""): ActionExecutionOutcome {
   return { status: "completed", message, detail, undoLabel: null, undo: null, choices: [] };
 }

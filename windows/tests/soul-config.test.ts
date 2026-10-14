@@ -12,10 +12,18 @@ import {
   sanitizeSoulSettings,
 } from "../src/main/soul-config";
 
-test("every ability is enabled by default and unknown stored values are ignored", () => {
-  assert.equal(abilityDefinitions.length, 13);
+test("every ability is enabled by default, except the picture switch, and unknown stored values are ignored", () => {
+  assert.equal(abilityDefinitions.length, 14);
+
+  // Drawing is off until the user turns it on: every picture is a call that
+  // spends money on their own key, and that is theirs to decide.
+  const abilitiesOffByDefault: string[] = ["imageGeneration"];
   for (const abilityDefinition of abilityDefinitions) {
-    assert.equal(defaultAbilitySettings[abilityDefinition.id], true, abilityDefinition.id);
+    assert.equal(
+      defaultAbilitySettings[abilityDefinition.id],
+      !abilitiesOffByDefault.includes(abilityDefinition.id),
+      abilityDefinition.id,
+    );
   }
 
   const sanitizedAbilities = sanitizeAbilitySettings({ memory: false, teleportation: false });

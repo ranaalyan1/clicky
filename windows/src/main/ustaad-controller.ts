@@ -1,8 +1,8 @@
 import { randomUUID } from "node:crypto";
 import { networkInterfaces } from "node:os";
-import { mkdir, writeFile } from "node:fs/promises";
-import { join } from "node:path";
-import { app, clipboard, ClipboardItem } from "electron";
+import { mkdir, readdir, rm, writeFile } from "node:fs/promises";
+import { isAbsolute, join, relative } from "node:path";
+import { app, clipboard, ClipboardItem, nativeImage, shell } from "electron";
 import {
   ActiveTimer,
   BrainConnectionTestResult,
@@ -18,6 +18,7 @@ import {
   RegionSelectorSelection,
   PhoneBridgeInfo,
   PhoneBridgeStatus,
+  GeneratedPicture,
   QueuedTask,
   RunHistoryEntry,
   RunHistorySearchResult,
@@ -41,9 +42,11 @@ import { BrainRouter } from "./brain-router";
 import {
   ActionExecutionOutcome,
   completedActionOutcome,
+  completedActionOutcomeWithUndo,
   UstaadActionExecutor,
   failedActionOutcome,
 } from "./system-actions";
+import { pictureFolderName, picturePreviewWidth, resolvePictureFileName } from "./image-generation";
 import { ClipboardHistoryStore } from "./clipboard-history-store";
 import { ConfirmationQueue, interpretConfirmationAnswer } from "./confirmation-queue";
 import { UstaadConfigStore } from "./config-store";
@@ -151,6 +154,11 @@ export class UstaadController {
   private readonly auditLogStore: AuditLogStore;
   private readonly skillStore: SkillStore;
   private readonly taskQueueStore: TaskQueueStore;
+  /**
+   * The last picture drawn, held in memory rather than on disk: it is a
+   * result the user is looking at, not something to restore next launch.
+   */
+  private drawnPicture: GeneratedPicture | null = null;
   /** The queue entry the running task came from, so its outcome can be filed. */
   private currentQueuedTaskId: string | null = null;
   private readonly systemAccessRunner: SystemAccessRunner;
@@ -1022,6 +1030,8 @@ export class UstaadController {
         outcome = await this.runTimerAction(action);
       } else if (action.type === "clipboard_transform") {
         outcome = await this.runClipboardTransform(action.operation, action.targetLanguage);
+      } else if (action.type === "create_image") {
+        outcome = await this.drawPicture(action.prompt, action.name);
       } else if (action.type === "run_skill") {
         outcome = await this.runSavedSkill(action.name);
       } else if (action.type === "screenshot_region") {
@@ -1200,6 +1210,95 @@ export class UstaadController {
    * Rewrites whatever is on the clipboard and puts the result back, so the user
    * can paste it straight away. The previous text is kept for undo.
    */
+  /**
+   * Draws one picture on the user's own key and saves it in their Pictures
+   * folder, then shows it in the island.
+   *
+   * Nothing here is overwritten — a name that is already used gets a number —
+   * and the undo chip deletes exactly the file this call wrote.
+   */
+  private async drawPicture(prompt: string, requestedName: string | null): Promise<ActionExecutionOutcome> {
+    const picturesFolder = join(app.getPath("pictures"), pictureFolderName);
+    await mkdir(picturesFolder, { recursive: true });
+
+    const drawnPicture = await this.brainRouter.drawPicture(this.configStore.getConfig(), prompt);
+    const fileName = resolvePictureFileName({
+      prompt,
+      requestedName,
+      mimeType: drawnPicture.mimeType,
+      takenFileNames: new Set(await readdir(picturesFolder)),
+    });
+    const filePath = join(picturesFolder, fileName);
+    await writeFile(filePath, Buffer.from(drawnPicture.base64Data, "base64"));
+
+    this.drawnPicture = {
+      id: randomUUID(),
+      prompt,
+      filePath,
+      previewDataUrl: buildPicturePreviewDataUrl(drawnPicture.base64Data),
+      drawnAtIso: new Date().toISOString(),
+    };
+    this.publishIslandState();
+    this.desktopWindows.showNotification("your picture is ready", `${fileName} is in your Pictures folder.`);
+
+    return completedActionOutcomeWithUndo(
+      `drew "${prompt}"`,
+      filePath,
+      "delete the picture",
+      async () => {
+        await rm(filePath, { force: true });
+        if (this.drawnPicture?.filePath === filePath) {
+          this.drawnPicture = null;
+          this.publishIslandState();
+        }
+      },
+    );
+  }
+
+  /** Opens the last drawn picture in the user's picture viewer. */
+  async openDrawnPicture(): Promise<string> {
+    const openablePath = this.readOpenablePicturePath();
+    if (!openablePath) {
+      return "there is no picture to open.";
+    }
+    const openFailure = await shell.openPath(openablePath);
+    return openFailure || "opened it.";
+  }
+
+  /** Shows the last drawn picture in Explorer, so it can be dragged anywhere. */
+  revealDrawnPicture(): string {
+    const openablePath = this.readOpenablePicturePath();
+    if (!openablePath) {
+      return "there is no picture to show.";
+    }
+    shell.showItemInFolder(openablePath);
+    return "showed it in your folder.";
+  }
+
+  /** Hides the picture card. The file itself stays in Pictures. */
+  dismissDrawnPicture(): void {
+    this.drawnPicture = null;
+    this.publishIslandState();
+  }
+
+  /**
+   * The path the picture buttons are allowed to touch.
+   *
+   * Both buttons open something, so the path is re-checked against the folder
+   * Ustaad writes pictures into rather than trusted for being in memory.
+   */
+  private readOpenablePicturePath(): string | null {
+    const filePath = this.drawnPicture?.filePath ?? "";
+    if (!filePath) {
+      return null;
+    }
+    const picturesFolder = join(app.getPath("pictures"), pictureFolderName);
+    const pathInsidePictures = relative(picturesFolder, filePath);
+    return pathInsidePictures && !pathInsidePictures.startsWith("..") && !isAbsolute(pathInsidePictures)
+      ? filePath
+      : null;
+  }
+
   private async runClipboardTransform(
     operation: ClipboardTransformOperation,
     targetLanguage: string | null,
@@ -3249,6 +3348,7 @@ export class UstaadController {
       skillSuggestion: this.currentSkillSuggestion,
       skillRepair: this.currentSkillRepair,
       taskQueue: this.taskQueueStore.waiting(),
+      drawnPicture: this.drawnPicture,
       cursorEnabled: config.cursorEnabled,
       automationPaused: config.automationPaused,
       status: {
@@ -3435,6 +3535,24 @@ function describeInteractionHint(interactionKind: InteractionKind, config: Ustaa
     default:
       return config.abilities.screenVision ? "listening — I can see your screen" : "listening";
   }
+}
+
+/**
+ * A small jpeg the island can show without reading the file back.
+ *
+ * The picture Google returns is around a megabyte; this keeps what the island
+ * sends on every state update to a few tens of kilobytes, which matters on the
+ * low-spec machines Ustaad is built for.
+ */
+function buildPicturePreviewDataUrl(base64Data: string): string {
+  const drawnImage = nativeImage.createFromBuffer(Buffer.from(base64Data, "base64"));
+  if (drawnImage.isEmpty()) {
+    return "";
+  }
+  const previewImage = drawnImage.getSize().width > picturePreviewWidth
+    ? drawnImage.resize({ width: picturePreviewWidth })
+    : drawnImage;
+  return `data:image/jpeg;base64,${previewImage.toJPEG(82).toString("base64")}`;
 }
 
 function describeIslandStatus(

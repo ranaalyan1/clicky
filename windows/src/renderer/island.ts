@@ -679,6 +679,74 @@ function renderTaskQueue(islandState: IslandState): void {
 }
 
 /**
+ * The picture Ustaad just drew.
+ *
+ * It stays on screen until the user hides it, because the first thing anyone
+ * does with a picture is look at it, and it can be opened or found in Explorer
+ * from here without knowing where Ustaad saves things.
+ */
+function renderDrawnPicture(islandState: IslandState): void {
+  const picture = islandState.drawnPicture;
+  if (!picture) {
+    return;
+  }
+
+  const card = document.createElement("div");
+  card.className = "confirmation-card drawn-picture-card";
+
+  if (picture.previewDataUrl) {
+    const preview = document.createElement("img");
+    preview.className = "drawn-picture-preview";
+    preview.src = picture.previewDataUrl;
+    preview.alt = picture.prompt;
+    card.append(preview);
+  }
+
+  const title = document.createElement("p");
+  title.className = "confirmation-title";
+  title.textContent = `drew "${picture.prompt}"`;
+
+  const reason = document.createElement("p");
+  reason.className = "confirmation-reason";
+  reason.textContent = "saved in your Pictures folder as " + picture.filePath.split(/[\\/]/u).pop();
+
+  const buttonRow = document.createElement("div");
+  buttonRow.className = "confirmation-buttons";
+
+  const openButton = document.createElement("button");
+  openButton.type = "button";
+  openButton.className = "confirmation-button approve";
+  openButton.textContent = "open it";
+  openButton.addEventListener("click", () => {
+    openButton.disabled = true;
+    void window.ustaad.openDrawnPicture().then((message) => {
+      openButton.disabled = false;
+      reason.textContent = message;
+    });
+  });
+
+  const revealButton = document.createElement("button");
+  revealButton.type = "button";
+  revealButton.className = "confirmation-button";
+  revealButton.textContent = "show in folder";
+  revealButton.addEventListener("click", () => {
+    void window.ustaad.revealDrawnPicture();
+  });
+
+  const hideButton = document.createElement("button");
+  hideButton.type = "button";
+  hideButton.className = "confirmation-button";
+  hideButton.textContent = "hide";
+  hideButton.addEventListener("click", () => {
+    void window.ustaad.dismissDrawnPicture();
+  });
+
+  buttonRow.append(openButton, revealButton, hideButton);
+  card.append(title, reason, buttonRow);
+  element.confirmationStack.append(card);
+}
+
+/**
  * The repair card for a saved skill that keeps failing. It has three faces:
  * the offer, the wait while the model thinks, and the proposed new way. Only
  * "save the fix" changes the skill, and even then every run is confirmed.
@@ -787,6 +855,7 @@ function renderIsland(islandState: IslandState): void {
   renderSkillSuggestion(islandState);
   renderSkillRepair(islandState);
   renderTaskQueue(islandState);
+  renderDrawnPicture(islandState);
   renderTimers(islandState);
   renderSnippets(islandState);
   renderActivityFeed(islandState.activityFeed);

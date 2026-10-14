@@ -392,6 +392,7 @@ body[data-media-playing="false"] .music-art span { animation-play-state: paused;
 /* A waiting task is a sentence, not a label: it gets the room, and the drop
    button keeps its own width instead of being pushed off the edge. */
 .task-queue-goal { flex: 1 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.drawn-picture-preview { width: 100%; max-height: 190px; object-fit: contain; border-radius: 12px; margin-bottom: 8px; background: var(--island-surface); }
 .task-queue-card .text-button { flex: 0 0 auto; }
 .island-row-main { flex: 1; min-width: 0; }
 .island-row-title { font-size: 10.5px; line-height: 1.5; word-break: break-word; }

@@ -30,6 +30,7 @@ const abilityCopy: Array<{ id: AbilityId; label: string; description: string }> 
   { id: "dictation", label: "dictation", description: "hold the dictation shortcut to talk and have clean text land in the focused app" },
   { id: "circleToAsk", label: "circle to ask", description: "circle anything on screen and ask about it out loud" },
   { id: "webSearch", label: "web search", description: "search google, youtube, amazon and friends in your browser" },
+  { id: "imageGeneration", label: "draw pictures", description: "draw one picture from your description into your Pictures folder — it runs on your google key, so each picture is billed to you" },
   { id: "systemControl", label: "system control", description: "volume, media playback, windows and wallpaper" },
   { id: "scheduling", label: "reminders and routines", description: "run tasks later, by themselves, and tell you what they did" },
   { id: "toDoList", label: "to-do list", description: "keep a spoken to-do list in the island" },

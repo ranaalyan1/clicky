@@ -69,6 +69,7 @@ export const abilityIds = [
   "dictation",
   "circleToAsk",
   "webSearch",
+  "imageGeneration",
   "systemControl",
   "scheduling",
   "toDoList",
@@ -293,6 +294,14 @@ export interface ManageFileAction {
   content: string;
 }
 
+/** "draw me a red panda on a skateboard" — one picture, on the user's own key. */
+export interface CreateImageAction {
+  type: "create_image";
+  prompt: string;
+  /** What to call the file. Null means "name it after the prompt". */
+  name: string | null;
+}
+
 /** "do my morning videos" — runs a task the user saved by name. */
 export interface RunSkillAction {
   type: "run_skill";
@@ -354,9 +363,11 @@ export type UstaadAction =
   | RunCommandAction
   | ManageFileAction
   | ReadRegistryAction
+  | CreateImageAction
   | RunSkillAction;
 
 export type UstaadActionType =
+  | "create_image"
   | "open_app"
   | "open_url"
   | "search_web"
@@ -423,6 +434,7 @@ export const ustaadActionTypes: readonly UstaadActionType[] = [
   "run_command",
   "manage_file",
   "read_registry",
+  "create_image",
   "run_skill",
 ];
 
@@ -785,6 +797,20 @@ export interface IslandStatusSummary {
  */
 export type IslandPresentation = "hidden" | "revealed" | "open";
 
+/**
+ * A picture Ustaad drew, as the island shows it.
+ *
+ * The preview travels with the state so the island can show the picture without
+ * reading the disk again; it is a small jpeg, never the full-size file.
+ */
+export interface GeneratedPicture {
+  id: string;
+  prompt: string;
+  filePath: string;
+  previewDataUrl: string;
+  drawnAtIso: string;
+}
+
 export interface IslandState {
   isExpanded: boolean;
   isEnabled: boolean;
@@ -806,6 +832,8 @@ export interface IslandState {
   skillRepair: SkillRepairSurface | null;
   /** Tasks waiting to run, oldest first. */
   taskQueue: QueuedTask[];
+  /** The last picture Ustaad drew, until the user hides it. */
+  drawnPicture: GeneratedPicture | null;
   /** Why the wake word is in that state, shown as the indicator's tooltip. */
   wakeWordMessage: string;
   todos: TodoItem[];

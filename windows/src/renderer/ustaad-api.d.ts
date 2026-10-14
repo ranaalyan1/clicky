@@ -78,6 +78,9 @@ declare global {
       workOutSkillRepair(): Promise<string>;
       saveSkillRepair(): Promise<string>;
       dismissSkillRepair(): Promise<void>;
+      openDrawnPicture(): Promise<string>;
+      revealDrawnPicture(): Promise<string>;
+      dismissDrawnPicture(): Promise<void>;
       runTaskQueue(): Promise<string>;
       cancelQueuedTask(taskId: string): Promise<string>;
       clearTaskQueue(): Promise<string>;

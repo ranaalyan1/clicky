@@ -9,6 +9,7 @@ import {
   SearchTarget,
   searchTargets,
 } from "../shared/contracts";
+import { maximumPictureNameLength, maximumPicturePromptLength } from "./image-generation";
 
 /* The action list itself lives in the shared contracts file so the panel, the
    island and the main process can never disagree about what exists. */
@@ -112,6 +113,27 @@ export function isAllowedAutomationUrl(rawUrl: string): boolean {
 }
 
 const actionDefinitions: Record<UstaadActionType, ActionDefinition> = {
+  create_image: {
+    type: "create_image",
+    risk: "safe",
+    requiredAbility: "imageGeneration",
+    describe: (action) => `draw "${(action as { prompt: string }).prompt}"`,
+    normalize: (rawAction) => {
+      const prompt = readRequiredText(rawAction, "prompt");
+      if (!prompt) {
+        return { action: null, problem: "create_image needs a prompt" };
+      }
+      const requestedName = readRequiredText(rawAction, "name");
+      return {
+        action: {
+          type: "create_image",
+          prompt: prompt.slice(0, maximumPicturePromptLength),
+          name: requestedName ? requestedName.slice(0, maximumPictureNameLength) : null,
+        },
+        problem: null,
+      };
+    },
+  },
   open_app: {
     type: "open_app",
     risk: "confirm",
@@ -884,6 +906,10 @@ export function buildActionProtocolInstructions(abilities: AbilitySettings): str
 - open_panel: {"type":"open_panel","page":"plans"} — open this app's own panel (pages: home, soul, plans, memory, setup).`);
   }
 
+  if (abilities.imageGeneration) {
+    sections.push(`- create_image: {"type":"create_image","prompt":"a red panda skateboarding at golden hour, digital painting"} — draw one picture and save it to the user's Pictures folder, where the island shows it. use it for "draw me", "make a picture of", "generate an image of". describe the subject, the style and the light in one sentence, never a bare keyword list.`);
+  }
+
   if (abilities.webSearch) {
     sections.push(`- search_web: {"type":"search_web","query":"gift wraps","target":"amazon"} — search the web. targets: default, google, youtube, amazon, bing, wikipedia. use this instead of open_url whenever the user says "search".`);
   }
@@ -945,6 +971,10 @@ Ustaad will run that first step, look at the screen, and continue on its own unt
 
   if (!sections.length) {
     return "";
+  }
+
+  if (!abilities.imageGeneration) {
+    sections.push('- drawing pictures is switched off: if the user asks for a picture, say so in one sentence and tell them the "draw pictures" switch in the panel\'s soul page turns it on. do not offer to draw it another way.');
   }
 
   return `actions:
