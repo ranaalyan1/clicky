@@ -3,6 +3,8 @@ import { dirname } from "node:path";
 import {
   AbilitySettings,
   brainProviderIds,
+  defaultLocalBrainBaseUrl,
+  defaultLocalBrainModel,
   BrainProviderId,
   UstaadUserConfig,
   dictationShortcutIds,
@@ -25,10 +27,14 @@ import {
   sanitizeSoulSettings,
 } from "./soul-config";
 import { defaultPresenceSettings, sanitizePresenceSettings } from "./presence-schedule";
+import { normalizeLocalBrainBaseUrl } from "./local-brain-client";
 
 export const defaultUstaadUserConfig: UstaadUserConfig = {
   workerBaseUrl: "",
   brainProvider: "gemini",
+  localBrainBaseUrl: defaultLocalBrainBaseUrl,
+  localBrainModel: defaultLocalBrainModel,
+  localBrainSeesScreen: false,
   geminiApiKey: "",
   geminiChatModel: "gemini-2.5-flash",
   selectedClaudeModel: "claude-sonnet-4-6",
@@ -159,11 +165,29 @@ export function sanitizeStoredConfig(storedConfig: unknown): UstaadUserConfig {
     }
   }
 
+  let localBrainBaseUrl = defaultUstaadUserConfig.localBrainBaseUrl;
+  if (typeof possibleConfig.localBrainBaseUrl === "string") {
+    try {
+      localBrainBaseUrl = normalizeLocalBrainBaseUrl(possibleConfig.localBrainBaseUrl)
+        || defaultUstaadUserConfig.localBrainBaseUrl;
+    } catch {
+      localBrainBaseUrl = defaultUstaadUserConfig.localBrainBaseUrl;
+    }
+  }
+
   return {
     workerBaseUrl,
     brainProvider: isSupportedBrainProvider(possibleConfig.brainProvider)
       ? possibleConfig.brainProvider
       : defaultUstaadUserConfig.brainProvider,
+    localBrainBaseUrl,
+    localBrainModel: typeof possibleConfig.localBrainModel === "string" && possibleConfig.localBrainModel.trim()
+      ? possibleConfig.localBrainModel.trim().slice(0, 120)
+      : defaultUstaadUserConfig.localBrainModel,
+    localBrainSeesScreen: readBoolean(
+      possibleConfig.localBrainSeesScreen,
+      defaultUstaadUserConfig.localBrainSeesScreen,
+    ),
     geminiApiKey,
     geminiChatModel: isSupportedGeminiModel(possibleConfig.geminiChatModel)
       ? possibleConfig.geminiChatModel
@@ -260,6 +284,19 @@ export class UstaadConfigStore {
     }
     if ("geminiApiKey" in configUpdates) {
       updatedConfig.geminiApiKey = normalizeGeminiApiKey(updatedConfig.geminiApiKey);
+    }
+    if ("localBrainBaseUrl" in configUpdates) {
+      // Throws with the reason ("that address is on the internet") so the
+      // panel can show it beside the field instead of replacing it silently.
+      updatedConfig.localBrainBaseUrl = normalizeLocalBrainBaseUrl(updatedConfig.localBrainBaseUrl)
+        || defaultUstaadUserConfig.localBrainBaseUrl;
+    }
+    if ("localBrainModel" in configUpdates) {
+      const requestedModel = updatedConfig.localBrainModel.trim();
+      if (!requestedModel) {
+        throw new Error("Name the model your local server has loaded.");
+      }
+      updatedConfig.localBrainModel = requestedModel.slice(0, 120);
     }
     if ("selectedClaudeModel" in configUpdates && !isSupportedModel(updatedConfig.selectedClaudeModel)) {
       throw new Error("That Claude model is not supported by this version of Ustaad.");

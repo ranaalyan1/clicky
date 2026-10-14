@@ -58,14 +58,25 @@ opening youtube now.
 
 Ustaad then does one step, takes a fresh screenshot of every display, and asks the model a single question: is the goal met? The answer is `DONE`, `NEXT` (one more step, usually a `click_at` on a spot read off that screenshot) or `GIVE_UP`. The loop is bounded — 8 steps, 2 re-plans per step, 75 seconds — and a model that asks for the identical step twice is treated as stuck and handed back to you. Playback goals skip the screenshot question entirely: Ustaad asks Windows what is playing, which is cheaper and much harder to get wrong.
 
-## Two ways to give Ustaad a brain
+## Three ways to give Ustaad a brain
 
-Ustaad needs a model to think with. Pick either, in the panel's **setup** tab:
+Ustaad needs a model to think with. Pick any of these, in the panel's **setup** tab:
 
 1. **Your own Gemini API key** — make a free key at <https://aistudio.google.com/api-keys>, paste it into **setup → your own gemini key**, and press **save & test**. Talking, seeing your screen, dictation and acting all run on that one key, stored on this PC only, in `%APPDATA%\Ustaad\settings.json`. No Worker, no other account.
 2. **A deployed Cloudflare Worker** — the original path, which keeps the Claude, AssemblyAI and ElevenLabs keys off this PC (see the repository's root `README.md`). Paste the Worker base URL into **setup → cloudflare worker**.
+3. **A model on this PC** — **setup → on this pc** runs the brain yourself with [Ollama](https://ollama.com), LM Studio, Jan or `llama.cpp`; they all answer on the same address, so the only thing to fill in is where it listens (`http://127.0.0.1:11434` is Ollama's) and which model to use. **Nothing you say leaves your own network** — a public address is refused, because that would be the one thing a local brain is for — and **save & test** lists the models your server actually has loaded so a typo in the model name is caught straight away. See below for what a local model can and cannot do.
 
-If both are configured, the provider selected in **setup** wins; if that provider has no key or URL yet, Ustaad uses the other one instead of failing.
+If several are configured, the provider selected in **setup** wins; if that provider has no key or URL yet, Ustaad uses another one instead of failing.
+
+### What a local brain can and cannot do
+
+A small model on the PC is the privacy answer and the cheapest one, but it is not a Gemini key in every respect, and Ustaad says so rather than pretending:
+
+- **Thinking, answers, dictation cleanup and skills: yes.** The cleanup pass for dictated text runs on the local model too.
+- **Hearing: no.** Speech-to-text and transcription stay on your Google key; with a local brain Ustaad asks for one instead of failing quietly.
+- **Seeing: only if your model really has eyes.** The **my model can look at screenshots** switch is off by default. With it off, screenshots are not sent and the model is told, in the prompt, that it cannot see the screen — so it asks you instead of guessing. With it on, images go to your own server like everything else.
+- **Speaking:** the offline Windows voice, always, whatever the brain. A local text model has no voice of its own.
+- **Drawing pictures:** needs the Google key, because the model that draws is Google's.
 
 ## Requirements
 

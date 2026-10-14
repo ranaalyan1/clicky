@@ -437,6 +437,10 @@
               <strong>cloudflare worker</strong>
               <span>keeps claude, elevenlabs and assemblyai keys off this pc. paste your deployed worker url below.</span>
             </button>
+            <button class="provider-card" type="button" data-brain-provider="local">
+              <strong>on this pc</strong>
+              <span>run the brain yourself with ollama, lm studio or llama.cpp. nothing you say leaves your own network, and it costs nothing per word.</span>
+            </button>
           </div>
 
           <div id="gemini-setup" class="setup-block">
@@ -451,6 +455,22 @@
             <div class="button-row">
               <button id="gemini-save-button" class="secondary-button" type="button">save</button>
               <button id="gemini-test-button" class="primary-button" type="button">save &amp; test</button>
+            </div>
+          </div>
+
+          <div id="local-setup" class="setup-block">
+            <label class="field-label" for="local-brain-url">server address</label>
+            <input id="local-brain-url" class="text-field" type="text" spellcheck="false" autocomplete="off" placeholder="http://127.0.0.1:11434">
+            <label class="field-label" for="local-brain-model">model</label>
+            <input id="local-brain-model" class="text-field" type="text" spellcheck="false" autocomplete="off" placeholder="llama3.2">
+            <label class="toggle-control" for="local-brain-sees-screen-toggle">
+              <input id="local-brain-sees-screen-toggle" type="checkbox">
+              <span>my model can look at screenshots</span>
+            </label>
+            <p class="field-hint">ollama, lm studio, jan and llama.cpp all answer on the same address. this machine or your own network only: a public address is refused. leave the screen switch off unless your model really does have eyes — a model that cannot see gets told so instead of guessing.</p>
+            <div class="button-row">
+              <button id="local-brain-save-button" class="secondary-button" type="button">save</button>
+              <button id="local-brain-test-button" class="primary-button" type="button">save &amp; test</button>
             </div>
           </div>
 

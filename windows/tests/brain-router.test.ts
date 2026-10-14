@@ -76,3 +76,33 @@ test("pasted keys are cleaned up and obviously wrong ones are refused", () => {
   assert.throws(() => normalizeGeminiApiKey("too-short"), /Google AI Studio/);
   assert.throws(() => normalizeGeminiApiKey("AIza key with spaces 0000000000"), /Google AI Studio/);
 });
+
+test("a brain on this pc is chosen on purpose, and it never pretends to be the cloud", async () => {
+  const localConfig = sanitizeStoredConfig({
+    ...defaultUstaadUserConfig,
+    brainProvider: "local",
+    localBrainBaseUrl: "127.0.0.1:11434",
+    localBrainModel: "qwen2.5:3b",
+  });
+
+  assert.equal(brainRouter.resolveActiveProvider(localConfig), "local");
+  assert.equal(brainRouter.isConfigured(localConfig), true);
+  assert.equal(brainRouter.configurationHint(localConfig), "");
+  assert.equal(brainRouter.getBrainLabel(localConfig), "on this pc (qwen2.5:3b)");
+
+  // Speech still lands on the offline windows voice rather than failing.
+  assert.equal(brainRouter.resolveSpeechProvider(localConfig), "windows");
+
+  // A local brain cannot hear, and says so instead of looking for a key.
+  await assert.rejects(
+    () => brainRouter.transcribeRecordedAudio(localConfig, Buffer.from("wav"), new AbortController().signal),
+    /cannot hear/u,
+  );
+
+  // The address is still checked when the test button is pressed, including
+  // the case the sanitizer would have replaced: an address on the internet.
+  const publicAddressConfig = { ...localConfig, localBrainBaseUrl: "https://api.example.com" };
+  const testResult = await brainRouter.testConnection(publicAddressConfig);
+  assert.equal(testResult.ok, false);
+  assert.equal(testResult.message.includes("own network"), true);
+});

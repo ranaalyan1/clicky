@@ -8,6 +8,7 @@ import { ClaudeClient } from "./claude-client";
 import { buildDictationCleanupUserPrompt, dictationCleanupSystemPrompt } from "./dictation-prompts";
 import { GeminiClient } from "./gemini-client";
 import { GeneratedPicturePayload } from "./image-generation";
+import { LocalBrainClient, normalizeLocalBrainBaseUrl } from "./local-brain-client";
 import { normalizeWorkerBaseUrl } from "./config-store";
 
 export type ResolvedSpeechProvider = "gemini" | "elevenlabs" | "windows";
@@ -22,13 +23,19 @@ export type ResolvedSpeechProvider = "gemini" | "elevenlabs" | "windows";
  *   ElevenLabs) so the user's PC never holds a shared key.
  */
 export class BrainRouter {
-  constructor(private readonly claudeClient = new ClaudeClient()) {}
+  constructor(
+    private readonly claudeClient = new ClaudeClient(),
+    private readonly localBrainClient = new LocalBrainClient(),
+  ) {}
 
   /**
    * The provider that can actually answer right now. A user who picked Gemini
    * but pasted a Worker URL still gets a working Ustaad instead of an error.
    */
-  resolveActiveProvider(config: UstaadUserConfig): "gemini" | "worker" | null {
+  resolveActiveProvider(config: UstaadUserConfig): "gemini" | "worker" | "local" | null {
+    if (config.brainProvider === "local" && config.localBrainBaseUrl) {
+      return "local";
+    }
     if (config.brainProvider === "gemini" && config.geminiApiKey) {
       return "gemini";
     }
@@ -47,6 +54,10 @@ export class BrainRouter {
       return config.brainProvider === "gemini" ? "Gemini (key needed)" : "Worker (url needed)";
     }
 
+    if (activeProvider === "local") {
+      return `on this pc (${config.localBrainModel})`;
+    }
+
     if (activeProvider === "gemini") {
       return config.geminiChatModel === "gemini-2.5-pro" ? "Gemini Pro" : "Gemini Flash";
     }
@@ -61,6 +72,9 @@ export class BrainRouter {
   configurationHint(config: UstaadUserConfig): string {
     if (this.isConfigured(config)) {
       return "";
+    }
+    if (config.brainProvider === "local") {
+      return "Start your local model server (ollama serve, or LM Studio) and check the address in the setup tab.";
     }
     return config.brainProvider === "gemini"
       ? "Paste your Gemini API key from Google AI Studio to switch Ustaad on."
@@ -91,7 +105,16 @@ export class BrainRouter {
   }
 
   async streamResponse(config: UstaadUserConfig, request: BrainStreamRequest): Promise<string> {
-    if (this.resolveActiveProvider(config) === "gemini") {
+    const activeProvider = this.resolveActiveProvider(config);
+    if (activeProvider === "local") {
+      return this.localBrainClient.streamChat(
+        request,
+        config.localBrainBaseUrl,
+        config.localBrainModel,
+        config.localBrainSeesScreen,
+      );
+    }
+    if (activeProvider === "gemini") {
       return new GeminiClient(config.geminiApiKey).streamChat(request, config.geminiChatModel);
     }
 
@@ -102,11 +125,41 @@ export class BrainRouter {
     );
   }
 
+  /** Confirms the local server is up and says which models it has loaded. */
+  async testLocalConnection(config: UstaadUserConfig): Promise<BrainConnectionTestResult> {
+    let baseUrl: string;
+    try {
+      baseUrl = normalizeLocalBrainBaseUrl(config.localBrainBaseUrl);
+    } catch (error) {
+      return { ok: false, message: error instanceof Error ? error.message : String(error) };
+    }
+    if (!baseUrl) {
+      return { ok: false, message: "paste the address of your local model server first." };
+    }
+
+    try {
+      const listedModels = await this.localBrainClient.listModels(baseUrl);
+      if (!listedModels.length) {
+        return { ok: false, message: `${baseUrl} answered but has no models loaded. pull one first, for example: ollama pull ${config.localBrainModel}` };
+      }
+      const chosenModelIsThere = listedModels.includes(config.localBrainModel);
+      return {
+        ok: true,
+        message: chosenModelIsThere
+          ? `your local brain answered. ${config.localBrainModel} is loaded and ready.`
+          : `${baseUrl} answered with ${listedModels.slice(0, 5).join(", ")}. ${config.localBrainModel} is not among them — set a model name that is.`,
+      };
+    } catch (error) {
+      return { ok: false, message: error instanceof Error ? error.message : String(error) };
+    }
+  }
+
   /**
    * Draws one picture on the user's own Google key.
    *
-   * Pictures are Gemini-only: the Worker proxy speaks for Claude, which cannot
-   * draw, so this asks for the missing key here instead of failing deeper down.
+   * Pictures are Gemini-only: the Worker proxy speaks for Claude, and a local
+   * text model has no brush, so the missing key is reported here rather than
+   * failing somewhere deeper down.
    */
   async drawPicture(config: UstaadUserConfig, prompt: string): Promise<GeneratedPicturePayload> {
     if (!config.geminiApiKey) {
@@ -146,7 +199,9 @@ export class BrainRouter {
   ): Promise<string> {
     if (!config.geminiApiKey) {
       throw new Error(
-        "One-shot transcription needs a Gemini API key. Add one in setup, or deploy the Worker to stream transcription instead.",
+        this.resolveActiveProvider(config) === "local"
+          ? "the brain on this pc answers in text but cannot hear. listening needs a Google key: paste one in the setup tab, or switch the brain back."
+          : "One-shot transcription needs a Gemini API key. Add one in setup, or deploy the Worker to stream transcription instead.",
       );
     }
     return new GeminiClient(config.geminiApiKey).transcribeAudio(wavAudio, signal);
@@ -168,8 +223,25 @@ export class BrainRouter {
       customInstructions: config.soul.customInstructions,
     });
 
+    const activeProvider = this.resolveActiveProvider(config);
+
     try {
-      if (this.resolveActiveProvider(config) === "gemini") {
+      if (activeProvider === "local") {
+        return await this.localBrainClient.streamChat(
+          {
+            systemPrompt: dictationCleanupSystemPrompt,
+            userPrompt: cleanupPrompt,
+            images: [],
+            conversationHistory: [],
+            signal,
+          },
+          config.localBrainBaseUrl,
+          config.localBrainModel,
+          false,
+        );
+      }
+
+      if (activeProvider === "gemini") {
         return await new GeminiClient(config.geminiApiKey).completeText(
           dictationCleanupSystemPrompt,
           cleanupPrompt,
@@ -196,6 +268,9 @@ export class BrainRouter {
 
   /** The panel's connection test, for whichever brain is selected. */
   async testConnection(config: UstaadUserConfig): Promise<BrainConnectionTestResult> {
+    if (config.brainProvider === "local") {
+      return this.testLocalConnection(config);
+    }
     if (config.brainProvider === "gemini" && config.geminiApiKey) {
       return new GeminiClient(config.geminiApiKey).verifyApiKey();
     }

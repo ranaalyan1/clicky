@@ -16,7 +16,11 @@ export type CompanionVoiceState = "idle" | "listening" | "processing" | "respond
  * Google AI Studio key stored on this PC. "worker" keeps the original Cloudflare
  * Worker proxy that hides a shared Claude / AssemblyAI / ElevenLabs key set.
  */
-export const brainProviderIds = ["gemini", "worker"] as const;
+export const brainProviderIds = ["gemini", "worker", "local"] as const;
+
+/** Where the local brain talks to: ollama, LM Studio, Jan and llama.cpp all answer here. */
+export const defaultLocalBrainBaseUrl = "http://127.0.0.1:11434";
+export const defaultLocalBrainModel = "llama3.2";
 export type BrainProviderId = (typeof brainProviderIds)[number];
 
 export const geminiChatModels = ["gemini-2.5-flash", "gemini-2.5-pro"] as const;
@@ -454,6 +458,11 @@ export interface ActionExecutionResult {
 export interface UstaadUserConfig {
   workerBaseUrl: string;
   brainProvider: BrainProviderId;
+  /** The address of the model server on this pc, used when the brain is "local". */
+  localBrainBaseUrl: string;
+  localBrainModel: string;
+  /** Whether that model can look at screenshots. Off unless the user says so. */
+  localBrainSeesScreen: boolean;
   geminiApiKey: string;
   geminiChatModel: GeminiChatModel;
   selectedClaudeModel: SupportedClaudeModel;

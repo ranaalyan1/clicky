@@ -141,6 +141,12 @@ const element = {
   geminiModel: requireElement<HTMLSelectElement>("gemini-model"),
   geminiSaveButton: requireElement<HTMLButtonElement>("gemini-save-button"),
   geminiTestButton: requireElement<HTMLButtonElement>("gemini-test-button"),
+  localSetup: requireElement<HTMLElement>("local-setup"),
+  localBrainUrl: requireElement<HTMLInputElement>("local-brain-url"),
+  localBrainModel: requireElement<HTMLInputElement>("local-brain-model"),
+  localBrainSeesScreenToggle: requireElement<HTMLInputElement>("local-brain-sees-screen-toggle"),
+  localBrainSaveButton: requireElement<HTMLButtonElement>("local-brain-save-button"),
+  localBrainTestButton: requireElement<HTMLButtonElement>("local-brain-test-button"),
   workerSetup: requireElement<HTMLElement>("worker-setup"),
   workerUrl: requireElement<HTMLInputElement>("worker-url"),
   claudeModel: requireElement<HTMLSelectElement>("claude-model"),
@@ -383,6 +389,15 @@ function renderSetup(state: UstaadPublicState): void {
   }
   element.geminiSetup.classList.toggle("active", config.brainProvider === "gemini");
   element.workerSetup.classList.toggle("active", config.brainProvider === "worker");
+  element.localSetup.classList.toggle("active", config.brainProvider === "local");
+
+  if (!hasInitializedFields || document.activeElement !== element.localBrainUrl) {
+    element.localBrainUrl.value = config.localBrainBaseUrl;
+  }
+  if (!hasInitializedFields || document.activeElement !== element.localBrainModel) {
+    element.localBrainModel.value = config.localBrainModel;
+  }
+  element.localBrainSeesScreenToggle.checked = config.localBrainSeesScreen;
 
   if (!hasInitializedFields || document.activeElement !== element.geminiKey) {
     element.geminiKey.value = config.geminiApiKey;
@@ -734,6 +749,7 @@ async function saveSettings(settingsUpdates: Partial<UstaadUserConfig>): Promise
 async function testBrain(settingsUpdates: Partial<UstaadUserConfig>): Promise<void> {
   element.geminiTestButton.disabled = true;
   element.workerTestButton.disabled = true;
+  element.localBrainTestButton.disabled = true;
   element.brainResult.className = "connection-result";
   element.brainResult.textContent = "checking…";
 
@@ -748,6 +764,7 @@ async function testBrain(settingsUpdates: Partial<UstaadUserConfig>): Promise<vo
   } finally {
     element.geminiTestButton.disabled = false;
     element.workerTestButton.disabled = false;
+    element.localBrainTestButton.disabled = false;
   }
 }
 
@@ -1067,7 +1084,10 @@ for (const confirmationModeButton of document.querySelectorAll<HTMLButtonElement
 
 for (const providerCard of element.brainProviderList.querySelectorAll<HTMLButtonElement>("[data-brain-provider]")) {
   providerCard.addEventListener("click", () => {
-    void saveSettings({ brainProvider: providerCard.dataset.brainProvider === "worker" ? "worker" : "gemini" });
+    const chosenProvider = providerCard.dataset.brainProvider;
+    void saveSettings({
+      brainProvider: chosenProvider === "worker" || chosenProvider === "local" ? chosenProvider : "gemini",
+    });
   });
 }
 
@@ -1124,6 +1144,16 @@ element.geminiSaveButton.addEventListener("click", () => void saveSettings({ gem
 element.geminiTestButton.addEventListener("click", () => void testBrain({ geminiApiKey: element.geminiKey.value }));
 element.workerSaveButton.addEventListener("click", () => void saveSettings({ workerBaseUrl: element.workerUrl.value }));
 element.workerTestButton.addEventListener("click", () => void testBrain({ workerBaseUrl: element.workerUrl.value }));
+element.localBrainSaveButton.addEventListener("click", () => void saveSettings({
+  localBrainBaseUrl: element.localBrainUrl.value,
+  localBrainModel: element.localBrainModel.value,
+  localBrainSeesScreen: element.localBrainSeesScreenToggle.checked,
+}));
+element.localBrainTestButton.addEventListener("click", () => void testBrain({
+  localBrainBaseUrl: element.localBrainUrl.value,
+  localBrainModel: element.localBrainModel.value,
+  localBrainSeesScreen: element.localBrainSeesScreenToggle.checked,
+}));
 
 element.todoAddButton.addEventListener("click", () => {
   const todoText = element.todoInput.value.trim();

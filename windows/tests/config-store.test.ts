@@ -7,6 +7,7 @@ import {
   UstaadConfigStore,
   defaultUstaadUserConfig,
   normalizeWorkerBaseUrl,
+  sanitizeStoredConfig,
 } from "../src/main/config-store";
 
 test("normalizeWorkerBaseUrl accepts secure production URLs and local HTTP", () => {
@@ -44,4 +45,34 @@ test("UstaadConfigStore persists updates and sanitizes corrupt files", () => {
   } finally {
     rmSync(temporaryDirectory, { recursive: true, force: true });
   }
+});
+
+test("the local brain keeps an address on this machine and nothing that points at the internet", () => {
+  const storedConfig = sanitizeStoredConfig({
+    ...defaultUstaadUserConfig,
+    brainProvider: "local",
+    localBrainBaseUrl: "localhost:1234/v1",
+    localBrainModel: "  llama3.2  ",
+    localBrainSeesScreen: true,
+  });
+
+  assert.equal(storedConfig.brainProvider, "local");
+  assert.equal(storedConfig.localBrainBaseUrl, "http://localhost:1234");
+  assert.equal(storedConfig.localBrainModel, "llama3.2");
+  assert.equal(storedConfig.localBrainSeesScreen, true);
+
+  // A public address is not a local brain, so the default comes back instead
+  // of a setting that would quietly send the user's words off the machine.
+  const publicAddressConfig = sanitizeStoredConfig({
+    ...defaultUstaadUserConfig,
+    localBrainBaseUrl: "https://api.example.com",
+  });
+  assert.equal(publicAddressConfig.localBrainBaseUrl, "http://127.0.0.1:11434");
+
+  const nonsenseModelConfig = sanitizeStoredConfig({
+    ...defaultUstaadUserConfig,
+    localBrainModel: "   ",
+  });
+  assert.equal(nonsenseModelConfig.localBrainModel, "llama3.2");
+  assert.equal(sanitizeStoredConfig({}).localBrainSeesScreen, false);
 });

@@ -86,7 +86,8 @@ Worker vars: `ELEVENLABS_VOICE_ID`
 | `windows/src/main/windows-bridge-script.ts` | ~760 | The helper script itself: ASCII-only, written with a UTF-8 BOM because PowerShell 5.1 reads un-BOM'd files as ANSI. |
 | `windows/src/main/wake-word-listener.ts` | ~264 | Starts, restarts and stops the offline wake-word listener, and parses its event lines. |
 | `windows/src/main/wake-word-script.ts` | ~115 | The System.Speech helper that hears only the wake phrases, with a stricter confidence threshold for phrases that hide inside typing. |
-| `windows/src/main/brain-router.ts` | ~222 | Picks Gemini or the Worker for chat and speech, falls back to the offline Windows voice, and reports configuration hints. |
+| `windows/src/main/brain-router.ts` | ~330 | Picks Gemini, the Worker or a model on this PC for chat, falls back to the offline Windows voice, and reports configuration hints. |
+| `windows/src/main/local-brain-client.ts` | ~215 | The OpenAI-shaped chat client every local server speaks (Ollama, LM Studio, Jan, llama.cpp): address rules, the streaming reader, and the sentence shown when nothing answers. Purely local: a public address is refused outright. |
 | `windows/src/main/gemini-client.ts` | ~345 | Gemini chat streaming, TTS, single-shot transcription, dictation cleanup, picture drawing, and API-key checks. |
 | `windows/src/main/image-generation.ts` | ~155 | Picture naming, extension choice, reading a picture out of either Google answer shape, and the sentences shown when Google refuses. Pure on purpose: none of it needs the network or an Electron window to be tested. |
 | `windows/src/main/claude-client.ts` | ~170 | Claude vision SSE, ElevenLabs TTS, and AssemblyAI token clients for the Worker path. |
