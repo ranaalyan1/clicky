@@ -168,6 +168,54 @@ test("clicking is confirmable and waiting is not", () => {
   assert.equal(actionNeedsConfirmation({ type: "wait", seconds: 1 }, "risky", []), false);
 });
 
+test("system access actions parse, and they need the system access switches", () => {
+  const parsedResponse = parseModelResponse(
+    '<actions>[{"type":"run_command","command":"Get-Process","reason":"checking what is running"},'
+    + '{"type":"manage_file","operation":"read","path":"C:/Users/me/Documents/notes.txt"},'
+    + '{"type":"read_registry","path":"HKCU/Software/Microsoft/Windows/CurrentVersion/Run"}]</actions>',
+  );
+
+  assert.deepEqual(parsedResponse.actions, [
+    { type: "run_command", command: "Get-Process", reason: "checking what is running" },
+    { type: "manage_file", operation: "read", path: "C:/Users/me/Documents/notes.txt", content: "" },
+    {
+      type: "read_registry",
+      path: "HKCU/Software/Microsoft/Windows/CurrentVersion/Run",
+      valueName: null,
+    },
+  ]);
+
+  // Every one of them is gated on the system access ability, so a switched-off
+  // ability drops the action before any policy question is asked.
+  assert.equal(getActionRequiredAbility("run_command"), "systemAccessTier1");
+  assert.equal(getActionRequiredAbility("manage_file"), "systemAccessTier1");
+  assert.equal(getActionRequiredAbility("read_registry"), "systemAccessTier1");
+
+  const { allowedActions, blockedActions } = filterActionsByAbilities(
+    parsedResponse.actions,
+    { ...defaultAbilitySettings, systemAccessTier1: false },
+  );
+  assert.deepEqual(allowedActions, []);
+  assert.equal(blockedActions.length, 3);
+
+  // Commands and file writes ask first; reading a registry key does not.
+  assert.equal(getActionRisk("run_command"), "confirm");
+  assert.equal(getActionRisk("manage_file"), "confirm");
+  assert.equal(getActionRisk("read_registry"), "safe");
+});
+
+test("a malformed system access action is refused with a usable reason", () => {
+  const parsedResponse = parseModelResponse(
+    '<actions>[{"type":"run_command"},{"type":"manage_file","operation":"delete","path":"C:/a.txt"},'
+    + '{"type":"read_registry"}]</actions>',
+  );
+
+  assert.deepEqual(parsedResponse.actions, []);
+  assert.equal(parsedResponse.problems.length, 3);
+  assert.equal(parsedResponse.problems[0]?.includes("command"), true);
+  assert.equal(parsedResponse.problems[1]?.includes("read, write or list"), true);
+});
+
 test("a snip action parses, stays safe, and needs screen vision", () => {
   const parsedResponse = parseModelResponse(
     'sure. <actions>[{"type":"screenshot_region"}]</actions>',

@@ -3,6 +3,7 @@ import test from "node:test";
 import {
   buildShortcutDefinitions,
   dictationShortcutLabels,
+  uiohookSKeyCode,
   ModifierKeyCodes,
   ModifierShortcutStateMachine,
 } from "../src/main/shortcut-registry";
@@ -106,7 +107,7 @@ test("shortcuts are mutually exclusive and reset releases whatever is held", () 
   assert.equal(stateMachine.isShortcutActive("circle"), false);
 });
 
-const sKeyCode = 31;
+const uiohookQKeyCode = 16;
 
 test("adding S to the talk chord hands the keys to the snip shortcut", () => {
   const stateMachine = createStateMachine();
@@ -117,7 +118,7 @@ test("adding S to the talk chord hands the keys to the snip shortcut", () => {
   ]);
 
   // The chord resolves on the S key: talk steps aside, snip takes over.
-  assert.deepEqual(stateMachine.handleKeyDown(sKeyCode), [
+  assert.deepEqual(stateMachine.handleKeyDown(uiohookSKeyCode), [
     { shortcutId: "snip", phase: "pressed" },
     { shortcutId: "talk", phase: "released" },
   ]);
@@ -130,9 +131,9 @@ test("letting go of S does not restart the talk shortcut underneath", () => {
 
   stateMachine.handleKeyDown(modifierKeyCodes.leftControl);
   stateMachine.handleKeyDown(modifierKeyCodes.leftAlt);
-  stateMachine.handleKeyDown(sKeyCode);
+  stateMachine.handleKeyDown(uiohookSKeyCode);
 
-  assert.deepEqual(stateMachine.handleKeyUp(sKeyCode), [
+  assert.deepEqual(stateMachine.handleKeyUp(uiohookSKeyCode), [
     { shortcutId: "snip", phase: "released" },
   ]);
   // Ctrl+Alt is still held, and talk must stay quiet until the user starts over.
@@ -172,7 +173,7 @@ test("reset clears a superseded shortcut so the next chord behaves", () => {
 
   stateMachine.handleKeyDown(modifierKeyCodes.leftControl);
   stateMachine.handleKeyDown(modifierKeyCodes.leftAlt);
-  stateMachine.handleKeyDown(sKeyCode);
+  stateMachine.handleKeyDown(uiohookSKeyCode);
 
   assert.deepEqual(stateMachine.reset(), [
     { shortcutId: "snip", phase: "released" },
@@ -191,10 +192,16 @@ test("only the shortcuts a chord declares are ever taken from it", () => {
   // The snip chord borrows the talk keys and nothing else: holding Ctrl+Shift to
   // circle must never be cancelled by an accidental keypress.
   assert.deepEqual(snipShortcut.supersedes, ["talk"]);
+  // Both chords that start life as Ctrl+Alt declare it, and nothing else does.
   assert.deepEqual(
     definitions.filter((definition) => definition.supersedes).map((definition) => definition.id),
-    ["snip"],
+    ["panic", "snip"],
   );
+  for (const definition of definitions) {
+    for (const supersededShortcutId of definition.supersedes ?? []) {
+      assert.equal(supersededShortcutId, "talk");
+    }
+  }
 
   // Every declared id has to be a real shortcut.
   const shortcutIds = definitions.map((definition) => definition.id);
@@ -203,4 +210,42 @@ test("only the shortcuts a chord declares are ever taken from it", () => {
       assert.equal(shortcutIds.includes(supersededShortcutId), true);
     }
   }
+});
+
+test("the panic chord wins over the talk shortcut it starts with", () => {
+  const stateMachine = createStateMachine();
+
+  stateMachine.handleKeyDown(modifierKeyCodes.leftControl);
+  assert.deepEqual(stateMachine.handleKeyDown(modifierKeyCodes.leftAlt), [
+    { shortcutId: "talk", phase: "pressed" },
+  ]);
+
+  // Ctrl+Alt+Q stops everything, so talking must not survive the chord.
+  assert.deepEqual(stateMachine.handleKeyDown(uiohookQKeyCode), [
+    { shortcutId: "panic", phase: "pressed" },
+    { shortcutId: "talk", phase: "released" },
+  ]);
+  assert.equal(stateMachine.isShortcutActive("panic"), true);
+  assert.equal(stateMachine.isShortcutActive("talk"), false);
+
+  // Releasing the Q does not restart talking, and neither does a second press.
+  assert.deepEqual(stateMachine.handleKeyUp(uiohookQKeyCode), [
+    { shortcutId: "panic", phase: "released" },
+  ]);
+  assert.deepEqual(stateMachine.handleKeyDown(uiohookQKeyCode), [
+    { shortcutId: "panic", phase: "pressed" },
+  ]);
+  assert.equal(stateMachine.isShortcutActive("talk"), false);
+});
+
+test("the panic chord never fires from a snip or a circle", () => {
+  const stateMachine = createStateMachine();
+
+  // Ctrl+Alt+S is a snip: the S key decides, so panic must not appear.
+  stateMachine.handleKeyDown(modifierKeyCodes.leftControl);
+  stateMachine.handleKeyDown(modifierKeyCodes.leftAlt);
+  assert.deepEqual(stateMachine.handleKeyDown(uiohookSKeyCode), [
+    { shortcutId: "snip", phase: "pressed" },
+    { shortcutId: "talk", phase: "released" },
+  ]);
 });

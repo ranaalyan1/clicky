@@ -255,6 +255,12 @@ function registerIpcHandlers(): void {
       clickaaController?.handlePanelMemoryAdd(String(factText));
     }
   });
+  ipcMain.on("panel:clear-audit-log", (event) => {
+    if (panelSentEvent(event.sender.id)) {
+      clickaaController?.clearAuditLog();
+    }
+  });
+
   ipcMain.on("panel:clear-memory", (event) => {
     if (panelSentEvent(event.sender.id)) {
       clickaaController?.handlePanelMemoryClear();

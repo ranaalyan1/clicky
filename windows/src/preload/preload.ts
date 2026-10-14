@@ -89,6 +89,7 @@ contextBridge.exposeInMainWorld("clickaa", {
   addTodo: (todoText: string): void => ipcRenderer.send("panel:add-todo", todoText),
   addMemory: (factText: string): void => ipcRenderer.send("panel:add-memory", factText),
   clearMemory: (): void => ipcRenderer.send("panel:clear-memory"),
+  clearAuditLog: (): void => ipcRenderer.send("panel:clear-audit-log"),
 
   /* Cursor overlay ------------------------------------------------------- */
   sendPointingAnimationCompleted: (interactionId: number): void => {

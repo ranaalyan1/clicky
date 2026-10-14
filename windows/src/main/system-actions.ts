@@ -1,13 +1,16 @@
 import { spawn } from "node:child_process";
 import { clipboard, shell } from "electron";
-import { CapturedDisplayImage, ClickaaAction } from "../shared/contracts";
+import { AbilitySettings, CapturedDisplayImage, ClickaaAction } from "../shared/contracts";
 import { isAppChoiceAmbiguous, LaunchableApp } from "./app-name-matching";
 import { buildSearchUrl } from "./web-search";
 import { MemoryStore } from "./memory-store";
 import { ScheduleStore } from "./schedule-store";
 import { describeScheduledTask } from "./schedule-time";
 import { StartMenuAppIndex } from "./start-menu-app-index";
+import { AuditLogStore } from "./audit-log-store";
 import { SnippetStore } from "./snippet-store";
+import { decideSystemAccess } from "./system-access";
+import { SystemAccessRunner } from "./system-access-runner";
 import { TodoStore } from "./todo-store";
 import { mapImageCoordinateToWindowsDesktop, selectPointingDisplay } from "./pointing";
 import { ClickaaWindowsBridge } from "./windows-bridge";
@@ -34,6 +37,10 @@ export interface ActionExecutorDependencies {
   memoryStore: MemoryStore;
   scheduleStore: ScheduleStore;
   snippetStore: SnippetStore;
+  auditLogStore: AuditLogStore;
+  systemAccessRunner: SystemAccessRunner;
+  /** The user's ability switches, read fresh for every system-access decision. */
+  readAbilities: () => AbilitySettings;
   openExternalUrl: (url: string) => Promise<void>;
   showNotification: (title: string, body: string) => void;
   showPanel: (page: string) => void;
@@ -148,6 +155,12 @@ export class ClickaaActionExecutor {
         return this.changeWallpaper(action.operation, action.path, action.color);
       case "click_at":
         return this.clickAt(action);
+      case "run_command":
+        return this.runCommand(action.command, action.reason);
+      case "manage_file":
+        return this.manageFile(action);
+      case "read_registry":
+        return this.readRegistry(action.path, action.valueName);
       case "wait":
         await new Promise((resolve) => setTimeout(resolve, action.seconds * 1_000));
         return completedOutcome(`waited ${action.seconds} seconds`);
@@ -195,6 +208,204 @@ export class ClickaaActionExecutor {
     }
 
     return completedOutcome(`clicked ${action.label}`);
+  }
+
+  /* ---------------------------------------------------------------------- */
+  /* System access                                                          */
+  /* ---------------------------------------------------------------------- */
+
+  private currentAbilities(): AbilitySettings {
+    return this.dependencies.readAbilities();
+  }
+
+  private async runCommand(rawCommand: string, reason: string): Promise<ActionExecutionOutcome> {
+    const decision = decideSystemAccess({
+      request: { kind: "command", command: rawCommand },
+      abilities: this.currentAbilities(),
+    });
+
+    if (!decision.allowed) {
+      this.dependencies.auditLogStore.record({
+        summary: `refused: ${reason}`,
+        detail: rawCommand,
+        tier: decision.tier,
+        outcome: decision.tier === "blocked" ? "blocked" : "refused",
+        resultPreview: decision.message,
+      });
+      return failedOutcome(decision.message);
+    }
+
+    let runResult;
+    try {
+      runResult = await this.dependencies.systemAccessRunner.runPowerShell(rawCommand);
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      this.dependencies.auditLogStore.record({
+        summary: `failed: ${reason}`,
+        detail: rawCommand,
+        tier: decision.tier,
+        outcome: "failed",
+        resultPreview: errorMessage,
+      });
+      return failedOutcome(`that command did not run: ${errorMessage}`);
+    }
+
+    const outputPreview = [runResult.standardOutput, runResult.standardError]
+      .filter(Boolean)
+      .join("\n")
+      .trim();
+
+    this.dependencies.auditLogStore.record({
+      summary: reason,
+      detail: rawCommand,
+      tier: decision.tier,
+      outcome: "allowed",
+      resultPreview: outputPreview,
+    });
+
+    if (runResult.timedOut) {
+      return failedOutcome("that command was still running after twenty seconds, so I stopped it.");
+    }
+    if (runResult.exitCode !== 0 && !outputPreview) {
+      return failedOutcome(`that command finished with code ${runResult.exitCode}.`);
+    }
+    return {
+      status: "completed",
+      message: reason,
+      detail: outputPreview || "the command produced no output",
+      undoLabel: null,
+      undo: null,
+      choices: [],
+    };
+  }
+
+  private async manageFile(action: Extract<ClickaaAction, { type: "manage_file" }>): Promise<ActionExecutionOutcome> {
+    const decision = decideSystemAccess({
+      request: { kind: "file", path: action.path, operation: action.operation },
+      abilities: this.currentAbilities(),
+    });
+
+    if (!decision.allowed) {
+      this.dependencies.auditLogStore.record({
+        summary: `refused: ${action.operation} ${action.path}`,
+        detail: action.path,
+        tier: decision.tier,
+        outcome: decision.tier === "blocked" ? "blocked" : "refused",
+        resultPreview: decision.message,
+      });
+      return failedOutcome(decision.message);
+    }
+
+    try {
+      if (action.operation === "read") {
+        const fileContents = await this.dependencies.systemAccessRunner.readTextFile(action.path);
+        this.dependencies.auditLogStore.record({
+          summary: `read ${action.path}`,
+          detail: action.path,
+          tier: decision.tier,
+          outcome: "allowed",
+          resultPreview: fileContents.slice(0, 600),
+        });
+        return {
+          status: "completed",
+          message: `read ${action.path}`,
+          detail: fileContents.slice(0, 600),
+          undoLabel: null,
+          undo: null,
+          choices: [],
+        };
+      }
+
+      if (action.operation === "list") {
+        const listOutput = await this.dependencies.systemAccessRunner.runPowerShell(
+          `Get-ChildItem -LiteralPath '${action.path.replace(/'/gu, "''")}' | Select-Object Name, Length, LastWriteTime | Format-Table -AutoSize`,
+        );
+        this.dependencies.auditLogStore.record({
+          summary: `listed ${action.path}`,
+          detail: action.path,
+          tier: decision.tier,
+          outcome: "allowed",
+          resultPreview: listOutput.standardOutput.slice(0, 600),
+        });
+        return {
+          status: "completed",
+          message: `listed ${action.path}`,
+          detail: listOutput.standardOutput.slice(0, 600) || "that folder is empty",
+          undoLabel: null,
+          undo: null,
+          choices: [],
+        };
+      }
+
+      await this.dependencies.systemAccessRunner.writeTextFile(action.path, action.content);
+      this.dependencies.auditLogStore.record({
+        summary: `wrote ${action.path}`,
+        detail: `${action.path}\n\n${action.content.slice(0, 1_000)}`,
+        tier: decision.tier,
+        outcome: "allowed",
+        resultPreview: `${action.content.length} characters written`,
+      });
+      return completedOutcome(`wrote ${action.path}`, `${action.content.length} characters`);
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      this.dependencies.auditLogStore.record({
+        summary: `failed: ${action.operation} ${action.path}`,
+        detail: action.path,
+        tier: decision.tier,
+        outcome: "failed",
+        resultPreview: errorMessage,
+      });
+      return failedOutcome(`I could not ${action.operation} that file: ${errorMessage}`);
+    }
+  }
+
+  private async readRegistry(
+    registryPath: string,
+    valueName: string | null,
+  ): Promise<ActionExecutionOutcome> {
+    const decision = decideSystemAccess({
+      request: { kind: "registry", path: registryPath },
+      abilities: this.currentAbilities(),
+    });
+
+    if (!decision.allowed) {
+      this.dependencies.auditLogStore.record({
+        summary: `refused: read ${registryPath}`,
+        detail: registryPath,
+        tier: decision.tier,
+        outcome: decision.tier === "blocked" ? "blocked" : "refused",
+        resultPreview: decision.message,
+      });
+      return failedOutcome(decision.message);
+    }
+
+    const escapedPath = registryPath.replace(/'/gu, "''");
+    const registryQuery = valueName
+      ? `Get-ItemProperty -LiteralPath '${escapedPath}' -Name '${valueName.replace(/'/gu, "''")}' | Format-List`
+      : `Get-ItemProperty -LiteralPath '${escapedPath}' | Format-List`;
+
+    try {
+      const queryResult = await this.dependencies.systemAccessRunner.runPowerShell(registryQuery);
+      const registryOutput = queryResult.standardOutput.trim();
+      this.dependencies.auditLogStore.record({
+        summary: `read ${registryPath}${valueName ? ` (${valueName})` : ""}`,
+        detail: registryPath,
+        tier: decision.tier,
+        outcome: "allowed",
+        resultPreview: registryOutput.slice(0, 600),
+      });
+      return {
+        status: "completed",
+        message: `read ${registryPath}`,
+        detail: registryOutput.slice(0, 600) || "that key has no values to show",
+        undoLabel: null,
+        undo: null,
+        choices: [],
+      };
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      return failedOutcome(`I could not read that key: ${errorMessage}`);
+    }
   }
 
   private saveSnippet(snippetName: string, snippetText: string): ActionExecutionOutcome {

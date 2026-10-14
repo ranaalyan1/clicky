@@ -514,6 +514,87 @@ const actionDefinitions: Record<ClickaaActionType, ActionDefinition> = {
       };
     },
   },
+  run_command: {
+    type: "run_command",
+    risk: "confirm",
+    requiredAbility: "systemAccessTier1",
+    describe: (action) => {
+      const commandAction = action as { command: string };
+      return `run ${commandAction.command}`;
+    },
+    normalize: (rawAction) => {
+      const command = readRequiredText(rawAction, "command");
+      if (!command) {
+        return { action: null, problem: "run_command needs the command to run" };
+      }
+      return {
+        action: {
+          type: "run_command",
+          command: command.slice(0, 2_000),
+          reason: readOptionalText(rawAction, "reason") ?? "no reason given",
+        },
+        problem: null,
+      };
+    },
+  },
+  manage_file: {
+    type: "manage_file",
+    risk: "confirm",
+    requiredAbility: "systemAccessTier1",
+    describe: (action) => {
+      const fileAction = action as { operation: string; path: string };
+      const operationWords: Record<string, string> = {
+        read: "read",
+        write: "write",
+        list: "list",
+      };
+      return `${operationWords[fileAction.operation] ?? fileAction.operation} ${fileAction.path}`;
+    },
+    normalize: (rawAction) => {
+      const rawOperation = readRequiredText(rawAction, "operation") ?? "";
+      const operation = (["read", "write", "list"] as const).find(
+        (candidateOperation) => candidateOperation === rawOperation,
+      );
+      const filePath = readRequiredText(rawAction, "path");
+      if (!operation || !filePath) {
+        return { action: null, problem: "manage_file needs operation (read, write or list) and path" };
+      }
+      return {
+        action: {
+          type: "manage_file",
+          operation,
+          path: filePath,
+          content: typeof rawAction.content === "string" ? rawAction.content.slice(0, 100_000) : "",
+        },
+        problem: null,
+      };
+    },
+  },
+  read_registry: {
+    type: "read_registry",
+    risk: "safe",
+    requiredAbility: "systemAccessTier1",
+    describe: (action) => {
+      const registryAction = action as { path: string; valueName: string | null };
+      return registryAction.valueName
+        ? `read ${registryAction.path} ... ${registryAction.valueName}`
+        : `read the ${registryAction.path} registry key`;
+    },
+    normalize: (rawAction) => {
+      const registryPath = readRequiredText(rawAction, "path");
+      if (!registryPath) {
+        return { action: null, problem: "read_registry needs a path" };
+      }
+      return {
+        action: {
+          type: "read_registry",
+          path: registryPath.slice(0, 300),
+          valueName: readOptionalText(rawAction, "valueName") ?? readOptionalText(rawAction, "value"),
+        },
+        problem: null,
+      };
+    },
+  },
   click_at: {
     type: "click_at",
     risk: "confirm",
@@ -816,6 +897,15 @@ export function buildActionProtocolInstructions(abilities: AbilitySettings): str
 - screenshot_region: {"type":"screenshot_region"} — opens the overlay so the user can drag over part of the screen; the pixels land on their clipboard. use it for "let me screenshot this", "snip this area", "grab that region".
 - click_at: {"type":"click_at","x":420,"y":310,"label":"the first video"} — clicks a real point on screen. x and y are pixels in the screenshot you were shown, exactly like the numbers in [POINT:x,y]. set "screenNumber" when the target is on a different display than the pointer. always name what you are clicking in "label".
 - wait: {"type":"wait","seconds":2} — pause before the next action, for pages that are still loading.`);
+
+  if (abilities.systemAccessTier1) {
+    sections.push(`Working on the user's pc beyond apps and keys:
+
+- read_registry: {"type":"read_registry","path":"HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Run"} — reads one registry key and its values. read-only, never a credential store.
+- manage_file: {"type":"manage_file","operation":"read","path":"C:\\Users\\me\\Documents\\notes.txt"} — reads, lists or writes one file inside the user's own Documents, Downloads, Desktop, Pictures, Videos or Music folder. nothing outside those folders will run, and writes ask first.
+- run_command: {"type":"run_command","command":"Get-Process | Sort-Object CPU -Descending | Select-Object -First 5","reason":"finding what is using the cpu"} — runs one PowerShell command. read-only diagnostics run with the first switch on; anything that changes the pc, reaches the network or installs software needs the separate arbitrary-commands switch, and Clickaa refuses credentials, elevation and anything that weakens windows security whatever is switched on. always include "reason", and prefer the read-only diagnostics: Get-Date, Get-Process, Get-Service, Get-ChildItem, Get-Volume, ipconfig, systeminfo, tasklist, whoami, ping, ping's cousins, and pipes made only of those.
+- never try to read saved passwords, browser login data, .ssh keys or the registry's SAM or SECURITY hives: Clickaa blocks those, and asking wastes the user's time.`);
+  }
   }
 
   if (abilities.automation && abilities.screenVision) {

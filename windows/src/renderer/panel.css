@@ -492,3 +492,21 @@ footer {
 .footer-dot-label.unavailable i { background: var(--danger); }
 
 .provider-warning { color: #ffca9b; }
+
+/* The audit log shows the raw command as well as the friendly summary, because
+   "what did it actually run?" is the whole point of keeping a log. */
+.audit-detail {
+  display: block;
+  margin-top: 4px;
+  padding: 6px 8px;
+  border: 1px solid var(--clickaa-line);
+  border-radius: 6px;
+  background: var(--clickaa-canvas);
+  color: var(--clickaa-ink-muted);
+  font: var(--clickaa-text-xs) var(--clickaa-font-mono);
+  line-height: 1.5;
+  white-space: pre-wrap;
+  word-break: break-word;
+  max-height: 96px;
+  overflow: hidden;
+}

@@ -44,6 +44,7 @@ declare global {
       addTodo(todoText: string): void;
       addMemory(factText: string): void;
       clearMemory(): void;
+      clearAuditLog(): void;
 
       /* Cursor overlay */
       sendPointingAnimationCompleted(interactionId: number): void;

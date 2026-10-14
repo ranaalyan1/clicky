@@ -32,6 +32,9 @@ const abilityCopy: Array<{ id: AbilityId; label: string; description: string }> 
   { id: "memory", label: "memory", description: "remember facts you ask it to keep" },
   { id: "clipboardHistory", label: "clipboard history", description: "keep your recent copies in the island, on this pc only" },
   { id: "island", label: "the island", description: "show the notch at the top of the screen" },
+  { id: "wakeWord", label: "wake word", description: "listen for \"clickaa\" on this pc, and open the island when you say it" },
+  { id: "systemAccessTier1", label: "system access", description: "read-only diagnostics, registry reads, and files in your own folders — each one asks first" },
+  { id: "systemAccessTier2", label: "arbitrary commands", description: "let clickaa run commands that change your pc. leave this off unless you want that, and read every card it shows" },
 ];
 
 const personalityCopy: Array<{ id: PersonalityPresetId; label: string; description: string }> = [
@@ -139,6 +142,9 @@ const element = {
   wakeWordProvider: requireElement<HTMLSelectElement>("wake-word-provider"),
   wakeWordStateChip: requireElement<HTMLElement>("wake-word-state-chip"),
   wakeWordStatus: requireElement<HTMLElement>("wake-word-status"),
+  auditSummary: requireElement<HTMLElement>("audit-summary"),
+  auditList: requireElement<HTMLElement>("audit-list"),
+  auditClearButton: requireElement<HTMLButtonElement>("audit-clear-button"),
   islandMusicToggle: requireElement<HTMLInputElement>("island-music-toggle"),
   islandClipboardToggle: requireElement<HTMLInputElement>("island-clipboard-toggle"),
   refreshAppsButton: requireElement<HTMLButtonElement>("refresh-apps-button"),
@@ -358,6 +364,7 @@ function renderSetup(state: ClickaaPublicState): void {
   element.wakeWordProvider.value = config.wakeWordProvider;
   element.wakeWordStateChip.textContent = describeWakeWordState(state, config);
   element.wakeWordStatus.textContent = describeWakeWordStatus(state, config);
+  renderAuditLog(state);
   element.islandMusicToggle.checked = config.islandShowNowPlaying;
   element.islandClipboardToggle.checked = config.islandShowClipboard;
 
@@ -398,6 +405,47 @@ function describeWakeWordStatus(state: ClickaaPublicState, config: ClickaaUserCo
   return config.abilities.wakeWord
     ? "waiting for you to say the name."
     : "switched off, so the microphone is closed.";
+}
+
+const auditOutcomeLabels: Record<ClickaaPublicState["auditLog"][number]["outcome"], string> = {
+  allowed: "ran",
+  refused: "you said no",
+  blocked: "clickaa blocked it",
+  failed: "failed",
+};
+
+function renderAuditLog(state: ClickaaPublicState): void {
+  const { auditLog, auditLogCounts } = state;
+  element.auditSummary.textContent = auditLogCounts.total
+    ? `${auditLogCounts.total} ${auditLogCounts.total === 1 ? "entry" : "entries"}: ${auditLogCounts.allowed} ran, ${auditLogCounts.refused} refused, ${auditLogCounts.blocked} blocked by clickaa, ${auditLogCounts.failed} failed. newest first.`
+    : "nothing yet. every command, file and registry read shows up here, whether you allowed it or clickaa refused it.";
+
+  element.auditList.replaceChildren(...auditLog.slice(0, 25).map((auditEntry) => {
+    const row = document.createElement("div");
+    row.className = "list-row";
+
+    const copy = document.createElement("div");
+    copy.className = "list-row-copy";
+
+    const title = document.createElement("strong");
+    title.textContent = auditEntry.summary;
+
+    const meta = document.createElement("span");
+    const shownTime = auditEntry.createdAtIso.slice(11, 16);
+    meta.textContent = `${shownTime} · ${auditOutcomeLabels[auditEntry.outcome]}${auditEntry.tier === "tier2" ? " · arbitrary command" : ""}`;
+
+    copy.append(title, meta);
+    row.append(copy);
+
+    if (auditEntry.detail || auditEntry.resultPreview) {
+      const detail = document.createElement("code");
+      detail.className = "audit-detail";
+      detail.textContent = auditEntry.detail || auditEntry.resultPreview;
+      row.append(detail);
+    }
+
+    return row;
+  }));
 }
 
 async function saveSettings(settingsUpdates: Partial<ClickaaUserConfig>): Promise<void> {
@@ -759,6 +807,9 @@ element.speakScheduledToggle.addEventListener("change", () => {
 element.launchToggle.addEventListener("change", () => void saveSettings({ launchAtLogin: element.launchToggle.checked }));
 element.islandSummonToggle.addEventListener("change", () => {
   void saveSettings({ islandSummonEnabled: element.islandSummonToggle.checked });
+});
+element.auditClearButton.addEventListener("click", () => {
+  window.clickaa.clearAuditLog();
 });
 element.wakeWordToggle.addEventListener("change", () => {
   void saveSettings({

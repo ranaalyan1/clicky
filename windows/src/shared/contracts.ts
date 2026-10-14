@@ -76,6 +76,8 @@ export const abilityIds = [
   "clipboardHistory",
   "island",
   "wakeWord",
+  "systemAccessTier1",
+  "systemAccessTier2",
 ] as const;
 export type AbilityId = (typeof abilityIds)[number];
 export type AbilitySettings = Record<AbilityId, boolean>;
@@ -269,6 +271,33 @@ export interface ClickAtAction {
   label: string;
 }
 
+/**
+ * Runs a PowerShell command or script. Whether it may run at all, and how loud
+ * the confirmation is, is decided by system-access.ts — never by this shape.
+ */
+export interface RunCommandAction {
+  type: "run_command";
+  command: string;
+  /** Why Clickaa wants to run it, shown on the confirmation card. */
+  reason: string;
+}
+
+/** Reads or writes one file inside the user's own folders. */
+export interface ManageFileAction {
+  type: "manage_file";
+  operation: "read" | "write" | "list";
+  path: string;
+  /** Only for a write. */
+  content: string;
+}
+
+/** Reads one registry key, values only, and changes nothing. */
+export interface ReadRegistryAction {
+  type: "read_registry";
+  path: string;
+  valueName: string | null;
+}
+
 /** "wait a second" — used between steps of a task so the screen can catch up. */
 export interface WaitAction {
   type: "wait";
@@ -313,7 +342,10 @@ export type ClickaaAction =
   | ClipboardTransformAction
   | ScreenshotRegionAction
   | ClickAtAction
-  | WaitAction;
+  | WaitAction
+  | RunCommandAction
+  | ManageFileAction
+  | ReadRegistryAction;
 
 export type ClickaaActionType =
   | "open_app"
@@ -343,7 +375,10 @@ export type ClickaaActionType =
   | "clipboard_transform"
   | "screenshot_region"
   | "click_at"
-  | "wait";
+  | "wait"
+  | "run_command"
+  | "manage_file"
+  | "read_registry";
 
 /** Canonical action list, kept in the shared contracts so both sides agree. */
 export const clickaaActionTypes: readonly ClickaaActionType[] = [
@@ -375,6 +410,9 @@ export const clickaaActionTypes: readonly ClickaaActionType[] = [
   "screenshot_region",
   "click_at",
   "wait",
+  "run_command",
+  "manage_file",
+  "read_registry",
 ];
 
 export type ActionRisk = "safe" | "confirm";
@@ -534,6 +572,20 @@ export interface ClickaaPublicState {
   wakeWordMessage: string;
   wakeWordMuted: boolean;
   config: ClickaaUserConfig;
+  /** The last few system-access entries, newest first, for the panel's log. */
+  auditLog: AuditLogEntry[];
+  auditLogCounts: { allowed: number; refused: number; blocked: number; failed: number; total: number };
+}
+
+/** One line of the record Clickaa keeps of everything it did on this pc. */
+export interface AuditLogEntry {
+  id: string;
+  createdAtIso: string;
+  summary: string;
+  detail: string;
+  tier: "tier1" | "tier2" | "blocked";
+  outcome: "allowed" | "refused" | "blocked" | "failed";
+  resultPreview: string;
 }
 
 export interface ActiveTimer {

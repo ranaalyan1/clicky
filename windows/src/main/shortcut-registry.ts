@@ -1,7 +1,10 @@
 import { DictationShortcutId } from "../shared/contracts";
 
 export const uiohookSpaceKeyCode = 57;
+// These numbers are the library's own key codes (see UiohookKey), repeated here
+// so this file stays testable without loading the native hook.
 export const uiohookSKeyCode = 31;
+export const uiohookQKeyCode = 16;
 export const uiohookCapsLockKeyCode = 58;
 
 export interface ModifierKeyCodes {
@@ -15,7 +18,7 @@ export interface ModifierKeyCodes {
   rightShift: number;
 }
 
-export type ShortcutId = "talk" | "dictation" | "circle" | "snip";
+export type ShortcutId = "talk" | "dictation" | "circle" | "snip" | "panic";
 
 export interface ShortcutDefinition {
   id: ShortcutId;
@@ -44,6 +47,7 @@ export const shortcutLabels: Record<Exclude<ShortcutId, "dictation">, string> = 
   talk: "Ctrl + Alt",
   circle: "Ctrl + Shift",
   snip: "Ctrl + Alt + S",
+  panic: "Ctrl + Alt + Q",
 };
 
 export const dictationShortcutLabels: Record<DictationShortcutId, string> = {
@@ -52,7 +56,7 @@ export const dictationShortcutLabels: Record<DictationShortcutId, string> = {
   "capslock": "Caps Lock",
 };
 
-/** Builds the four shortcuts Clickaa listens for. */
+/** Builds the five shortcuts Clickaa listens for. */
 export function buildShortcutDefinitions(dictationShortcut: DictationShortcutId): ShortcutDefinition[] {
   const dictionaryDefinitions: ShortcutDefinition = dictationShortcut === "capslock"
     ? {
@@ -101,6 +105,17 @@ export function buildShortcutDefinitions(dictationShortcut: DictationShortcutId)
     },
     /* Ctrl+Alt+S. Longer than the talk chord on purpose: the state machine
        hands the keys over to the snip shortcut the moment the S arrives. */
+    /* Ctrl+Alt+Q. The panic chord: it stops whatever Clickaa is doing, so it
+       has to win over the talk shortcut that started the same way. */
+    {
+      id: "panic",
+      supersedes: ["talk"],
+      requiresControl: true,
+      requiresLeftAlt: true,
+      requiresWindows: false,
+      requiresShift: false,
+      requiredKeyCode: uiohookQKeyCode,
+    },
     {
       id: "snip",
       // Ctrl+Alt on its own is push-to-talk; the S turns it into a snip.

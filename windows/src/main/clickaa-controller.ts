@@ -54,7 +54,9 @@ import {
 import { ShortcutId } from "./shortcut-registry";
 import { mapImageCoordinateToWindowsDesktop, parsePointingTag, selectPointingDisplay } from "./pointing";
 import { ScheduleStore } from "./schedule-store";
+import { AuditLogStore } from "./audit-log-store";
 import { SnippetStore } from "./snippet-store";
+import { SystemAccessRunner } from "./system-access-runner";
 import { captureAllWindowsDisplays, captureWindowsDesktopRegion } from "./screen-capture";
 import { describeScheduledTask } from "./schedule-time";
 import { dictationShortcutLabels, shortcutLabels } from "./shortcut-registry";
@@ -100,6 +102,8 @@ export class ClickaaController {
   private readonly memoryStore: MemoryStore;
   private readonly scheduleStore: ScheduleStore;
   private readonly snippetStore: SnippetStore;
+  private readonly auditLogStore: AuditLogStore;
+  private readonly systemAccessRunner: SystemAccessRunner;
   private readonly clipboardHistoryStore: ClipboardHistoryStore;
   private readonly activityFeed = new ActivityFeed();
   private readonly confirmationQueue = new ConfirmationQueue();
@@ -159,6 +163,8 @@ export class ClickaaController {
     this.memoryStore = new MemoryStore(`${userDataDirectory}/memory.json`);
     this.scheduleStore = new ScheduleStore(`${userDataDirectory}/schedules.json`);
     this.snippetStore = new SnippetStore(`${userDataDirectory}/snippets.json`);
+    this.auditLogStore = new AuditLogStore(`${userDataDirectory}/audit-log.json`);
+    this.systemAccessRunner = new SystemAccessRunner();
     this.clipboardHistoryStore = new ClipboardHistoryStore(
       `${userDataDirectory}/clipboard-history.json`,
     );
@@ -169,6 +175,9 @@ export class ClickaaController {
       memoryStore: this.memoryStore,
       scheduleStore: this.scheduleStore,
       snippetStore: this.snippetStore,
+      auditLogStore: this.auditLogStore,
+      systemAccessRunner: this.systemAccessRunner,
+      readAbilities: () => this.configStore.getConfig().abilities,
       openExternalUrl: async (url) => {
         const { shell } = await import("electron");
         await shell.openExternal(url);
@@ -223,6 +232,8 @@ export class ClickaaController {
       wakeWordState: "off",
       wakeWordMessage: "",
       wakeWordMuted: false,
+      auditLog: [],
+      auditLogCounts: { allowed: 0, refused: 0, blocked: 0, failed: 0, total: 0 },
       config,
     };
   }
@@ -266,7 +277,20 @@ export class ClickaaController {
   }
 
   getPublicState(): ClickaaPublicState {
-    return { ...this.publicState, config: this.configStore.getConfig() };
+    return {
+      ...this.publicState,
+      config: this.configStore.getConfig(),
+      auditLog: this.auditLogStore.list(50),
+      auditLogCounts: this.auditLogStore.summarizeCounts(),
+    };
+  }
+
+  /** Wipes the audit log, at the user's request, and says so in the log itself. */
+  clearAuditLog(): void {
+    this.auditLogStore.clear();
+    this.publishState();
+    this.activityFeed.record("system", "cleared the activity log", "the record of what ran on this pc is now empty", false);
+    this.publishIslandState();
   }
 
   getIslandState(): IslandState {
@@ -278,6 +302,10 @@ export class ClickaaController {
   /* ---------------------------------------------------------------------- */
 
   handleShortcutPressed(shortcutId: ShortcutId): void {
+    if (shortcutId === "panic") {
+      this.handlePanicHotkey();
+      return;
+    }
     if (shortcutId === "snip") {
       this.beginSnip();
       return;
@@ -289,6 +317,10 @@ export class ClickaaController {
   }
 
   handleShortcutReleased(shortcutId: ShortcutId): void {
+    if (shortcutId === "panic") {
+      // Lifting the Q changes nothing: the panic already did its work.
+      return;
+    }
     if (shortcutId === "snip") {
       // Lifting the S leaves the overlay up: the drag finishes the snip, and
       // Escape or a bare click walks away from it.
@@ -311,6 +343,40 @@ export class ClickaaController {
 
   handlePanelPushToTalkReleased(): void {
     this.handleShortcutReleased("talk");
+  }
+
+  /**
+   * The panic hotkey. Whatever is happening — a task clicking through a website,
+   * a spoken answer, a pending confirmation, a snip waiting for a drag — it all
+   * stops here, and Clickaa says so out loud so the user is not left wondering.
+   */
+  handlePanicHotkey(): void {
+    const wasWorkingOnSomething = this.isAgentTaskRunning
+      || this.activeInteractionKind !== null
+      || this.confirmationQueue.list().length > 0
+      || this.isSnipInFlight;
+
+    this.endWakeFollowUp();
+    this.cancelAgentTask();
+    this.pendingTaskGoals.clear();
+    this.confirmationQueue.clear();
+    this.isSnipInFlight = false;
+    this.cancelActiveWork();
+    this.desktopWindows.hideRegionSelector();
+    this.desktopWindows.updateOverlayMode({ interactionKind: null, hint: "", typedText: "" });
+    this.publicState.voiceState = "idle";
+    this.publicState.interactionKind = null;
+    this.publicState.errorMessage = null;
+    this.publishState();
+    this.publishIslandState();
+
+    const panicMessage = wasWorkingOnSomething
+      ? "everything stopped. nothing else will run until you ask again."
+      : "nothing was running, so there was nothing to stop.";
+    this.activityFeed.record("system", "panic hotkey", panicMessage, false);
+    this.desktopWindows.showNotification("Clickaa stopped", panicMessage);
+    this.desktopWindows.revealIsland();
+    this.publishIslandState();
   }
 
   handleEscapePressed(): void {
@@ -2369,6 +2435,7 @@ export class ClickaaController {
         { label: this.publicState.dictationShortcutLabel, description: "hold to dictate clean text anywhere", hint: "hold" },
         { label: this.publicState.circleShortcutLabel, description: "hold, circle anything, ask about it", hint: "hold" },
         { label: shortcutLabels.snip, description: "drag over any part of the screen to copy it", hint: "press" },
+        { label: shortcutLabels.panic, description: "stop everything clickaa is doing, instantly", hint: "press" },
       ],
     };
   }
