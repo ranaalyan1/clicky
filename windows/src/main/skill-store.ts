@@ -1,5 +1,5 @@
 import { randomUUID } from "node:crypto";
-import { ClickaaAction, Skill } from "../shared/contracts";
+import { UstaadAction, Skill } from "../shared/contracts";
 import { JsonFileStore } from "./json-file-store";
 import { normalizeForMatch } from "./text-matching";
 
@@ -31,7 +31,7 @@ function sanitizeSkills(storedSkills: unknown): Skill[] {
       // Seed actions are a memory aid, never a permission: every run is filtered
       // and confirmed again, exactly like a freshly spoken task.
       seedActions: Array.isArray(skillRecord.seedActions)
-        ? (skillRecord.seedActions as ClickaaAction[]).slice(0, maximumSeedActionsPerSkill)
+        ? (skillRecord.seedActions as UstaadAction[]).slice(0, maximumSeedActionsPerSkill)
         : [],
       createdAtIso: typeof skillRecord.createdAtIso === "string"
         ? skillRecord.createdAtIso
@@ -85,7 +85,7 @@ export class SkillStore {
     return this.skills.some((skill) => normalizeForMatch(skill.goal) === normalizedGoal);
   }
 
-  save(skillDraft: { name: string; goal: string; seedActions: ClickaaAction[] }): Skill {
+  save(skillDraft: { name: string; goal: string; seedActions: UstaadAction[] }): Skill {
     const skillName = skillDraft.name.trim().slice(0, 60);
     const skillGoal = skillDraft.goal.trim().slice(0, 300);
     if (!skillName) {

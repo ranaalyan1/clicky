@@ -1,8 +1,8 @@
 import type {
   AudioPlaybackPayload,
   BrainConnectionTestResult,
-  ClickaaPublicState,
-  ClickaaUserConfig,
+  UstaadPublicState,
+  UstaadUserConfig,
   FallbackSpeechPayload,
   IslandPresentation,
   IslandState,
@@ -15,15 +15,15 @@ import type {
 
 declare global {
   interface Window {
-    clickaa: {
+    ustaad: {
       /* Panel */
-      getState(): Promise<ClickaaPublicState>;
-      updateSettings(settingsUpdates: Partial<ClickaaUserConfig>): Promise<ClickaaPublicState>;
-      testBrain(settingsUpdates: Partial<ClickaaUserConfig>): Promise<BrainConnectionTestResult>;
+      getState(): Promise<UstaadPublicState>;
+      updateSettings(settingsUpdates: Partial<UstaadUserConfig>): Promise<UstaadPublicState>;
+      testBrain(settingsUpdates: Partial<UstaadUserConfig>): Promise<BrainConnectionTestResult>;
       refreshAppIndex(): Promise<number>;
       hidePanel(): void;
       openSetupVideo(): void;
-      onState(listener: (state: ClickaaPublicState) => void): () => void;
+      onState(listener: (state: UstaadPublicState) => void): () => void;
       onOpenPanelPage(listener: (page: string) => void): () => void;
 
       pushToTalkPressed(): void;
@@ -49,7 +49,7 @@ declare global {
       /* Cursor overlay */
       sendPointingAnimationCompleted(interactionId: number): void;
       onOverlayState(
-        listener: (payload: Pick<ClickaaPublicState, "voiceState" | "audioPowerLevel">) => void,
+        listener: (payload: Pick<UstaadPublicState, "voiceState" | "audioPowerLevel">) => void,
       ): () => void;
       onOverlayCursor(listener: (payload: OverlayCursorPayload) => void): () => void;
       onOverlayResponse(listener: (responseText: string) => void): () => void;

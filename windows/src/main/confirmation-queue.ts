@@ -1,5 +1,5 @@
 import { randomUUID } from "node:crypto";
-import { ClickaaAction, PendingConfirmation } from "../shared/contracts";
+import { UstaadAction, PendingConfirmation } from "../shared/contracts";
 import { describeActions } from "./action-protocol";
 
 /**
@@ -9,7 +9,7 @@ import { describeActions } from "./action-protocol";
 export class ConfirmationQueue {
   private pendingConfirmations: PendingConfirmation[] = [];
 
-  enqueue(interactionId: number, actions: ClickaaAction[], reason: string): PendingConfirmation {
+  enqueue(interactionId: number, actions: UstaadAction[], reason: string): PendingConfirmation {
     const pendingConfirmation: PendingConfirmation = {
       id: randomUUID(),
       interactionId,

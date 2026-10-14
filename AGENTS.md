@@ -1,15 +1,15 @@
-# Clickaa - Agent Instructions
+# Ustaad - Agent Instructions
 
 <!-- This is the single source of truth for all AI coding agents. CLAUDE.md is a symlink to this file. -->
 <!-- AGENTS.md spec: https://github.com/agentsmd/agents.md — supported by Claude Code, Cursor, Copilot, Gemini CLI, and others. -->
 
 ## Overview
 
-Clickaa is a Windows desktop companion written entirely in TypeScript: an Electron system-tray client in `windows/` and a Cloudflare Worker proxy in `worker/`. It lives in the Windows notification area and opens a floating control panel plus a notch ("the island") at the top of every screen. Global push-to-talk captures voice input and sends the transcript plus multi-monitor screenshots to the configured model. The model responds with streamed text and speech, can point at UI elements, and can act on the PC through a typed action protocol.
+Ustaad is a Windows desktop companion written entirely in TypeScript: an Electron system-tray client in `windows/` and a Cloudflare Worker proxy in `worker/`. It lives in the Windows notification area and opens a floating control panel plus a notch ("the island") at the top of every screen. Global push-to-talk captures voice input and sends the transcript plus multi-monitor screenshots to the configured model. The model responds with streamed text and speech, can point at UI elements, and can act on the PC through a typed action protocol.
 
 There is **no Swift code and no macOS client** in this repository. The original open-source Clicky macOS client was removed; it remains in this repository's history at commit `629c868` if it is ever needed for reference.
 
-The client can think with **either** a user-supplied Gemini API key stored on that PC (`%APPDATA%\Clickaa\settings.json`) **or** the Cloudflare Worker proxy, which keeps the long-lived provider keys off the device.
+The client can think with **either** a user-supplied Gemini API key stored on that PC (`%APPDATA%\Ustaad\settings.json`) **or** the Cloudflare Worker proxy, which keeps the long-lived provider keys off the device.
 
 ## Architecture
 
@@ -18,7 +18,7 @@ The client can think with **either** a user-supplied Gemini API key stored on th
 - **App Type**: Electron system-tray app, with no taskbar window
 - **Framework**: Electron 44 + TypeScript; Chromium renderers for UI, microphone capture, audio playback, and overlay animation
 - **Security Boundary**: sandboxed renderers, context isolation enabled, Node integration disabled, narrow IPC API exposed through `src/preload/preload.ts`
-- **State Management**: `ClickaaController` is the main-process state machine and publishes an immutable public state snapshot to the panel, the island, and the overlays
+- **State Management**: `UstaadController` is the main-process state machine and publishes an immutable public state snapshot to the panel, the island, and the overlays
 - **Brain**: `BrainRouter` picks Gemini (user's own key) or the Cloudflare Worker; if the selected provider has no key or URL yet, it uses the other one instead of failing
 - **Global Shortcuts**: `uiohook-napi` tracks physical key-down and key-up. Talk is **Ctrl + Alt** (left Alt only, to avoid Windows AltGr), dictation is **Ctrl + Windows** (configurable: Ctrl + Shift + Space, or Caps Lock), circling is **Ctrl + Shift**, snip is **Ctrl + Alt + S**, panic is **Ctrl + Alt + Q**, and **Escape** cancels circling, closes a snip, and stops a running task
 - **Speech-to-Text**: Gemini (single-shot WAV upload) or the AssemblyAI v3 websocket, fed 16 kHz little-endian PCM by the hidden panel renderer
@@ -50,7 +50,7 @@ Worker vars: `ELEVENLABS_VOICE_ID`
 
 **Windows Main/Renderer Split**: Provider calls, configuration, global hooks, screen capture, and lifecycle state stay in Electron's main process. The renderer receives only the minimum APIs needed for UI, microphone PCM, audio playback, and overlay drawing. Do not enable Node integration or expose `ipcRenderer` directly.
 
-**Windows Overlay Pattern**: Each display gets its own non-focusable, click-through BrowserWindow. The windows are content-protected so Clickaa's own cursor and panel do not appear in screenshots. Main-process coordinates are translated into display-local top-left coordinates before an overlay animates.
+**Windows Overlay Pattern**: Each display gets its own non-focusable, click-through BrowserWindow. The windows are content-protected so Ustaad's own cursor and panel do not appear in screenshots. Main-process coordinates are translated into display-local top-left coordinates before an overlay animates.
 
 **Windows Audio Host**: The panel BrowserWindow is created once and hidden rather than destroyed. Its renderer remains the audio host while the panel is closed, allowing `getUserMedia`, provider speech playback, and the Windows speech fallback to continue in the tray.
 
@@ -67,7 +67,7 @@ Worker vars: `ELEVENLABS_VOICE_ID`
 | File | Lines | Purpose |
 |------|-------|---------|
 | `windows/src/main/main.ts` | ~430 | Electron entry point, secure permission policy, sender-checked IPC registration, single-instance lifecycle, display-change handling. |
-| `windows/src/main/clickaa-controller.ts` | ~2,800 | The orchestrator: talk, dictation, circle-to-ask, snips, timers, snippets, the task loop, confirmations, undo, the scheduler, wake-word lifecycle, skills, audit log, island state. |
+| `windows/src/main/ustaad-controller.ts` | ~2,800 | The orchestrator: talk, dictation, circle-to-ask, snips, timers, snippets, the task loop, confirmations, undo, the scheduler, wake-word lifecycle, skills, audit log, island state. |
 | `windows/src/main/desktop-windows.ts` | ~840 | Tray (with mute), floating panel, island presentation, per-display overlays and region selectors, cursor polling, renderer messaging. |
 | `windows/src/main/action-protocol.ts` | ~960 | `<actions>` and `<task>` parsing, risk classification, ability filtering, and the action section of the system prompt. |
 | `windows/src/main/agent-loop.ts` | ~340 | Plan, act, look, correct: the bounded task runner, its look protocol, and the playback shortcut. |
@@ -99,6 +99,7 @@ Worker vars: `ELEVENLABS_VOICE_ID`
 | `windows/src/main/system-prompt.ts` | ~151 | Builds the system prompt from the soul, abilities, memory, to-dos, schedules, snippets and saved skills. |
 | `windows/src/main/transcription-session.ts` | ~314 | The AssemblyAI websocket session used by dictation and circling. |
 | `windows/src/preload/preload.ts` | ~174 | Context-isolated IPC surface shared by the panel, island, overlays, and region selectors. |
+| `windows/electron-builder.signing.js` | ~70 | The packaging config the `package:win` scripts use: spreads `package.json`'s `build` block and adds Azure signing only when it is fully configured, throwing when it is only partly configured. |
 | `windows/src/shared/contracts.ts` | ~758 | Every shared type: actions, abilities, config, island state, skills, audit entries. |
 | `windows/src/renderer/panel.ts` | ~971 | Panel UI bindings and the persistent renderer host for microphone capture and response audio. |
 | `windows/src/renderer/island.ts` | ~728 | The notch: now playing, activity with undo, confirmations, timers, snippets, skills offers, plans, memory, clips, apps, wallpapers, quick switches. |
@@ -107,7 +108,7 @@ Worker vars: `ELEVENLABS_VOICE_ID`
 | `windows/src/renderer/audio-capture.ts` | ~160 | Microphone capture, PCM16 conversion, and the audio power level that drives the waveform and the wake-word silence detector. |
 | `windows/src/renderer/tokens.css` | ~150 | The design system: type scale, spacing, radii, colour, elevation, motion, focus ring. Everything else references these. |
 | `windows/src/renderer/icons.ts` | ~139 | The SVG icon set that replaced emoji across the UI. |
-| `windows/src/renderer/brand.css` | ~15 | The Clickaa mark as an inline data URI, used by the tray, panel, island and selection UI. |
+| `windows/src/renderer/brand.css` | ~15 | The Ustaad mark as an inline data URI, used by the tray, panel, island and selection UI. |
 | `windows/package.json` | ~75 | TypeScript, tests, Electron runtime, and x64/ARM64 NSIS packaging configuration. |
 | `worker/src/index.ts` | ~141 | Cloudflare Worker proxy. Three routes: `/chat` (Claude), `/tts` (ElevenLabs), `/transcribe-token` (AssemblyAI temp token). |
 
@@ -180,6 +181,20 @@ IMPORTANT: Follow these naming rules strictly. Clarity is the top priority.
 - Keep the PowerShell helper scripts ASCII-only and written with a UTF-8 BOM: PowerShell 5.1 reads un-BOM'd files as ANSI, and a smart quote would silently break a user's install. `tests/windows-scripts.test.ts` enforces this
 - Prefer pure modules with injected dependencies for anything with rules (policy, parsing, state machines, the agent loop). It is what makes the behaviour testable without a Windows machine
 - Run both `npm test` and `npm run typecheck` after Windows changes
+
+### Neumorphic Interface Conventions
+
+The interface is soft UI (neumorphism), and two rules keep it from falling apart:
+
+- **A shape's background must equal its parent's surface.** Depth comes from shadows, never from a lighter fill or a border. Setting a card to a different colour than the canvas flattens everything inside it, so `--ustaad-surface` is deliberately the same value as `--ustaad-canvas`.
+- **Raised means two shadows outward; pressed means the same two shadows inward.** Use `--ustaad-neu-raised*` for anything that sits above the surface and `--ustaad-neu-inset*` for anything carved into it (inputs, toggles, tracks, wells, and the active state of any button).
+
+Further rules that follow from those:
+
+- Never draw a border to separate two things on the same surface. Use an inset hairline (`inset 0 1px 0 var(--ustaad-line)`) or a shadow, and keep those shadows out of colour: they are translucent black and translucent white, so they work on any surface.
+- Anything clickable must visibly change depth on hover and again while held. A control that only changes colour reads as flat and breaks the metaphor.
+- `tokens.css` owns the depth values. Do not hand-write `box-shadow` in a component sheet; add a token instead.
+- Text contrast does not get softened for the sake of the look: `--ustaad-ink` on `--ustaad-canvas` stays above 4.5:1.
 
 ### Do NOT
 

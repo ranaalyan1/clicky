@@ -105,7 +105,7 @@ export class SnippetStore {
 
   /**
    * Resolves what the user asked for. An exact name always wins; anything fuzzier
-   * has to be clearly ahead of the runner-up, or Clickaa asks which one.
+   * has to be clearly ahead of the runner-up, or Ustaad asks which one.
    */
   resolveForInsert(query: string): SnippetLookupResult {
     const normalizedQuery = normalizeForMatch(query);
@@ -163,7 +163,7 @@ export class SnippetStore {
     return removedSnippets;
   }
 
-  /** Compact list for the system prompt, so Clickaa knows what it can insert. */
+  /** Compact list for the system prompt, so Ustaad knows what it can insert. */
   summarizeSnippetNames(limit: number): string[] {
     return this.list().slice(0, limit).map((snippet) => snippet.name);
   }

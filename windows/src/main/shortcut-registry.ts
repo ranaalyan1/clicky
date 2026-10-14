@@ -56,7 +56,7 @@ export const dictationShortcutLabels: Record<DictationShortcutId, string> = {
   "capslock": "Caps Lock",
 };
 
-/** Builds the five shortcuts Clickaa listens for. */
+/** Builds the five shortcuts Ustaad listens for. */
 export function buildShortcutDefinitions(dictationShortcut: DictationShortcutId): ShortcutDefinition[] {
   const dictionaryDefinitions: ShortcutDefinition = dictationShortcut === "capslock"
     ? {
@@ -105,7 +105,7 @@ export function buildShortcutDefinitions(dictationShortcut: DictationShortcutId)
     },
     /* Ctrl+Alt+S. Longer than the talk chord on purpose: the state machine
        hands the keys over to the snip shortcut the moment the S arrives. */
-    /* Ctrl+Alt+Q. The panic chord: it stops whatever Clickaa is doing, so it
+    /* Ctrl+Alt+Q. The panic chord: it stops whatever Ustaad is doing, so it
        has to win over the talk shortcut that started the same way. */
     {
       id: "panic",
@@ -130,7 +130,7 @@ export function buildShortcutDefinitions(dictationShortcut: DictationShortcutId)
 }
 
 /**
- * Tracks physical key state for every Clickaa shortcut at once.
+ * Tracks physical key state for every Ustaad shortcut at once.
  *
  * Physical key codes (rather than event flags) are required for true
  * push-to-talk, and they keep AltGr from firing the talk shortcut while someone

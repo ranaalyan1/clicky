@@ -1,5 +1,5 @@
 /**
- * The PowerShell helper Clickaa keeps running for everything Windows will not
+ * The PowerShell helper Ustaad keeps running for everything Windows will not
  * let Electron do: real key injection, media/volume control, window control,
  * wallpaper, and the installed-app list.
  *
@@ -13,7 +13,7 @@
  * to `powershell -File`) and is deliberately ASCII-only, because Windows
  * PowerShell 5.1 reads un-BOM'd files as ANSI.
  */
-export const clickaaWindowsBridgeScript = String.raw`
+export const ustaadWindowsBridgeScript = String.raw`
 $ErrorActionPreference = 'Stop'
 [Console]::OutputEncoding = New-Object System.Text.UTF8Encoding($false)
 [Console]::InputEncoding = New-Object System.Text.UTF8Encoding($false)
@@ -32,7 +32,7 @@ using System.Diagnostics;
 using System.Runtime.InteropServices;
 using System.Text;
 
-public static class ClickaaNative
+public static class UstaadNative
 {
     public const int KeyEventExtendedKey = 0x0001;
     public const int KeyEventKeyUp = 0x0002;
@@ -489,17 +489,17 @@ function Get-MediaStatusResult {
 function Set-SystemVolumeScalar([double]$level) {
     $scalar = [Math]::Max(0.0, [Math]::Min(1.0, $level))
     try {
-        $appliedLevel = [ClickaaNative]::SetVolumeScalar($scalar)
+        $appliedLevel = [UstaadNative]::SetVolumeScalar($scalar)
         return @{ ok = $true; level = $appliedLevel }
     } catch {
         # Fallback: walk the volume keys. Pressing down 60 times saturates at 0,
         # so the upward presses land at roughly the requested level (2% steps).
         for ($pressIndex = 0; $pressIndex -lt 60; $pressIndex++) {
-            [ClickaaNative]::TapVirtualKey(0xAE)
+            [UstaadNative]::TapVirtualKey(0xAE)
         }
         $upPressCount = [int]([Math]::Round($scalar * 50))
         for ($pressIndex = 0; $pressIndex -lt $upPressCount; $pressIndex++) {
-            [ClickaaNative]::TapVirtualKey(0xAF)
+            [UstaadNative]::TapVirtualKey(0xAF)
         }
         return @{ ok = $true; level = [int]([Math]::Round($scalar * 100)); mode = 'volume-keys' }
     }
@@ -507,10 +507,10 @@ function Set-SystemVolumeScalar([double]$level) {
 
 function Set-SystemMute([bool]$shouldMute) {
     try {
-        $isMutedNow = [ClickaaNative]::SetMute($shouldMute)
+        $isMutedNow = [UstaadNative]::SetMute($shouldMute)
         return @{ ok = $true; muted = $isMutedNow }
     } catch {
-        [ClickaaNative]::TapVirtualKey(0xAD)
+        [UstaadNative]::TapVirtualKey(0xAD)
         return @{ ok = $true; muted = 'toggled'; mode = 'volume-keys' }
     }
 }
@@ -559,26 +559,26 @@ function Send-KeyCombination([string]$combination) {
     foreach ($keyName in $keyNames) {
         $virtualKeys.Add([UInt16](ConvertTo-VirtualKey $keyName))
     }
-    [ClickaaNative]::PressVirtualKeys($virtualKeys.ToArray())
+    [UstaadNative]::PressVirtualKeys($virtualKeys.ToArray())
     return @{ pressed = $combination }
 }
 
 function Get-ForegroundWindowResult {
-    $windowHandle = [ClickaaNative]::GetForegroundWindow()
+    $windowHandle = [UstaadNative]::GetForegroundWindow()
     return @{
-        title = [ClickaaNative]::DescribeWindowTitle($windowHandle)
-        processName = [ClickaaNative]::DescribeProcessName($windowHandle)
+        title = [UstaadNative]::DescribeWindowTitle($windowHandle)
+        processName = [UstaadNative]::DescribeProcessName($windowHandle)
     }
 }
 
 function Invoke-WindowControl([string]$operation, [string]$appName) {
     $windowHandle = [IntPtr]::Zero
     if ([string]::IsNullOrEmpty($appName) -or $appName -eq 'active' -or $appName -eq 'current') {
-        $windowHandle = [ClickaaNative]::GetForegroundWindow()
+        $windowHandle = [UstaadNative]::GetForegroundWindow()
     } else {
-        $windowHandle = [ClickaaNative]::FindWindow($appName, $true)
+        $windowHandle = [UstaadNative]::FindWindow($appName, $true)
         if ($windowHandle -eq [IntPtr]::Zero) {
-            $windowHandle = [ClickaaNative]::FindWindow($appName, $false)
+            $windowHandle = [UstaadNative]::FindWindow($appName, $false)
         }
     }
 
@@ -586,20 +586,20 @@ function Invoke-WindowControl([string]$operation, [string]$appName) {
         throw ('no open window matched ' + $appName)
     }
 
-    $matchedTitle = [ClickaaNative]::DescribeWindowTitle($windowHandle)
+    $matchedTitle = [UstaadNative]::DescribeWindowTitle($windowHandle)
     switch ($operation) {
-        'minimize' { [ClickaaNative]::ShowWindow($windowHandle, $SwMinimize) | Out-Null }
+        'minimize' { [UstaadNative]::ShowWindow($windowHandle, $SwMinimize) | Out-Null }
         'maximize' {
-            [ClickaaNative]::ShowWindow($windowHandle, $SwRestore) | Out-Null
-            [ClickaaNative]::ShowWindow($windowHandle, $SwMaximize) | Out-Null
+            [UstaadNative]::ShowWindow($windowHandle, $SwRestore) | Out-Null
+            [UstaadNative]::ShowWindow($windowHandle, $SwMaximize) | Out-Null
         }
-        'restore' { [ClickaaNative]::ShowWindow($windowHandle, $SwRestore) | Out-Null }
-        'close' { [ClickaaNative]::PostMessage($windowHandle, $WmClose, [IntPtr]::Zero, [IntPtr]::Zero) | Out-Null }
+        'restore' { [UstaadNative]::ShowWindow($windowHandle, $SwRestore) | Out-Null }
+        'close' { [UstaadNative]::PostMessage($windowHandle, $WmClose, [IntPtr]::Zero, [IntPtr]::Zero) | Out-Null }
         'focus' {
-            if ([ClickaaNative]::IsIconic($windowHandle)) {
-                [ClickaaNative]::ShowWindow($windowHandle, $SwRestore) | Out-Null
+            if ([UstaadNative]::IsIconic($windowHandle)) {
+                [UstaadNative]::ShowWindow($windowHandle, $SwRestore) | Out-Null
             }
-            [ClickaaNative]::SetForegroundWindow($windowHandle) | Out-Null
+            [UstaadNative]::SetForegroundWindow($windowHandle) | Out-Null
         }
         default { throw ('unsupported window operation: ' + $operation) }
     }
@@ -614,7 +614,7 @@ function Invoke-WallpaperCommand([string]$imagePath, [int]$style) {
     Set-ItemProperty -Path 'HKCU:\Control Panel\Desktop' -Name WallpaperStyle -Value ([string]$style)
     Set-ItemProperty -Path 'HKCU:\Control Panel\Desktop' -Name TileWallpaper -Value '0'
     $updateFlags = $spifUpdateIniFile -bor $spifSendChange
-    $didApply = [ClickaaNative]::ApplyWallpaper($imagePath, [uint32]$updateFlags)
+    $didApply = [UstaadNative]::ApplyWallpaper($imagePath, [uint32]$updateFlags)
     if (-not $didApply) {
         throw 'Windows refused the wallpaper change'
     }
@@ -636,7 +636,7 @@ function Invoke-SolidWallpaperCommand([string]$colorHex) {
     $graphics.Clear($colour)
     $graphics.Dispose()
 
-    $solidWallpaperPath = Join-Path $env:TEMP ('clickaa-wallpaper-' + $trimmedColor + '.bmp')
+    $solidWallpaperPath = Join-Path $env:TEMP ('ustaad-wallpaper-' + $trimmedColor + '.bmp')
     $bitmap.Save($solidWallpaperPath, [System.Drawing.Imaging.ImageFormat]::Bmp)
     $bitmap.Dispose()
 
@@ -661,7 +661,7 @@ function Invoke-BridgeCommand($request) {
         'ping' { return @{ version = 1; platform = [System.Environment]::OSVersion.VersionString } }
         'send_keys' { return (Send-KeyCombination ([string]$request.keys)) }
         'type_unicode' {
-            [ClickaaNative]::SendUnicodeText([string]$request.text)
+            [UstaadNative]::SendUnicodeText([string]$request.text)
             return @{ characters = ([string]$request.text).Length }
         }
         'scroll' {
@@ -669,13 +669,13 @@ function Invoke-BridgeCommand($request) {
             if ($null -ne $request.amount) { $scrollAmount = [int]$request.amount }
             $directionMultiplier = 1
             if ([string]$request.direction -eq 'up') { $directionMultiplier = -1 }
-            [ClickaaNative]::ScrollWheel(($scrollAmount * $directionMultiplier) * 1)
+            [UstaadNative]::ScrollWheel(($scrollAmount * $directionMultiplier) * 1)
             return @{ direction = [string]$request.direction; amount = $scrollAmount }
         }
         'move_mouse' {
             $pointX = [int]$request.x
             $pointY = [int]$request.y
-            [ClickaaNative]::MoveTo($pointX, $pointY) | Out-Null
+            [UstaadNative]::MoveTo($pointX, $pointY) | Out-Null
             return @{ x = $pointX; y = $pointY }
         }
         'click' {
@@ -685,18 +685,18 @@ function Invoke-BridgeCommand($request) {
             if ($null -ne $request.button) { $clickButton = [string]$request.button }
             $isDoubleClick = $false
             if ($null -ne $request.double) { $isDoubleClick = [bool]$request.double }
-            [ClickaaNative]::ClickAt($clickX, $clickY, $clickButton, $isDoubleClick)
+            [UstaadNative]::ClickAt($clickX, $clickY, $clickButton, $isDoubleClick)
             return @{ x = $clickX; y = $clickY; button = $clickButton; double = $isDoubleClick }
         }
         'cursor_position' {
-            $cursorPosition = [ClickaaNative]::ReadCursorPosition()
+            $cursorPosition = [UstaadNative]::ReadCursorPosition()
             return @{ x = $cursorPosition[0]; y = $cursorPosition[1] }
         }
         'volume' {
             $volumeOperation = [string]$request.operation
             switch ($volumeOperation) {
-                'up' { [ClickaaNative]::TapVirtualKey(0xAF); return @{ operation = 'up' } }
-                'down' { [ClickaaNative]::TapVirtualKey(0xAE); return @{ operation = 'down' } }
+                'up' { [UstaadNative]::TapVirtualKey(0xAF); return @{ operation = 'up' } }
+                'down' { [UstaadNative]::TapVirtualKey(0xAE); return @{ operation = 'down' } }
                 'mute' { return (Set-SystemMute $true) }
                 'unmute' { return (Set-SystemMute $false) }
                 'set' {
@@ -710,10 +710,10 @@ function Invoke-BridgeCommand($request) {
         'media' {
             $mediaOperation = [string]$request.operation
             switch ($mediaOperation) {
-                'play_pause' { [ClickaaNative]::TapVirtualKey(0xB3); return @{ operation = 'play_pause' } }
-                'next' { [ClickaaNative]::TapVirtualKey(0xB0); return @{ operation = 'next' } }
-                'previous' { [ClickaaNative]::TapVirtualKey(0xB1); return @{ operation = 'previous' } }
-                'stop' { [ClickaaNative]::TapVirtualKey(0xB2); return @{ operation = 'stop' } }
+                'play_pause' { [UstaadNative]::TapVirtualKey(0xB3); return @{ operation = 'play_pause' } }
+                'next' { [UstaadNative]::TapVirtualKey(0xB0); return @{ operation = 'next' } }
+                'previous' { [UstaadNative]::TapVirtualKey(0xB1); return @{ operation = 'previous' } }
+                'stop' { [UstaadNative]::TapVirtualKey(0xB2); return @{ operation = 'stop' } }
                 default { throw ('unsupported media operation: ' + $mediaOperation) }
             }
         }

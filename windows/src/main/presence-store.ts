@@ -1,5 +1,5 @@
 /**
- * The memory of what Clickaa already said.
+ * The memory of what Ustaad already said.
  *
  * Without this, a restart at 09:00 would deliver the 08:30 brief a second time.
  * The file is small on purpose: one date key per check-in kind, plus the last

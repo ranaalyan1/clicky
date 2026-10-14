@@ -2,10 +2,10 @@ import {
   abilityIds,
   AbilityId,
   AbilitySettings,
-  clickaaActionTypes,
+  ustaadActionTypes,
   ConfirmationMode,
   confirmationModes,
-  ClickaaActionType,
+  UstaadActionType,
   geminiVoiceNames,
   GeminiVoiceName,
   PersonalityPresetId,
@@ -54,7 +54,7 @@ export const defaultAbilitySettings: AbilitySettings = {
   clipboardHistory: true,
   island: true,
   // Off by default: an always-open microphone is the user's decision to make,
-  // never something Clickaa switches on for them.
+  // never something Ustaad switches on for them.
   wakeWord: false,
   // Both system-access tiers start off. Tier 1 is the ordinary one (read-only
   // diagnostics, files in the user's own folders); Tier 2 is arbitrary commands
@@ -114,7 +114,7 @@ export const responseLengthInstructions: Record<ResponseLengthId, string> = {
 };
 
 export const defaultSoulSettings: SoulSettings = {
-  assistantName: "clickaa",
+  assistantName: "ustaad",
   personalityPreset: "companion",
   customInstructions: "",
   responseLength: "balanced",
@@ -193,14 +193,14 @@ export function sanitizeConfirmationMode(storedMode: unknown): ConfirmationMode 
     : "risky";
 }
 
-export function sanitizeAutoApprovedActionTypes(storedActionTypes: unknown): ClickaaActionType[] {
+export function sanitizeAutoApprovedActionTypes(storedActionTypes: unknown): UstaadActionType[] {
   if (!Array.isArray(storedActionTypes)) {
     return [];
   }
   const knownActionTypes = storedActionTypes.filter(
-    (storedActionType): storedActionType is ClickaaActionType =>
+    (storedActionType): storedActionType is UstaadActionType =>
       typeof storedActionType === "string"
-      && (clickaaActionTypes as readonly string[]).includes(storedActionType),
+      && (ustaadActionTypes as readonly string[]).includes(storedActionType),
   );
   return [...new Set(knownActionTypes)];
 }

@@ -1,8 +1,8 @@
-import { ClickaaAction } from "../shared/contracts";
+import { UstaadAction } from "../shared/contracts";
 import { normalizeForMatch } from "./text-matching";
 
 /**
- * One successful task, remembered so Clickaa can notice repetition. Nothing here
+ * One successful task, remembered so Ustaad can notice repetition. Nothing here
  * is a saved skill: this is just "you have asked for this before".
  */
 export interface TaskHistoryEntry {
@@ -11,7 +11,7 @@ export interface TaskHistoryEntry {
   goal: string;
   /** The normalized goal used for counting repeats. */
   signature: string;
-  seedActions: ClickaaAction[];
+  seedActions: UstaadAction[];
   succeededAtIso: string;
 }
 
@@ -20,12 +20,12 @@ export interface SkillSuggestion {
   signature: string;
   goal: string;
   proposedName: string;
-  seedActions: ClickaaAction[];
+  seedActions: UstaadAction[];
   /** How many times the user has asked for this. */
   successCount: number;
 }
 
-/** How many successful runs of the same task make Clickaa offer to save it. */
+/** How many successful runs of the same task make Ustaad offer to save it. */
 export const successfulRunsBeforeSuggesting = 3;
 
 const maximumHistoryEntries = 200;
@@ -72,7 +72,7 @@ export interface SkillSuggestionContext {
 }
 
 /**
- * Decides whether Clickaa should offer to save something as a skill.
+ * Decides whether Ustaad should offer to save something as a skill.
  *
  * Rules, in order: the same task has to have succeeded enough times, it must not
  * already be a skill, and a "no thanks" has to be respected for a while rather

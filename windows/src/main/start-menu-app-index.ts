@@ -2,7 +2,7 @@ import { readdirSync, statSync } from "node:fs";
 import { join } from "node:path";
 import { LaunchableAppView } from "../shared/contracts";
 import { deduplicateLaunchableApps, LaunchableApp, rankAppMatches } from "./app-name-matching";
-import { ClickaaWindowsBridge } from "./windows-bridge";
+import { UstaadWindowsBridge } from "./windows-bridge";
 
 /** Names Windows hides in the Start Menu that are never what someone means. */
 const ignoredShortcutFragments = [
@@ -42,7 +42,7 @@ const quickLaunchAppNames = [
 ];
 
 /**
- * Everything Clickaa can launch: Start Menu shortcuts plus Windows Store apps.
+ * Everything Ustaad can launch: Start Menu shortcuts plus Windows Store apps.
  * The index is built once at start-up and refreshed when the user asks for it.
  */
 export class StartMenuAppIndex {
@@ -50,7 +50,7 @@ export class StartMenuAppIndex {
   private storeAppRecordsAppIdByName = new Map<string, string>();
   private hasLoaded = false;
 
-  constructor(private readonly bridge: ClickaaWindowsBridge) {}
+  constructor(private readonly bridge: UstaadWindowsBridge) {}
 
   list(): LaunchableApp[] {
     return [...this.launchableApps];
@@ -171,7 +171,7 @@ export class StartMenuAppIndex {
       }
       return discoveredApps;
     } catch (error) {
-      console.warn("Clickaa could not read the Windows Store app list:", error);
+      console.warn("Ustaad could not read the Windows Store app list:", error);
       return [];
     }
   }

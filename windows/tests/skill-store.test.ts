@@ -13,7 +13,7 @@ import {
 } from "../src/main/skill-suggestions";
 
 function createSkillStore(): SkillStore {
-  return new SkillStore(join(mkdtempSync(join(tmpdir(), "clickaa-skill-")), "skills.json"));
+  return new SkillStore(join(mkdtempSync(join(tmpdir(), "ustaad-skill-")), "skills.json"));
 }
 
 function historyEntry(goal: string, succeededAtIso = new Date().toISOString()): TaskHistoryEntry {
@@ -74,7 +74,7 @@ test("running a skill counts, so the list can lead with what gets used", () => {
 });
 
 test("skills persist across a restart", () => {
-  const skillPath = join(mkdtempSync(join(tmpdir(), "clickaa-skill-")), "skills.json");
+  const skillPath = join(mkdtempSync(join(tmpdir(), "ustaad-skill-")), "skills.json");
   const firstStore = new SkillStore(skillPath);
   firstStore.save({
     name: "my videos",
@@ -127,7 +127,7 @@ test("a task that is already a skill is never offered again", () => {
   assert.equal(suggestSkill({ history, savedSignatures: new Set([taskSignature("play a video on youtube")]) }), null);
 });
 
-test("a no thanks is respected for a while, then clickaa may ask once more", () => {
+test("a no thanks is respected for a while, then ustaad may ask once more", () => {
   const threeRuns = [
     historyEntry("play a video on youtube"),
     historyEntry("play a video on youtube"),

@@ -92,8 +92,8 @@ export class MicrophoneCapture {
           copiedSamples,
           audioProcessEvent.inputBuffer.sampleRate,
         );
-        window.clickaa.sendAudioChunk(interactionId, pcm16Bytes);
-        window.clickaa.sendAudioPowerLevel(
+        window.ustaad.sendAudioChunk(interactionId, pcm16Bytes);
+        window.ustaad.sendAudioPowerLevel(
           interactionId,
           calculateAudioPowerLevel(copiedSamples),
         );
@@ -120,11 +120,11 @@ export class MicrophoneCapture {
       this.sourceNode = sourceNode;
       this.processorNode = processorNode;
       this.silentOutputNode = silentOutputNode;
-      window.clickaa.sendAudioCaptureStarted(interactionId);
+      window.ustaad.sendAudioCaptureStarted(interactionId);
     } catch (error) {
       if (this.activeInteractionId === interactionId) {
         this.activeInteractionId = null;
-        window.clickaa.sendAudioCaptureError(
+        window.ustaad.sendAudioCaptureError(
           interactionId,
           error instanceof Error ? error.message : String(error),
         );

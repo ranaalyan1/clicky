@@ -18,9 +18,9 @@ const azureSigningVariableNames = [
 
 const completeAzureConfiguration: Record<(typeof azureSigningVariableNames)[number], string> = {
   AZURE_CODE_SIGNING_ENDPOINT: "https://eus.codesigning.azure.net/",
-  AZURE_CODE_SIGNING_ACCOUNT_NAME: "ClickaaSigningAccount",
-  AZURE_CODE_SIGNING_CERTIFICATE_PROFILE_NAME: "ClickaaCertificate",
-  AZURE_CODE_SIGNING_PUBLISHER_NAME: "Clickaa contributors",
+  AZURE_CODE_SIGNING_ACCOUNT_NAME: "UstaadSigningAccount",
+  AZURE_CODE_SIGNING_CERTIFICATE_PROFILE_NAME: "UstaadCertificate",
+  AZURE_CODE_SIGNING_PUBLISHER_NAME: "Ustaad contributors",
 };
 
 interface SigningConfig {
@@ -64,8 +64,8 @@ describe("electron-builder signing configuration", () => {
   it("keeps the ordinary packaging settings from package.json", () => {
     const signingConfig = loadSigningConfigWith({});
 
-    assert.equal(signingConfig.productName, "Clickaa");
-    assert.equal(signingConfig.nsis.shortcutName, "Clickaa");
+    assert.equal(signingConfig.productName, "Ustaad");
+    assert.equal(signingConfig.nsis.shortcutName, "Ustaad");
     // The .node extension matters: uiohook-napi's native module is otherwise
     // left unsigned, and a signed app that loads it is refused on its own terms.
     assert.deepEqual(signingConfig.win.signExts, [".node"]);

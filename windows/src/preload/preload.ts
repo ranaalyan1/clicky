@@ -2,8 +2,8 @@ import { contextBridge, ipcRenderer } from "electron";
 import {
   AudioPlaybackPayload,
   BrainConnectionTestResult,
-  ClickaaPublicState,
-  ClickaaUserConfig,
+  UstaadPublicState,
+  UstaadUserConfig,
   FallbackSpeechPayload,
   IslandPresentation,
   IslandState,
@@ -31,19 +31,19 @@ function subscribeToSignal(channel: string, listener: () => void): () => void {
  * cursor overlay, and the region selector. Each renderer only gets a view it
  * needs, and the main process re-checks the sender of every message.
  */
-contextBridge.exposeInMainWorld("clickaa", {
+contextBridge.exposeInMainWorld("ustaad", {
   /* Panel: state and settings -------------------------------------------- */
-  getState: (): Promise<ClickaaPublicState> => ipcRenderer.invoke("clickaa:get-state"),
-  updateSettings: (settingsUpdates: Partial<ClickaaUserConfig>): Promise<ClickaaPublicState> => {
-    return ipcRenderer.invoke("clickaa:update-settings", settingsUpdates);
+  getState: (): Promise<UstaadPublicState> => ipcRenderer.invoke("ustaad:get-state"),
+  updateSettings: (settingsUpdates: Partial<UstaadUserConfig>): Promise<UstaadPublicState> => {
+    return ipcRenderer.invoke("ustaad:update-settings", settingsUpdates);
   },
-  testBrain: (settingsUpdates: Partial<ClickaaUserConfig>): Promise<BrainConnectionTestResult> => {
-    return ipcRenderer.invoke("clickaa:test-brain", settingsUpdates);
+  testBrain: (settingsUpdates: Partial<UstaadUserConfig>): Promise<BrainConnectionTestResult> => {
+    return ipcRenderer.invoke("ustaad:test-brain", settingsUpdates);
   },
-  refreshAppIndex: (): Promise<number> => ipcRenderer.invoke("clickaa:refresh-app-index"),
-  hidePanel: (): void => ipcRenderer.send("clickaa:panel-hide"),
-  openSetupVideo: (): void => ipcRenderer.send("clickaa:open-setup-video"),
-  onState: (listener: (state: ClickaaPublicState) => void): (() => void) => subscribe("clickaa:state", listener),
+  refreshAppIndex: (): Promise<number> => ipcRenderer.invoke("ustaad:refresh-app-index"),
+  hidePanel: (): void => ipcRenderer.send("ustaad:panel-hide"),
+  openSetupVideo: (): void => ipcRenderer.send("ustaad:open-setup-video"),
+  onState: (listener: (state: UstaadPublicState) => void): (() => void) => subscribe("ustaad:state", listener),
   onOpenPanelPage: (listener: (page: string) => void): (() => void) => subscribe("panel:open-page", listener),
 
   /* Panel: push-to-talk and audio --------------------------------------- */
@@ -96,7 +96,7 @@ contextBridge.exposeInMainWorld("clickaa", {
     ipcRenderer.send("overlay:point-complete", interactionId);
   },
   onOverlayState: (
-    listener: (payload: Pick<ClickaaPublicState, "voiceState" | "audioPowerLevel">) => void,
+    listener: (payload: Pick<UstaadPublicState, "voiceState" | "audioPowerLevel">) => void,
   ): (() => void) => subscribe("overlay:state", listener),
   onOverlayCursor: (listener: (payload: OverlayCursorPayload) => void): (() => void) => {
     return subscribe("overlay:cursor", listener);

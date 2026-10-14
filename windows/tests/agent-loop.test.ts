@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { ClickaaAction, NowPlayingInfo } from "../src/shared/contracts";
+import { UstaadAction, NowPlayingInfo } from "../src/shared/contracts";
 import {
   actionChangesScreen,
   AgentLoopBudget,
@@ -8,7 +8,7 @@ import {
   AgentLoopDependencies,
   AgentLoopLookResult,
   AgentLoopProgressEvent,
-  ClickaaAgentLoop,
+  UstaadAgentLoop,
   isPlaybackGoal,
   parseAgentLookResponse,
 } from "../src/main/agent-loop";
@@ -23,7 +23,7 @@ const testBudget: AgentLoopBudget = {
 interface FakeLoopHarness {
   dependencies: AgentLoopDependencies;
   /** Every action list the loop actually ran, in order. */
-  executedSteps: ClickaaAction[][];
+  executedSteps: UstaadAction[][];
   progressEvents: AgentLoopProgressEvent[];
   lookCalls: number;
 }
@@ -71,8 +71,8 @@ function createFakeDependencies(options: {
   return harness;
 }
 
-const openYouTube: ClickaaAction[] = [{ type: "open_url", url: "https://youtube.com" }];
-const clickFirstVideo: ClickaaAction[] = [
+const openYouTube: UstaadAction[] = [{ type: "open_url", url: "https://youtube.com" }];
+const clickFirstVideo: UstaadAction[] = [
   { type: "click_at", x: 420, y: 310, label: "the first video", screenNumber: null },
 ];
 
@@ -80,7 +80,7 @@ test("a task that works first time stops after one look", async () => {
   const harness = createFakeDependencies({
     lookResults: [{ kind: "done", note: "the video is playing" }],
   });
-  const loop = new ClickaaAgentLoop(harness.dependencies, testBudget);
+  const loop = new UstaadAgentLoop(harness.dependencies, testBudget);
 
   const result = await loop.run("go to youtube and play a video", openYouTube);
 
@@ -98,7 +98,7 @@ test("a step that was not enough is corrected with the next actions", async () =
       { kind: "done", note: "the video is playing" },
     ],
   });
-  const loop = new ClickaaAgentLoop(harness.dependencies, testBudget);
+  const loop = new UstaadAgentLoop(harness.dependencies, testBudget);
 
   const result = await loop.run("go to youtube and play anything", openYouTube);
 
@@ -118,7 +118,7 @@ test("a playback goal is settled by windows itself, without spending a look", as
       isPlaying: true,
     },
   });
-  const loop = new ClickaaAgentLoop(harness.dependencies, testBudget);
+  const loop = new UstaadAgentLoop(harness.dependencies, testBudget);
 
   const result = await loop.run("play something on youtube", openYouTube);
 
@@ -148,7 +148,7 @@ test("the loop keeps clicking while nothing is playing, then stops on the track"
       isPlaying: true,
     }],
   });
-  const loop = new ClickaaAgentLoop(harness.dependencies, testBudget);
+  const loop = new UstaadAgentLoop(harness.dependencies, testBudget);
 
   const result = await loop.run("go and play a song", openYouTube);
 
@@ -167,7 +167,7 @@ test("the step budget ends the task instead of letting it run forever", async ()
       { kind: "continue", actions: [{ type: "scroll", direction: "down", amount: 3 }], note: "not yet" },
     ],
   });
-  const loop = new ClickaaAgentLoop(harness.dependencies, { ...testBudget, maximumSteps: 3 });
+  const loop = new UstaadAgentLoop(harness.dependencies, { ...testBudget, maximumSteps: 3 });
 
   const result = await loop.run("find that email", openYouTube);
 
@@ -184,7 +184,7 @@ test("repeating the same step is capped, then handed back to the user", async ()
       { kind: "continue", actions: clickFirstVideo, note: "click it again" },
     ],
   });
-  const loop = new ClickaaAgentLoop(harness.dependencies, { ...testBudget, maximumReplansPerStep: 1 });
+  const loop = new UstaadAgentLoop(harness.dependencies, { ...testBudget, maximumReplansPerStep: 1 });
 
   // The initial step is an open, the look asks for a click, and then the model
   // asks for the identical click over and over.
@@ -199,7 +199,7 @@ test("a give-up from the model stops the task with its explanation", async () =>
   const harness = createFakeDependencies({
     lookResults: [{ kind: "give_up", note: "that page needs a login I do not have" }],
   });
-  const loop = new ClickaaAgentLoop(harness.dependencies, testBudget);
+  const loop = new UstaadAgentLoop(harness.dependencies, testBudget);
 
   const result = await loop.run("check my orders", openYouTube);
 
@@ -212,7 +212,7 @@ test("blind mode refuses to keep clicking when the screen cannot be seen", async
   const harness = createFakeDependencies({
     lookResults: [{ kind: "unavailable", note: "screen vision is switched off" }],
   });
-  const loop = new ClickaaAgentLoop(harness.dependencies, testBudget);
+  const loop = new UstaadAgentLoop(harness.dependencies, testBudget);
 
   const result = await loop.run("book a table", openYouTube);
 
@@ -225,7 +225,7 @@ test("a step that cannot change the screen finishes without a look", async () =>
   const harness = createFakeDependencies({
     lookResults: [{ kind: "done", note: "should never be consulted" }],
   });
-  const loop = new ClickaaAgentLoop(harness.dependencies, testBudget);
+  const loop = new UstaadAgentLoop(harness.dependencies, testBudget);
 
   const result = await loop.run(
     "set a timer for 10 minutes",
@@ -242,7 +242,7 @@ test("a failing step ends the task with the reason instead of retrying forever",
     lookResults: [],
     runActionsError: "the Windows helper is not running",
   });
-  const loop = new ClickaaAgentLoop(harness.dependencies, testBudget);
+  const loop = new UstaadAgentLoop(harness.dependencies, testBudget);
 
   const result = await loop.run("open spotify", [{ type: "open_app", name: "Spotify" }]);
 
@@ -255,7 +255,7 @@ test("progress is reported for every step so the user can watch it work", async 
   const harness = createFakeDependencies({
     lookResults: [{ kind: "done", note: "done" }],
   });
-  const loop = new ClickaaAgentLoop(harness.dependencies, testBudget);
+  const loop = new UstaadAgentLoop(harness.dependencies, testBudget);
 
   await loop.run("go to youtube", openYouTube);
 
@@ -289,7 +289,7 @@ test("a second task on the same loop does not inherit the first one's strikes", 
       { kind: "done", note: "got it" },
     ],
   });
-  const loop = new ClickaaAgentLoop(harness.dependencies, { ...testBudget, maximumReplansPerStep: 0 });
+  const loop = new UstaadAgentLoop(harness.dependencies, { ...testBudget, maximumReplansPerStep: 0 });
 
   const firstResult = await loop.run("find that video", openYouTube);
   assert.equal(firstResult.outcome, "gave_up");
@@ -308,7 +308,7 @@ test("cancelling stops the task before the next step starts", async () => {
     ],
     stopAfterSteps: 1,
   });
-  const loop = new ClickaaAgentLoop(harness.dependencies, testBudget);
+  const loop = new UstaadAgentLoop(harness.dependencies, testBudget);
 
   const result = await loop.run("book a table", openYouTube);
 

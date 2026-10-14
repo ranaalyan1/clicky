@@ -25,7 +25,7 @@ test("every ability is enabled by default and unknown stored values are ignored"
 });
 
 test("soul settings keep the companion defaults and reject nonsense", () => {
-  assert.equal(defaultSoulSettings.assistantName, "clickaa");
+  assert.equal(defaultSoulSettings.assistantName, "ustaad");
   assert.equal(defaultSoulSettings.personalityPreset, "companion");
   assert.equal(defaultSoulSettings.speechProvider, "auto");
   assert.equal(personalityPresets.some((personalityPreset) => personalityPreset.id === "focused"), true);

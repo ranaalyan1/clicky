@@ -1,4 +1,4 @@
-import { createClickaaIcon, setIconButton, updateIconButton } from "./icons.js";
+import { createUstaadIcon, setIconButton, updateIconButton } from "./icons.js";
 import type {
   ActivityFeedEntry,
   IslandToggleKey,
@@ -79,14 +79,14 @@ function renderNotch(islandState: IslandState): void {
   const collapsedLabels: Record<IslandState["status"]["voiceState"], string> = {
     idle: islandState.pendingConfirmations.length
       ? "waiting for your yes"
-      : statusSummary.detail || "clickaa",
+      : statusSummary.detail || "ustaad",
     listening: statusSummary.interactionKind === "dictation" ? "listening for dictation" : "listening…",
     processing: statusSummary.dictationStage === "cleaning"
       ? "cleaning up your words"
       : statusSummary.interactionKind === "circle"
         ? "looking at your circle"
         : "thinking…",
-    responding: statusSummary.label || "clickaa",
+    responding: statusSummary.label || "ustaad",
   };
   element.notchLabel.textContent = collapsedLabels[statusSummary.voiceState];
   element.notchTrack.textContent = islandState.nowPlaying?.isPlaying
@@ -105,7 +105,7 @@ function renderNotch(islandState: IslandState): void {
   element.notchBadge.classList.toggle("alert", pendingConfirmationCount > 0);
 
   element.headerStatus.textContent = islandState.status.label || "ready";
-  element.brainSummary.textContent = `thinking with ${islandState.brainLabel}. these settings live in the clickaa panel.`;
+  element.brainSummary.textContent = `thinking with ${islandState.brainLabel}. these settings live in the ustaad panel.`;
 }
 
 /* -------------------------------------------------------------------------- */
@@ -163,7 +163,7 @@ function renderConfirmations(islandState: IslandState): void {
     approveButton.className = "confirmation-button approve";
     approveButton.textContent = "yes, do it";
     approveButton.addEventListener("click", () => {
-      void window.clickaa.resolveConfirmation(pendingConfirmation.id, "approve");
+      void window.ustaad.resolveConfirmation(pendingConfirmation.id, "approve");
     });
 
     const rejectButton = document.createElement("button");
@@ -171,7 +171,7 @@ function renderConfirmations(islandState: IslandState): void {
     rejectButton.className = "confirmation-button";
     rejectButton.textContent = "no";
     rejectButton.addEventListener("click", () => {
-      void window.clickaa.resolveConfirmation(pendingConfirmation.id, "reject");
+      void window.ustaad.resolveConfirmation(pendingConfirmation.id, "reject");
     });
 
     buttonRow.append(approveButton, rejectButton);
@@ -207,7 +207,7 @@ function renderSkillSuggestion(islandState: IslandState): void {
   saveButton.className = "confirmation-button approve";
   saveButton.textContent = "save it";
   saveButton.addEventListener("click", () => {
-    void window.clickaa.saveSkillSuggestion();
+    void window.ustaad.saveSkillSuggestion();
   });
 
   const dismissButton = document.createElement("button");
@@ -215,7 +215,7 @@ function renderSkillSuggestion(islandState: IslandState): void {
   dismissButton.className = "confirmation-button";
   dismissButton.textContent = "no thanks";
   dismissButton.addEventListener("click", () => {
-    void window.clickaa.dismissSkillSuggestion();
+    void window.ustaad.dismissSkillSuggestion();
   });
 
   buttonRow.append(saveButton, dismissButton);
@@ -244,13 +244,13 @@ function renderActivityFeed(activityEntries: ActivityFeedEntry[]): void {
       undoButton.type = "button";
       undoButton.className = "undo-chip with-icon";
       undoButton.append(
-        createClickaaIcon(activityEntry.isUndone ? "check" : "undo", 12),
+        createUstaadIcon(activityEntry.isUndone ? "check" : "undo", 12),
         document.createTextNode(activityEntry.isUndone ? "undone" : "undo"),
       );
       undoButton.disabled = activityEntry.isUndone;
       undoButton.addEventListener("click", () => {
         undoButton.disabled = true;
-        void window.clickaa.undoActivity(activityEntry.id);
+        void window.ustaad.undoActivity(activityEntry.id);
       });
       row.append(undoButton);
     }
@@ -305,7 +305,7 @@ function formatTimerRemaining(remainingSeconds: number): string {
 }
 
 /**
- * The microphone light. It only appears when Clickaa is actually listening for
+ * The microphone light. It only appears when Ustaad is actually listening for
  * its name, and it is muted-coloured when the tray switch has silenced it, so
  * the answer to "is it listening to me?" is never a guess.
  */
@@ -320,7 +320,7 @@ function renderWakeIndicator(islandState: IslandState): void {
   const stateLabels: Record<IslandState["wakeWordState"], string> = {
     off: "wake word off",
     starting: "wake word starting",
-    listening: "listening for clickaa",
+    listening: "listening for ustaad",
     unavailable: "wake word unavailable",
     error: "wake word stopped",
   };
@@ -379,10 +379,10 @@ function renderPlans(islandState: IslandState): void {
 
   element.memoryList.replaceChildren(...(islandState.memoryFacts.length
     ? islandState.memoryFacts.map(buildMemoryRow)
-    : [createEmptyRow("say \"remember my wifi password is …\" and clickaa keeps it.")]));
+    : [createEmptyRow("say \"remember my wifi password is …\" and ustaad keeps it.")]));
 
   // The whole point of presence is that it is visible before it happens: the
-  // chip says when Clickaa will speak up next without the user asking.
+  // chip says when Ustaad will speak up next without the user asking.
   element.presenceNote.textContent = islandState.presence.nextCheckInLabel ?? "";
   element.presenceNote.hidden = !islandState.presence.nextCheckInLabel;
 }
@@ -397,7 +397,7 @@ function buildTodoRow(todoItem: TodoItem): HTMLElement {
   checkButton.classList.toggle("checked", todoItem.isDone);
   checkButton.title = todoItem.isDone ? "mark as not done" : "mark as done";
   checkButton.addEventListener("click", () => {
-    window.clickaa.toggleTodo(todoItem.id, !todoItem.isDone);
+    window.ustaad.toggleTodo(todoItem.id, !todoItem.isDone);
   });
 
   copy.append(createTitle(todoItem.text));
@@ -409,7 +409,7 @@ function buildTodoRow(todoItem: TodoItem): HTMLElement {
   removeButton.type = "button";
   removeButton.className = "row-icon-button";
   setIconButton(removeButton, "close", "Remove this to-do", 12);
-  removeButton.addEventListener("click", () => window.clickaa.removeTodo(todoItem.id));
+  removeButton.addEventListener("click", () => window.ustaad.removeTodo(todoItem.id));
 
   row.prepend(checkButton);
   row.append(removeButton);
@@ -434,14 +434,14 @@ function buildScheduledTaskRow(scheduledTask: ScheduledTask): HTMLElement {
   toggleButton.className = "undo-chip";
   toggleButton.textContent = scheduledTask.isEnabled ? "pause" : "resume";
   toggleButton.addEventListener("click", () => {
-    window.clickaa.toggleSchedule(scheduledTask.id, !scheduledTask.isEnabled);
+    window.ustaad.toggleSchedule(scheduledTask.id, !scheduledTask.isEnabled);
   });
 
   const removeButton = document.createElement("button");
   removeButton.type = "button";
   removeButton.className = "row-icon-button";
   setIconButton(removeButton, "close", "Remove this reminder", 12);
-  removeButton.addEventListener("click", () => window.clickaa.removeSchedule(scheduledTask.id));
+  removeButton.addEventListener("click", () => window.ustaad.removeSchedule(scheduledTask.id));
 
   row.append(toggleButton, removeButton);
   return row;
@@ -455,7 +455,7 @@ function buildMemoryRow(memoryFact: MemoryFact): HTMLElement {
   removeButton.type = "button";
   removeButton.className = "row-icon-button";
   setIconButton(removeButton, "close", "Forget this", 12);
-  removeButton.addEventListener("click", () => window.clickaa.removeMemory(memoryFact.id));
+  removeButton.addEventListener("click", () => window.ustaad.removeMemory(memoryFact.id));
 
   row.append(removeButton);
   return row;
@@ -470,16 +470,16 @@ function renderClips(clipboardClips: ClipboardClip[]): void {
       const copyButton = document.createElement("button");
       copyButton.type = "button";
       copyButton.className = "undo-chip with-icon";
-      copyButton.append(createClickaaIcon("copy", 12), document.createTextNode("copy"));
+      copyButton.append(createUstaadIcon("copy", 12), document.createTextNode("copy"));
       copyButton.addEventListener("click", () => {
         copyButton.replaceChildren(
-          createClickaaIcon("check", 12),
+          createUstaadIcon("check", 12),
           document.createTextNode("copied"),
         );
-        void window.clickaa.copyClip(clipboardClip.id).then((didCopy) => {
+        void window.ustaad.copyClip(clipboardClip.id).then((didCopy) => {
           window.setTimeout(() => {
             copyButton.replaceChildren(
-              createClickaaIcon("copy", 12),
+              createUstaadIcon("copy", 12),
               document.createTextNode(didCopy ? "copy" : "gone"),
             );
           }, 1_200);
@@ -502,7 +502,7 @@ function renderApps(quickLaunchApps: LaunchableAppView[]): void {
       tile.title = `open ${launchableApp.name}`;
       tile.addEventListener("click", () => {
         tile.textContent = "opening…";
-        void window.clickaa.launchApp(launchableApp.name).finally(() => {
+        void window.ustaad.launchApp(launchableApp.name).finally(() => {
           window.setTimeout(() => {
             tile.textContent = launchableApp.name;
           }, 1_200);
@@ -510,7 +510,7 @@ function renderApps(quickLaunchApps: LaunchableAppView[]): void {
       });
       return tile;
     })
-    : [createEmptyRow("ask clickaa to scan your start menu in the panel's setup tab.")]));
+    : [createEmptyRow("ask ustaad to scan your start menu in the panel's setup tab.")]));
 }
 
 function renderWallpaperSwatches(): void {
@@ -524,7 +524,7 @@ function renderWallpaperSwatches(): void {
     swatch.className = "wallpaper-swatch";
     swatch.style.background = wallpaperColor;
     swatch.title = `set a ${wallpaperColor} wallpaper`;
-    swatch.addEventListener("click", () => window.clickaa.setWallpaperSolidColor(wallpaperColor));
+    swatch.addEventListener("click", () => window.ustaad.setWallpaperSolidColor(wallpaperColor));
     return swatch;
   }));
 }
@@ -570,7 +570,7 @@ function renderControlToggles(islandState: IslandState): void {
     {
       key: "paused",
       label: "pause actions",
-      detail: "clickaa only describes what it would do",
+      detail: "ustaad only describes what it would do",
       isOn: islandState.automationPaused,
     },
   ];
@@ -593,7 +593,7 @@ function renderControlToggles(islandState: IslandState): void {
     input.checked = toggleDefinition.isOn;
     input.dataset.islandToggle = toggleDefinition.key;
     input.addEventListener("change", () => {
-      window.clickaa.setIslandToggle(toggleDefinition.key, input.checked);
+      window.ustaad.setIslandToggle(toggleDefinition.key, input.checked);
     });
     const track = document.createElement("i");
     control.append(input, track);
@@ -639,17 +639,17 @@ element.body.addEventListener("click", (mouseEvent) => {
     return;
   }
   if (currentPresentation === "open") {
-    window.clickaa.setIslandExpanded(false);
+    window.ustaad.setIslandExpanded(false);
     return;
   }
-  window.clickaa.setIslandExpanded(true);
+  window.ustaad.setIslandExpanded(true);
 });
 
-element.closeButton.addEventListener("click", () => window.clickaa.closeIsland());
+element.closeButton.addEventListener("click", () => window.ustaad.closeIsland());
 
 document.addEventListener("keydown", (keyboardEvent) => {
   if (keyboardEvent.key === "Escape") {
-    window.clickaa.closeIsland();
+    window.ustaad.closeIsland();
   }
 });
 
@@ -669,15 +669,15 @@ for (const mediaButton of document.querySelectorAll<HTMLButtonElement>("[data-me
   mediaButton.addEventListener("click", () => {
     const mediaOperation = mediaButton.dataset.media;
     if (mediaOperation === "play_pause" || mediaOperation === "next" || mediaOperation === "previous") {
-      void window.clickaa.mediaControl(mediaOperation);
+      void window.ustaad.mediaControl(mediaOperation);
     }
   });
 }
 
-requireElement<HTMLButtonElement>("open-panel-button").addEventListener("click", () => window.clickaa.openPanel("home"));
-requireElement<HTMLButtonElement>("open-soul-button").addEventListener("click", () => window.clickaa.openPanel("soul"));
-requireElement<HTMLButtonElement>("open-setup-button").addEventListener("click", () => window.clickaa.openPanel("setup"));
-requireElement<HTMLButtonElement>("clear-clips-button").addEventListener("click", () => window.clickaa.clearClips());
+requireElement<HTMLButtonElement>("open-panel-button").addEventListener("click", () => window.ustaad.openPanel("home"));
+requireElement<HTMLButtonElement>("open-soul-button").addEventListener("click", () => window.ustaad.openPanel("soul"));
+requireElement<HTMLButtonElement>("open-setup-button").addEventListener("click", () => window.ustaad.openPanel("setup"));
+requireElement<HTMLButtonElement>("clear-clips-button").addEventListener("click", () => window.ustaad.clearClips());
 
 /**
  * The island is click-through until the pointer is actually over it, so the
@@ -685,22 +685,22 @@ requireElement<HTMLButtonElement>("clear-clips-button").addEventListener("click"
  */
 document.addEventListener("mouseenter", () => {
   isPointerOverIsland = true;
-  window.clickaa.setIslandPointerOver(true);
+  window.ustaad.setIslandPointerOver(true);
 });
 document.addEventListener("mouseleave", () => {
   isPointerOverIsland = false;
-  window.clickaa.setIslandPointerOver(false);
+  window.ustaad.setIslandPointerOver(false);
 });
 document.addEventListener("mousemove", () => {
   if (!isPointerOverIsland) {
     isPointerOverIsland = true;
-    window.clickaa.setIslandPointerOver(true);
+    window.ustaad.setIslandPointerOver(true);
   }
 });
 document.addEventListener("mouseout", (mouseEvent) => {
   if (!mouseEvent.relatedTarget && isPointerOverIsland) {
     isPointerOverIsland = false;
-    window.clickaa.setIslandPointerOver(false);
+    window.ustaad.setIslandPointerOver(false);
   }
 });
 document.addEventListener("contextmenu", (contextMenuEvent) => contextMenuEvent.preventDefault());
@@ -708,13 +708,13 @@ document.addEventListener("wheel", (wheelEvent) => {
   // Scrolling over the island means the user wants it open.
   if (!latestIslandState?.isExpanded && wheelEvent.deltaY !== 0) {
     wheelEvent.preventDefault();
-    window.clickaa.setIslandExpanded(true);
+    window.ustaad.setIslandExpanded(true);
   }
 }, { passive: false });
 
-setIconButton(element.closeButton, "close", "Close Clickaa", 13);
+setIconButton(element.closeButton, "close", "Close Ustaad", 13);
 
-window.clickaa.onIslandPresentation(({ presentation }) => {
+window.ustaad.onIslandPresentation(({ presentation }) => {
   currentPresentation = presentation;
   element.body.dataset.presentation = presentation;
   if (latestIslandState) {
@@ -723,12 +723,12 @@ window.clickaa.onIslandPresentation(({ presentation }) => {
   }
 });
 
-window.clickaa.onIslandState(renderIsland);
-window.clickaa.onIslandExpanded(({ isExpanded }) => {
+window.ustaad.onIslandState(renderIsland);
+window.ustaad.onIslandExpanded(({ isExpanded }) => {
   element.body.dataset.expanded = String(isExpanded);
   if (latestIslandState) {
     latestIslandState.isExpanded = isExpanded;
   }
 });
 
-void window.clickaa.getIslandState().then(renderIsland);
+void window.ustaad.getIslandState().then(renderIsland);

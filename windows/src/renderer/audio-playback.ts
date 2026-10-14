@@ -16,20 +16,20 @@ export class CompanionAudioPlayback {
 
     audioElement.addEventListener("playing", () => {
       if (this.activeInteractionId === payload.interactionId) {
-        window.clickaa.sendAudioPlaybackStarted(payload.interactionId);
+        window.ustaad.sendAudioPlaybackStarted(payload.interactionId);
       }
     }, { once: true });
     audioElement.addEventListener("ended", () => {
       if (this.activeInteractionId === payload.interactionId) {
         this.clearActivePlayback();
-        window.clickaa.sendAudioPlaybackEnded(payload.interactionId);
+        window.ustaad.sendAudioPlaybackEnded(payload.interactionId);
       }
     }, { once: true });
     audioElement.addEventListener("error", () => {
       if (this.activeInteractionId === payload.interactionId) {
         const mediaErrorMessage = audioElement.error?.message || "Windows could not decode the speech audio.";
         this.clearActivePlayback();
-        window.clickaa.sendAudioPlaybackError(payload.interactionId, mediaErrorMessage);
+        window.ustaad.sendAudioPlaybackError(payload.interactionId, mediaErrorMessage);
       }
     }, { once: true });
 
@@ -38,7 +38,7 @@ export class CompanionAudioPlayback {
     } catch (error) {
       if (this.activeInteractionId === payload.interactionId) {
         this.clearActivePlayback();
-        window.clickaa.sendAudioPlaybackError(
+        window.ustaad.sendAudioPlaybackError(
           payload.interactionId,
           error instanceof Error ? error.message : String(error),
         );
@@ -57,19 +57,19 @@ export class CompanionAudioPlayback {
 
     speechUtterance.onstart = () => {
       if (this.activeInteractionId === payload.interactionId) {
-        window.clickaa.sendAudioPlaybackStarted(payload.interactionId);
+        window.ustaad.sendAudioPlaybackStarted(payload.interactionId);
       }
     };
     speechUtterance.onend = () => {
       if (this.activeInteractionId === payload.interactionId) {
         this.clearActivePlayback();
-        window.clickaa.sendAudioPlaybackEnded(payload.interactionId);
+        window.ustaad.sendAudioPlaybackEnded(payload.interactionId);
       }
     };
     speechUtterance.onerror = (speechErrorEvent) => {
       if (this.activeInteractionId === payload.interactionId) {
         this.clearActivePlayback();
-        window.clickaa.sendAudioPlaybackError(payload.interactionId, speechErrorEvent.error);
+        window.ustaad.sendAudioPlaybackError(payload.interactionId, speechErrorEvent.error);
       }
     };
 

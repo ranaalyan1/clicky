@@ -6,7 +6,7 @@ import test from "node:test";
 import { TodoStore } from "../src/main/todo-store";
 
 function createTodoStore(): TodoStore {
-  return new TodoStore(join(mkdtempSync(join(tmpdir(), "clickaa-todo-")), "todos.json"));
+  return new TodoStore(join(mkdtempSync(join(tmpdir(), "ustaad-todo-")), "todos.json"));
 }
 
 test("todos can be added, completed, reopened and removed", () => {
@@ -32,7 +32,7 @@ test("todos can be added, completed, reopened and removed", () => {
 test("matching items are found by fuzzy words and removal reports what it removed", () => {
   const todoStore = createTodoStore();
   todoStore.add("buy oat milk", null);
-  todoStore.add("ship the clickaa installer", null);
+  todoStore.add("ship the ustaad installer", null);
 
   const matchedItems = todoStore.completeMatching("oat milk");
   assert.equal(matchedItems.length, 1);
@@ -47,7 +47,7 @@ test("matching items are found by fuzzy words and removal reports what it remove
 });
 
 test("open items are summarized with counts and the store survives a reload", () => {
-  const todoFilePath = join(mkdtempSync(join(tmpdir(), "clickaa-todo-")), "todos.json");
+  const todoFilePath = join(mkdtempSync(join(tmpdir(), "ustaad-todo-")), "todos.json");
   const firstStore = new TodoStore(todoFilePath);
   const addedTodo = firstStore.add("water the plants", null);
   firstStore.add("pay the internet bill", null);

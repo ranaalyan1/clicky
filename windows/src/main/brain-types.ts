@@ -1,4 +1,4 @@
-/** Provider-neutral shapes both Clickaa brains (Gemini and Claude) share. */
+/** Provider-neutral shapes both Ustaad brains (Gemini and Claude) share. */
 
 export interface BrainImage {
   mediaType: string;

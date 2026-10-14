@@ -1,6 +1,6 @@
 /**
  * Dictation cleanup: the user talks badly on purpose ("uh, meet at nine, no
- * ten") and Clickaa types the sentence they meant.
+ * ten") and Ustaad types the sentence they meant.
  */
 
 export const dictationCleanupSystemPrompt = `you clean up dictated speech. the user talked into a microphone and the words landed in a text box.

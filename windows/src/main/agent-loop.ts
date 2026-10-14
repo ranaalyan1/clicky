@@ -1,9 +1,9 @@
-import { ClickaaAction, NowPlayingInfo } from "../shared/contracts";
-import { parseClickaaActions } from "./action-protocol";
+import { UstaadAction, NowPlayingInfo } from "../shared/contracts";
+import { parseUstaadActions } from "./action-protocol";
 
 /**
- * How long one task may run before Clickaa stops and reports where it got to.
- * Every number here exists to make "Clickaa went off and did something for two
+ * How long one task may run before Ustaad stops and reports where it got to.
+ * Every number here exists to make "Ustaad went off and did something for two
  * minutes" impossible: the loop is bounded in steps, in re-plans and in time.
  */
 export interface AgentLoopBudget {
@@ -23,7 +23,7 @@ export const defaultAgentLoopBudget: AgentLoopBudget = {
 /** What the model decided when it looked at the screen again. */
 export type AgentLoopLookResult =
   | { kind: "done"; note: string }
-  | { kind: "continue"; actions: ClickaaAction[]; note: string }
+  | { kind: "continue"; actions: UstaadAction[]; note: string }
   | { kind: "give_up"; note: string }
   | { kind: "unavailable"; note: string };
 
@@ -36,13 +36,13 @@ export interface AgentLoopProgressEvent {
 
 export interface AgentLoopDependencies {
   /** Runs one step's actions and answers with a summary for the activity feed. */
-  runActions: (actions: ClickaaAction[]) => Promise<string>;
+  runActions: (actions: UstaadAction[]) => Promise<string>;
   /** Takes a fresh look at the screen and asks the model whether the goal is met. */
   look: (request: {
     goal: string;
     stepNumber: number;
     previousSummary: string;
-    previousActions: ClickaaAction[];
+    previousActions: UstaadAction[];
   }) => Promise<AgentLoopLookResult>;
   /** The now-playing track, used to settle playback goals without a model call. */
   readNowPlaying: () => Promise<NowPlayingInfo | null>;
@@ -62,7 +62,7 @@ export interface AgentLoopResult {
 }
 
 /**
- * The instruction the model gets when Clickaa looks at the screen mid-task. It
+ * The instruction the model gets when Ustaad looks at the screen mid-task. It
  * is deliberately small: the model already has the goal, the screenshots and
  * its own last step, and it only has to answer one of three things.
  */
@@ -130,7 +130,7 @@ export function parseAgentLookResponse(modelResponseText: string): AgentLoopLook
 
   const nextMatch = /^NEXT\s*:?\s*([\s\S]*)$/iu.exec(trimmedResponse);
   if (nextMatch) {
-    const { actions, problems } = parseClickaaActions(nextMatch[1] ?? "");
+    const { actions, problems } = parseUstaadActions(nextMatch[1] ?? "");
     if (actions.length) {
       return { kind: "continue", actions, note: "carrying on" };
     }
@@ -157,9 +157,9 @@ export function isPlaybackGoal(goal: string): boolean {
 
 /**
  * True when the action list changes what is on screen, and therefore deserves a
- * fresh look before Clickaa decides whether it is finished.
+ * fresh look before Ustaad decides whether it is finished.
  */
-export function actionChangesScreen(action: ClickaaAction): boolean {
+export function actionChangesScreen(action: UstaadAction): boolean {
   switch (action.type) {
     case "open_app":
     case "open_url":
@@ -185,13 +185,13 @@ export function actionChangesScreen(action: ClickaaAction): boolean {
  * makes every branch of it testable. The controller supplies the screen, the
  * brain and the actions.
  */
-export class ClickaaAgentLoop {
+export class UstaadAgentLoop {
   constructor(
     private readonly dependencies: AgentLoopDependencies,
     private readonly budget: AgentLoopBudget = defaultAgentLoopBudget,
   ) {}
 
-  async run(goal: string, initialActions: ClickaaAction[]): Promise<AgentLoopResult> {
+  async run(goal: string, initialActions: UstaadAction[]): Promise<AgentLoopResult> {
     const startedAtMilliseconds = Date.now();
     let actions = initialActions;
     let stepsTaken = 0;
@@ -276,7 +276,7 @@ export class ClickaaAgentLoop {
         case "give_up":
           return this.finish("gave_up", stepsTaken, lookResult.note || "I could not get that working");
         case "unavailable":
-          // Clickaa cannot see the screen, so it must not keep clicking blind.
+          // Ustaad cannot see the screen, so it must not keep clicking blind.
           return this.finish(
             "gave_up",
             stepsTaken,
@@ -316,7 +316,7 @@ export class ClickaaAgentLoop {
 
   private replansForCurrentStep = 0;
 
-  private isSameStep(previousActions: ClickaaAction[], nextActions: ClickaaAction[]): boolean {
+  private isSameStep(previousActions: UstaadAction[], nextActions: UstaadAction[]): boolean {
     if (previousActions.length !== nextActions.length) {
       return false;
     }

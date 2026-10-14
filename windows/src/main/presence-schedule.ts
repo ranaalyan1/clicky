@@ -1,5 +1,5 @@
 /**
- * When Clickaa wakes up on its own.
+ * When Ustaad wakes up on its own.
  *
  * Everything here is pure: the controller says what time it is and which
  * check-ins already ran, and this module decides what is due. That keeps the
@@ -163,7 +163,7 @@ function presenceCheckInName(kind: PresenceCheckInKind): string {
   return kind === "morning" ? "morning brief" : "evening recap";
 }
 
-/** What the island shows about the next time Clickaa will speak up unprompted. */
+/** What the island shows about the next time Ustaad will speak up unprompted. */
 export function describeNextPresenceCheckIn(settings: PresenceSettings, now: Date): string | null {
   const upcoming: Array<{ kind: PresenceCheckInKind; scheduledAt: Date; label: string }> = [];
 

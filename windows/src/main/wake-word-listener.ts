@@ -1,7 +1,7 @@
 import { spawn } from "node:child_process";
 import { writeFileSync } from "node:fs";
 import { join } from "node:path";
-import { clickaaWakeWordScript } from "./wake-word-script";
+import { ustaadWakeWordScript } from "./wake-word-script";
 
 /** "off" is idle-by-choice; "stopped" never reaches the panel. */
 export type WakeWordListenerState = "stopped" | "starting" | "listening" | "unavailable" | "error";
@@ -19,7 +19,7 @@ export type WakeWordListenerEvent =
   | { kind: "error"; message: string };
 
 /**
- * Turns one line of the listener's output into an event. Anything Clickaa does
+ * Turns one line of the listener's output into an event. Anything Ustaad does
  * not recognise is ignored, so PowerShell noise can never be mistaken for the
  * user calling its name.
  */
@@ -33,8 +33,8 @@ export function parseWakeWordListenerLine(line: string): WakeWordListenerEvent |
     return { kind: "ready" };
   }
 
-  // The event words have to stand alone. "WAKEUP 90 clickaa" is a diagnostic,
-  // not the user calling Clickaa's name, and must never open the microphone.
+  // The event words have to stand alone. "WAKEUP 90 ustaad" is a diagnostic,
+  // not the user calling Ustaad's name, and must never open the microphone.
   if (/^WAKE\b/u.test(trimmedLine)) {
     const [, rawConfidence, ...phraseParts] = trimmedLine.split(/\s+/u);
     const confidence = Number.parseInt(rawConfidence ?? "", 10);
@@ -74,7 +74,7 @@ export interface WakeWordListenerCallbacks {
 }
 
 export interface WakeWordListenerOptions {
-  /** How many times a dying listener is restarted before Clickaa gives up. */
+  /** How many times a dying listener is restarted before Ustaad gives up. */
   maximumRestarts?: number;
   restartDelayMilliseconds?: number;
 }
@@ -82,7 +82,7 @@ export interface WakeWordListenerOptions {
 /**
  * Runs the offline wake word listener as a child process.
  *
- * Clickaa starts it only when the wake word is switched on and stops it the
+ * Ustaad starts it only when the wake word is switched on and stops it the
  * moment it is switched off, so the microphone is never open behind the user's
  * back. An unavailable speech engine is reported, never retried in a loop.
  */
@@ -177,7 +177,7 @@ export class WakeWordListener {
     });
 
     listenerProcess.stderr?.on("data", (rawChunk: Buffer) => {
-      console.warn("[clickaa-wake-word]", rawChunk.toString("utf8").trim().slice(0, 500));
+      console.warn("[ustaad-wake-word]", rawChunk.toString("utf8").trim().slice(0, 500));
     });
 
     listenerProcess.on("error", (error) => {
@@ -207,7 +207,7 @@ export class WakeWordListener {
         // A listener that got this far has proven it works, so the restart
         // budget is fresh again.
         this.restartsUsed = 0;
-        this.updateState("listening", "listening for \"clickaa\" on this pc");
+        this.updateState("listening", "listening for \"ustaad\" on this pc");
         return;
       case "wake":
         this.callbacks.onWakeWordDetected(listenerEvent.detection);
@@ -253,12 +253,12 @@ export class WakeWordListener {
   }
 
   private writeScriptToDisk(): void {
-    this.scriptPath = join(this.userDataDirectory, "clickaa-wake-word.ps1");
+    this.scriptPath = join(this.userDataDirectory, "ustaad-wake-word.ps1");
     // Windows PowerShell reads files without a byte-order mark as ANSI, so the
     // script is written with a UTF-8 BOM even though it is ASCII-only today.
     writeFileSync(this.scriptPath, Buffer.concat([
       Buffer.from([0xef, 0xbb, 0xbf]),
-      Buffer.from(clickaaWakeWordScript, "utf8"),
+      Buffer.from(ustaadWakeWordScript, "utf8"),
     ]));
   }
 }

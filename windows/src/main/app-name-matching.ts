@@ -122,7 +122,7 @@ export function deduplicateLaunchableApps(launchableApps: LaunchableApp[]): Laun
 
 /**
  * True when the top two candidates are close enough that launching the wrong
- * one is likely. Clickaa asks the user instead of guessing.
+ * one is likely. Ustaad asks the user instead of guessing.
  */
 export function isAppChoiceAmbiguous(rankedMatches: Array<RankedTextMatch<LaunchableApp>>): boolean {
   const [bestMatch, secondMatch] = rankedMatches;

@@ -1,6 +1,6 @@
 import {
   BrainConnectionTestResult,
-  ClickaaUserConfig,
+  UstaadUserConfig,
   GeminiChatModel,
 } from "../shared/contracts";
 import { BrainStreamRequest, SynthesizedSpeech } from "./brain-types";
@@ -25,9 +25,9 @@ export class BrainRouter {
 
   /**
    * The provider that can actually answer right now. A user who picked Gemini
-   * but pasted a Worker URL still gets a working Clickaa instead of an error.
+   * but pasted a Worker URL still gets a working Ustaad instead of an error.
    */
-  resolveActiveProvider(config: ClickaaUserConfig): "gemini" | "worker" | null {
+  resolveActiveProvider(config: UstaadUserConfig): "gemini" | "worker" | null {
     if (config.brainProvider === "gemini" && config.geminiApiKey) {
       return "gemini";
     }
@@ -40,7 +40,7 @@ export class BrainRouter {
     return null;
   }
 
-  getBrainLabel(config: ClickaaUserConfig): string {
+  getBrainLabel(config: UstaadUserConfig): string {
     const activeProvider = this.resolveActiveProvider(config);
     if (!activeProvider) {
       return config.brainProvider === "gemini" ? "Gemini (key needed)" : "Worker (url needed)";
@@ -53,21 +53,21 @@ export class BrainRouter {
     return config.selectedClaudeModel === "claude-opus-4-6" ? "Claude Opus" : "Claude Sonnet";
   }
 
-  isConfigured(config: ClickaaUserConfig): boolean {
+  isConfigured(config: UstaadUserConfig): boolean {
     return this.resolveActiveProvider(config) !== null;
   }
 
-  configurationHint(config: ClickaaUserConfig): string {
+  configurationHint(config: UstaadUserConfig): string {
     if (this.isConfigured(config)) {
       return "";
     }
     return config.brainProvider === "gemini"
-      ? "Paste your Gemini API key from Google AI Studio to switch Clickaa on."
-      : "Paste your Cloudflare Worker URL to switch Clickaa on.";
+      ? "Paste your Gemini API key from Google AI Studio to switch Ustaad on."
+      : "Paste your Cloudflare Worker URL to switch Ustaad on.";
   }
 
   /** Which engine should read this reply aloud. */
-  resolveSpeechProvider(config: ClickaaUserConfig): ResolvedSpeechProvider {
+  resolveSpeechProvider(config: UstaadUserConfig): ResolvedSpeechProvider {
     const geminiIsAvailable = Boolean(config.geminiApiKey);
     const elevenLabsIsAvailable = Boolean(config.workerBaseUrl);
 
@@ -89,7 +89,7 @@ export class BrainRouter {
     }
   }
 
-  async streamResponse(config: ClickaaUserConfig, request: BrainStreamRequest): Promise<string> {
+  async streamResponse(config: UstaadUserConfig, request: BrainStreamRequest): Promise<string> {
     if (this.resolveActiveProvider(config) === "gemini") {
       return new GeminiClient(config.geminiApiKey).streamChat(request, config.geminiChatModel);
     }
@@ -102,7 +102,7 @@ export class BrainRouter {
   }
 
   async synthesizeSpeech(
-    config: ClickaaUserConfig,
+    config: UstaadUserConfig,
     text: string,
     signal: AbortSignal,
   ): Promise<SynthesizedSpeech> {
@@ -124,7 +124,7 @@ export class BrainRouter {
 
   /** Used by dictation and circle-to-ask when the brain has no live stream. */
   async transcribeRecordedAudio(
-    config: ClickaaUserConfig,
+    config: UstaadUserConfig,
     wavAudio: Buffer,
     signal: AbortSignal,
   ): Promise<string> {
@@ -142,7 +142,7 @@ export class BrainRouter {
    * pasting a few "ums".
    */
   async cleanDictationTranscript(
-    config: ClickaaUserConfig,
+    config: UstaadUserConfig,
     rawTranscript: string,
     signal: AbortSignal,
   ): Promise<string> {
@@ -173,13 +173,13 @@ export class BrainRouter {
       if (error instanceof Error && error.name === "AbortError") {
         throw error;
       }
-      console.warn("Clickaa could not clean up dictated text; pasting the raw transcript.", error);
+      console.warn("Ustaad could not clean up dictated text; pasting the raw transcript.", error);
       return rawTranscript;
     }
   }
 
   /** The panel's connection test, for whichever brain is selected. */
-  async testConnection(config: ClickaaUserConfig): Promise<BrainConnectionTestResult> {
+  async testConnection(config: UstaadUserConfig): Promise<BrainConnectionTestResult> {
     if (config.brainProvider === "gemini" && config.geminiApiKey) {
       return new GeminiClient(config.geminiApiKey).verifyApiKey();
     }

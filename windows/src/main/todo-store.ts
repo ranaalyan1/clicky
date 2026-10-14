@@ -37,7 +37,7 @@ export interface TodoLookupResult {
   matches: Array<RankedTextMatch<TodoItem>>;
 }
 
-/** Clickaa's to-do list, as spoken by the user and shown in the island. */
+/** Ustaad's to-do list, as spoken by the user and shown in the island. */
 export class TodoStore {
   private readonly fileStore: JsonFileStore<TodoItem[]>;
   private items: TodoItem[];

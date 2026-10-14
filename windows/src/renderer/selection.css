@@ -76,7 +76,7 @@ html, body {
 .hint-cursor {
   width: 16px;
   height: 16px;
-  background-image: var(--clickaa-mark-image);
+  background-image: var(--ustaad-mark-image);
   background-repeat: no-repeat;
   background-position: center;
   background-size: contain;
@@ -107,17 +107,17 @@ kbd {
 body[data-purpose="snip"] .dim-layer { background: rgba(6, 10, 9, 0.16); }
 
 body[data-purpose="snip"] .selection-rect {
-  border-color: var(--clickaa-accent);
+  border-color: var(--ustaad-accent);
   background: rgba(69, 150, 255, 0.1);
 }
 
-body[data-purpose="snip"] .corner-handle { border-color: var(--clickaa-accent); }
+body[data-purpose="snip"] .corner-handle { border-color: var(--ustaad-accent); }
 
-body[data-purpose="snip"] .selection-size-label { color: var(--clickaa-accent); }
+body[data-purpose="snip"] .selection-size-label { color: var(--ustaad-accent); }
 
 body[data-purpose="snip"] .hint-cursor {
   background-image: none;
-  border: 1px solid var(--clickaa-accent);
+  border: 1px solid var(--ustaad-accent);
   border-radius: 3px;
   filter: none;
 }

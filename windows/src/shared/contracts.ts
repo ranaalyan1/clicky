@@ -1,5 +1,5 @@
 /**
- * Shared contracts between the Clickaa main process, preload bridge, and renderers.
+ * Shared contracts between the Ustaad main process, preload bridge, and renderers.
  *
  * This file is compiled for both the main process (CommonJS) and the renderers
  * (browser ES modules), so it must never import from Node or Electron.
@@ -84,7 +84,7 @@ export type AbilityId = (typeof abilityIds)[number];
 export type AbilitySettings = Record<AbilityId, boolean>;
 
 /**
- * Where Clickaa listens for its name. "offline" uses the speech recognizer
+ * Where Ustaad listens for its name. "offline" uses the speech recognizer
  * Windows already ships, so no audio leaves the machine. "cloud" keeps a local
  * loudness gate and only sends the clip that followed speech.
  */
@@ -206,7 +206,7 @@ export interface RoutineAddAction {
   name: string;
   timeOfDay: string;
   repeat: ScheduleRepeat;
-  actions: ClickaaAction[];
+  actions: UstaadAction[];
 }
 
 export interface RememberAction {
@@ -279,7 +279,7 @@ export interface ClickAtAction {
 export interface RunCommandAction {
   type: "run_command";
   command: string;
-  /** Why Clickaa wants to run it, shown on the confirmation card. */
+  /** Why Ustaad wants to run it, shown on the confirmation card. */
   reason: string;
 }
 
@@ -321,7 +321,7 @@ export interface OpenPanelAction {
   page: string;
 }
 
-export type ClickaaAction =
+export type UstaadAction =
   | OpenAppAction
   | OpenUrlAction
   | SearchWebAction
@@ -355,7 +355,7 @@ export type ClickaaAction =
   | ReadRegistryAction
   | RunSkillAction;
 
-export type ClickaaActionType =
+export type UstaadActionType =
   | "open_app"
   | "open_url"
   | "search_web"
@@ -390,7 +390,7 @@ export type ClickaaActionType =
   | "run_skill";
 
 /** Canonical action list, kept in the shared contracts so both sides agree. */
-export const clickaaActionTypes: readonly ClickaaActionType[] = [
+export const ustaadActionTypes: readonly UstaadActionType[] = [
   "open_app",
   "open_url",
   "search_web",
@@ -431,14 +431,14 @@ export interface ActionExecutionResult {
   status: "completed" | "failed" | "needs_choice";
   message: string;
   undoLabel: string | null;
-  choices: ClickaaAction[];
+  choices: UstaadAction[];
 }
 
 /* -------------------------------------------------------------------------- */
 /* Persistent user data                                                       */
 /* -------------------------------------------------------------------------- */
 
-export interface ClickaaUserConfig {
+export interface UstaadUserConfig {
   workerBaseUrl: string;
   brainProvider: BrainProviderId;
   geminiApiKey: string;
@@ -449,7 +449,7 @@ export interface ClickaaUserConfig {
   launchAtLogin: boolean;
   automationPaused: boolean;
   confirmationMode: ConfirmationMode;
-  autoApprovedActionTypes: ClickaaActionType[];
+  autoApprovedActionTypes: UstaadActionType[];
 
   dictationShortcut: DictationShortcutId;
   dictationCleanupEnabled: boolean;
@@ -469,7 +469,7 @@ export interface ClickaaUserConfig {
   soul: SoulSettings;
   abilities: AbilitySettings;
 
-  /** When Clickaa speaks up on its own, without being asked. */
+  /** When Ustaad speaks up on its own, without being asked. */
   presence: PresenceSettings;
 }
 
@@ -485,14 +485,14 @@ export interface TodoItem {
 }
 
 /**
- * A task the user saved by name. The seed actions are a memory aid for Clickaa,
+ * A task the user saved by name. The seed actions are a memory aid for Ustaad,
  * never a permission: every run is checked and confirmed again.
  */
 export interface Skill {
   id: string;
   name: string;
   goal: string;
-  seedActions: ClickaaAction[];
+  seedActions: UstaadAction[];
   createdAtIso: string;
   runCount: number;
   lastRunAtIso: string | null;
@@ -524,7 +524,7 @@ export interface ScheduledTask {
   name: string;
   kind: "reminder" | "routine";
   prompt: string;
-  actions: ClickaaAction[];
+  actions: UstaadAction[];
   timeOfDay: string | null;
   startAtIso: string | null;
   repeat: ScheduleRepeat;
@@ -545,7 +545,7 @@ export const presenceCheckInIds = ["morning", "evening"] as const;
 export type PresenceCheckInKind = (typeof presenceCheckInIds)[number];
 
 /**
- * When Clickaa wakes up on its own. Times are local "HH:MM" strings so the
+ * When Ustaad wakes up on its own. Times are local "HH:MM" strings so the
  * panel's time inputs round-trip exactly what the user typed.
  */
 export interface PresenceSettings {
@@ -556,7 +556,7 @@ export interface PresenceSettings {
   speakCheckIns: boolean;
 }
 
-/** The last time Clickaa spoke up unprompted, so the island can show it. */
+/** The last time Ustaad spoke up unprompted, so the island can show it. */
 export interface PresenceCheckInRecord {
   kind: PresenceCheckInKind;
   title: string;
@@ -582,7 +582,7 @@ export interface ActivityFeedEntry {
 export interface PendingConfirmation {
   id: string;
   interactionId: number;
-  actions: ClickaaAction[];
+  actions: UstaadAction[];
   reason: string;
   createdAtIso: string;
 }
@@ -610,7 +610,7 @@ export type InteractionKind = "talk" | "dictation" | "circle" | "scheduled";
 
 export type DictationStage = "idle" | "recording" | "cleaning" | "typing";
 
-export interface ClickaaPublicState {
+export interface UstaadPublicState {
   voiceState: CompanionVoiceState;
   interactionKind: InteractionKind | null;
   dictationStage: DictationStage;
@@ -634,13 +634,13 @@ export interface ClickaaPublicState {
   wakeWordState: WakeWordSurfaceState;
   wakeWordMessage: string;
   wakeWordMuted: boolean;
-  config: ClickaaUserConfig;
+  config: UstaadUserConfig;
   /** The last few system-access entries, newest first, for the panel's log. */
   auditLog: AuditLogEntry[];
   auditLogCounts: { allowed: number; refused: number; blocked: number; failed: number; total: number };
 }
 
-/** One line of the record Clickaa keeps of everything it did on this pc. */
+/** One line of the record Ustaad keeps of everything it did on this pc. */
 export interface AuditLogEntry {
   id: string;
   createdAtIso: string;

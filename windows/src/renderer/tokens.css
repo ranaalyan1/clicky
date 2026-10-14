@@ -1,107 +1,157 @@
 /*
- * Clickaa design tokens.
+ * Ustaad design tokens.
  *
  * Every renderer links this file first and reads from it, so type, spacing,
- * colour and motion can only be changed in one place. The legacy variable names
- * at the bottom are aliases kept so older rules keep working during the move.
+ * colour and motion can only be changed in one place.
+ *
+ * The surface language is neumorphism: elements are not drawn with borders and
+ * fills, they are *carved out of* or *pressed into* the surface they sit on.
+ * That only works if the element and its parent share one background colour, so
+ * `--ustaad-surface` is deliberately identical to `--ustaad-canvas` — depth
+ * comes from the two shadows and nothing else. Breaking that equality is the
+ * fastest way to make the whole interface look flat and broken again.
  */
+
 :root {
   color-scheme: dark;
 
   /* Type ---------------------------------------------------------------- */
-  --clickaa-font-ui: "Segoe UI Variable Text", "Segoe UI", system-ui, sans-serif;
-  --clickaa-font-display: "Segoe UI Variable Display", "Segoe UI", system-ui, sans-serif;
-  --clickaa-font-mono: "Cascadia Mono", "Consolas", "SF Mono", ui-monospace, monospace;
+  --ustaad-font-ui: "Segoe UI Variable Text", "Segoe UI", system-ui, sans-serif;
+  --ustaad-font-display: "Segoe UI Variable Display", "Segoe UI", system-ui, sans-serif;
+  --ustaad-font-mono: "Cascadia Mono", "Consolas", "SF Mono", ui-monospace, monospace;
 
-  --clickaa-text-2xs: 8.5px;
-  --clickaa-text-xs: 10px;
-  --clickaa-text-sm: 11.5px;
-  --clickaa-text-base: 13px;
-  --clickaa-text-lg: 17px;
-  --clickaa-text-xl: 22px;
+  --ustaad-text-2xs: 8.5px;
+  --ustaad-text-xs: 10px;
+  --ustaad-text-sm: 11.5px;
+  --ustaad-text-base: 13px;
+  --ustaad-text-lg: 17px;
+  --ustaad-text-xl: 22px;
 
-  --clickaa-weight-regular: 400;
-  --clickaa-weight-medium: 600;
-  --clickaa-weight-strong: 650;
+  --ustaad-weight-regular: 400;
+  --ustaad-weight-medium: 600;
+  --ustaad-weight-strong: 650;
 
   /* Spacing: a 2px-based ladder, used for both padding and gaps. ---------- */
-  --clickaa-space-1: 2px;
-  --clickaa-space-2: 4px;
-  --clickaa-space-3: 6px;
-  --clickaa-space-4: 8px;
-  --clickaa-space-5: 10px;
-  --clickaa-space-6: 12px;
-  --clickaa-space-7: 16px;
-  --clickaa-space-8: 20px;
-  --clickaa-space-9: 28px;
+  --ustaad-space-1: 2px;
+  --ustaad-space-2: 4px;
+  --ustaad-space-3: 6px;
+  --ustaad-space-4: 8px;
+  --ustaad-space-5: 10px;
+  --ustaad-space-6: 12px;
+  --ustaad-space-7: 16px;
+  --ustaad-space-8: 20px;
+  --ustaad-space-9: 28px;
 
-  /* Radii --------------------------------------------------------------- */
-  --clickaa-radius-xs: 4px;
-  --clickaa-radius-sm: 6px;
-  --clickaa-radius-md: 9px;
-  --clickaa-radius-lg: 12px;
-  --clickaa-radius-xl: 16px;
-  --clickaa-radius-pill: 999px;
+  /* Radii: generous, because soft shapes are what neumorphism reads as. --- */
+  --ustaad-radius-xs: 6px;
+  --ustaad-radius-sm: 9px;
+  --ustaad-radius-md: 12px;
+  --ustaad-radius-lg: 16px;
+  --ustaad-radius-xl: 22px;
+  --ustaad-radius-pill: 999px;
 
-  /* Colour -------------------------------------------------------------- */
-  --clickaa-canvas: #0c110f;
-  --clickaa-surface: #131a17;
-  --clickaa-surface-raised: #18211d;
-  --clickaa-surface-hover: rgba(255, 255, 255, 0.06);
-  --clickaa-line: rgba(255, 255, 255, 0.075);
-  --clickaa-line-strong: rgba(255, 255, 255, 0.14);
+  /* Colour: one neutral graphite, so nothing tints the shadows. ---------- */
+  --ustaad-canvas: #22262b;
+  /* Same value as the canvas on purpose: see the note at the top. */
+  --ustaad-surface: #22262b;
+  --ustaad-surface-raised: #262b31;
+  --ustaad-surface-hover: rgba(255, 255, 255, 0.04);
+  --ustaad-line: rgba(255, 255, 255, 0.06);
+  --ustaad-line-strong: rgba(255, 255, 255, 0.12);
 
-  --clickaa-ink: #f0f5f2;
-  --clickaa-ink-muted: #8e9b94;
-  --clickaa-ink-faint: #627068;
+  --ustaad-ink: #e8ecf1;
+  --ustaad-ink-muted: #9aa3ae;
+  --ustaad-ink-faint: #6d7681;
 
-  --clickaa-accent: #4596ff;
-  --clickaa-accent-bright: #72b2ff;
-  --clickaa-accent-soft: rgba(69, 150, 255, 0.16);
-  --clickaa-positive: #65d99a;
-  --clickaa-caution: #ffc56a;
-  --clickaa-danger: #ff8585;
+  --ustaad-accent: #4596ff;
+  --ustaad-accent-bright: #7db8ff;
+  --ustaad-accent-deep: #2f7ae0;
+  --ustaad-accent-soft: rgba(69, 150, 255, 0.16);
+  --ustaad-positive: #69d99f;
+  --ustaad-caution: #ffc56a;
+  --ustaad-danger: #ff8a8a;
 
-  /* Elevation ----------------------------------------------------------- */
-  --clickaa-shadow-soft: 0 6px 18px rgba(0, 0, 0, 0.28);
-  --clickaa-shadow-raised: 0 12px 30px rgba(0, 0, 0, 0.42);
-  --clickaa-shadow-floating: 0 18px 44px rgba(0, 0, 0, 0.52);
+  /* --------------------------------------------------------------------- */
+  /* Neumorphic depth                                                      */
+  /* --------------------------------------------------------------------- */
+  /* The two lights every raised shape is lit by: a soft highlight from the
+     top-left, a soft shade to the bottom-right. They are translucent rather
+     than fixed colours so they keep working on any surface. */
+  --ustaad-neu-highlight: rgba(255, 255, 255, 0.055);
+  --ustaad-neu-highlight-strong: rgba(255, 255, 255, 0.09);
+  --ustaad-neu-shade: rgba(0, 0, 0, 0.45);
+  --ustaad-neu-shade-strong: rgba(0, 0, 0, 0.6);
 
-  /* Motion -------------------------------------------------------------- */
-  --clickaa-ease-out: cubic-bezier(0.2, 0.8, 0.3, 1);
-  --clickaa-ease-in-out: cubic-bezier(0.45, 0, 0.55, 1);
-  --clickaa-duration-fast: 140ms;
-  --clickaa-duration-base: 200ms;
-  --clickaa-duration-slow: 320ms;
+  /* Raised: sits above the surface. The small sizes are for controls, the
+     larger ones for cards and the panel itself. */
+  --ustaad-neu-raised:
+    -2px -2px 5px var(--ustaad-neu-highlight),
+    3px 3px 7px var(--ustaad-neu-shade);
+  --ustaad-neu-raised-sm:
+    -1px -1px 3px var(--ustaad-neu-highlight),
+    2px 2px 4px var(--ustaad-neu-shade);
+  --ustaad-neu-raised-lg:
+    -4px -4px 12px var(--ustaad-neu-highlight),
+    7px 7px 18px var(--ustaad-neu-shade-strong);
 
-  /* Focus: one ring for every control, so keyboard use is obvious. ------- */
-  --clickaa-focus-ring: 0 0 0 2px rgba(69, 150, 255, 0.65);
-  --clickaa-focus-shadow: 0 0 0 2px rgba(69, 150, 255, 0.65), 0 0 0 4px rgba(12, 17, 15, 0.9);
+  /* Pressed: sunk into the surface, for wells, inputs and active controls. */
+  --ustaad-neu-inset:
+    inset 2px 2px 5px var(--ustaad-neu-shade),
+    inset -2px -2px 4px var(--ustaad-neu-highlight);
+  --ustaad-neu-inset-sm:
+    inset 1px 1px 3px var(--ustaad-neu-shade),
+    inset -1px -1px 2px var(--ustaad-neu-highlight);
+  --ustaad-neu-inset-lg:
+    inset 4px 4px 10px var(--ustaad-neu-shade-strong),
+    inset -3px -3px 8px var(--ustaad-neu-highlight);
+
+  /* A raised shape that is lit from the other side, which is how a control
+     reads as "on" without changing its colour. */
+  --ustaad-neu-raised-lit:
+    -3px -3px 8px var(--ustaad-neu-highlight-strong),
+    3px 3px 9px var(--ustaad-neu-shade-strong);
+
+  /* Focus has to stay visible on a soft surface, so it is a ring *and* a
+     glow rather than a colour change alone. */
+  --ustaad-focus-ring: 0 0 0 2px rgba(69, 150, 255, 0.75);
+  --ustaad-focus-shadow: 0 0 0 2px rgba(69, 150, 255, 0.7), 0 0 14px rgba(69, 150, 255, 0.35);
+
+  /* Elevation, kept for anything that genuinely floats above the panel. */
+  --ustaad-shadow-soft: 0 6px 18px rgba(0, 0, 0, 0.28);
+  --ustaad-shadow-raised: 0 12px 30px rgba(0, 0, 0, 0.42);
+  --ustaad-shadow-floating: 0 18px 44px rgba(0, 0, 0, 0.52);
+
+  /* Motion: soft surfaces want slightly longer, eased transitions. -------- */
+  --ustaad-ease-out: cubic-bezier(0.2, 0.8, 0.3, 1);
+  --ustaad-ease-in-out: cubic-bezier(0.45, 0, 0.55, 1);
+  --ustaad-duration-fast: 140ms;
+  --ustaad-duration-base: 220ms;
+  --ustaad-duration-slow: 340ms;
 
   /* --------------------------------------------------------------------- */
   /* Aliases: the names the older rules already use.                       */
   /* --------------------------------------------------------------------- */
-  --background: var(--clickaa-canvas);
-  --surface: var(--clickaa-surface);
-  --surface-raised: var(--clickaa-surface-raised);
-  --line: var(--clickaa-line);
-  --text: var(--clickaa-ink);
-  --muted: var(--clickaa-ink-muted);
-  --faint: var(--clickaa-ink-faint);
-  --blue: var(--clickaa-accent);
-  --blue-bright: var(--clickaa-accent-bright);
-  --green: var(--clickaa-positive);
-  --danger: var(--clickaa-danger);
+  --background: var(--ustaad-canvas);
+  --surface: var(--ustaad-surface);
+  --surface-raised: var(--ustaad-surface-raised);
+  --line: var(--ustaad-line);
+  --text: var(--ustaad-ink);
+  --muted: var(--ustaad-ink-muted);
+  --faint: var(--ustaad-ink-faint);
+  --blue: var(--ustaad-accent);
+  --blue-bright: var(--ustaad-accent-bright);
+  --green: var(--ustaad-positive);
+  --danger: var(--ustaad-danger);
 
-  --island-background: var(--clickaa-canvas);
-  --island-surface: var(--clickaa-surface);
-  --island-line: var(--clickaa-line);
-  --island-text: var(--clickaa-ink);
-  --island-muted: var(--clickaa-ink-muted);
-  --island-faint: var(--clickaa-ink-faint);
-  --island-blue: var(--clickaa-accent-bright);
-  --island-green: var(--clickaa-positive);
-  --island-danger: var(--clickaa-danger);
+  --island-background: var(--ustaad-canvas);
+  --island-surface: var(--ustaad-surface);
+  --island-line: var(--ustaad-line);
+  --island-text: var(--ustaad-ink);
+  --island-muted: var(--ustaad-ink-muted);
+  --island-faint: var(--ustaad-ink-faint);
+  --island-blue: var(--ustaad-accent-bright);
+  --island-green: var(--ustaad-positive);
+  --island-danger: var(--ustaad-danger);
 }
 
 * {
@@ -109,20 +159,37 @@
 }
 
 body {
-  font-family: var(--clickaa-font-ui);
+  font-family: var(--ustaad-font-ui);
   -webkit-font-smoothing: antialiased;
 }
 
+/* ------------------------------------------------------------------------ */
+/* The two shared shapes every renderer builds from.                        */
+/* ------------------------------------------------------------------------ */
+
+/* A soft panel: the surface, extruded. Use for cards, rows and containers. */
+.soft-raised {
+  background: var(--ustaad-surface);
+  box-shadow: var(--ustaad-neu-raised);
+}
+
+/* A soft well: the surface, pressed in. Use for inputs, tracks and any
+   container that holds something. */
+.soft-inset {
+  background: var(--ustaad-surface);
+  box-shadow: var(--ustaad-neu-inset);
+}
+
 /* Inline SVG icons, sized by the component that owns them. */
-.clickaa-icon {
+.ustaad-icon {
   display: block;
   flex: 0 0 auto;
   width: 16px;
   height: 16px;
   color: inherit;
 }
-.clickaa-icon.size-sm { width: 13px; height: 13px; }
-.clickaa-icon.size-lg { width: 20px; height: 20px; }
+.ustaad-icon.size-sm { width: 13px; height: 13px; }
+.ustaad-icon.size-lg { width: 20px; height: 20px; }
 
 button:focus-visible,
 input:focus-visible,
@@ -130,11 +197,11 @@ select:focus-visible,
 textarea:focus-visible,
 [tabindex]:focus-visible {
   outline: none;
-  box-shadow: var(--clickaa-focus-ring);
+  box-shadow: var(--ustaad-focus-shadow);
 }
 
 ::selection {
-  background: var(--clickaa-accent-soft);
+  background: var(--ustaad-accent-soft);
 }
 
 /* Someone who asked Windows to calm animations down gets a still interface. */

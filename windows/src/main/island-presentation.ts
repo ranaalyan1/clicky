@@ -1,7 +1,7 @@
 import { IslandPresentation } from "../shared/contracts";
 
 /**
- * Clickaa's island is summoned, never pinned. These three states are what the
+ * Ustaad's island is summoned, never pinned. These three states are what the
  * user sees:
  *
  * - `hidden`   nothing on screen at all,
@@ -32,7 +32,7 @@ export const islandHoverOpenMilliseconds = 320;
 /** An open island with the pointer elsewhere closes itself after this long. */
 const openIdleMilliseconds = 6_000;
 
-/** While Clickaa is listening, thinking or acting the mark is never hidden. */
+/** While Ustaad is listening, thinking or acting the mark is never hidden. */
 const interactionRevealGraceMilliseconds = 8_000;
 
 export function isPointInsideRect(point: DesktopPoint, rect: DesktopRect | null): boolean {
@@ -65,7 +65,7 @@ export interface IslandPresentationInput {
   summonBand: DesktopRect | null;
   /** Where the collapsed island window currently sits, when it is on screen. */
   islandBounds: DesktopRect | null;
-  /** True while Clickaa is listening, thinking, acting or speaking. */
+  /** True while Ustaad is listening, thinking, acting or speaking. */
   hasActiveInteraction: boolean;
   /** The user asked for the island to stay open permanently. */
   isAlwaysVisible: boolean;
@@ -128,7 +128,7 @@ export class IslandPresentationController {
 
     if (input.hasActiveInteraction) {
       // Work in progress: the mark stays, and an open island does not close
-      // while Clickaa is still talking.
+      // while Ustaad is still talking.
       if (this.currentPresentation === "hidden") {
         this.setPresentation("revealed");
       }

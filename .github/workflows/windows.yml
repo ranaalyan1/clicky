@@ -76,8 +76,8 @@ jobs:
           # A signature that is merely present is not enough: only a valid,
           # timestamped signature makes Windows trust the file. Check every
           # binary a user or Windows itself will load.
-          $signableFiles = @(Get-ChildItem "windows/release/Clickaa-Setup-*.exe") +
-            @(Get-ChildItem "windows/release/win-unpacked/Clickaa.exe")
+          $signableFiles = @(Get-ChildItem "windows/release/Ustaad-Setup-*.exe") +
+            @(Get-ChildItem "windows/release/win-unpacked/Ustaad.exe")
 
           foreach ($file in $signableFiles) {
             $signature = Get-AuthenticodeSignature -FilePath $file.FullName
@@ -99,10 +99,10 @@ jobs:
         env:
           ELECTRON_ENABLE_LOGGING: "1"
         run: |
-          $applicationPath = Resolve-Path "release/win-unpacked/Clickaa.exe"
-          $standardOutputPath = Join-Path $env:RUNNER_TEMP "clickaa-smoke-stdout.log"
-          $standardErrorPath = Join-Path $env:RUNNER_TEMP "clickaa-smoke-stderr.log"
-          $clickaaProcess = Start-Process `
+          $applicationPath = Resolve-Path "release/win-unpacked/Ustaad.exe"
+          $standardOutputPath = Join-Path $env:RUNNER_TEMP "ustaad-smoke-stdout.log"
+          $standardErrorPath = Join-Path $env:RUNNER_TEMP "ustaad-smoke-stderr.log"
+          $ustaadProcess = Start-Process `
             -FilePath $applicationPath `
             -PassThru `
             -RedirectStandardOutput $standardOutputPath `
@@ -110,8 +110,8 @@ jobs:
 
           try {
             Start-Sleep -Seconds 10
-            if ($clickaaProcess.HasExited) {
-              Write-Host "Clickaa exited with code $($clickaaProcess.ExitCode)."
+            if ($ustaadProcess.HasExited) {
+              Write-Host "Ustaad exited with code $($ustaadProcess.ExitCode)."
               if (Test-Path $standardOutputPath) { Get-Content $standardOutputPath }
               if (Test-Path $standardErrorPath) { Get-Content $standardErrorPath }
               throw "The packaged x64 application did not stay running."
@@ -119,16 +119,16 @@ jobs:
             Write-Host "Packaged x64 application remained healthy for the smoke-test window."
           }
           finally {
-            if (-not $clickaaProcess.HasExited) {
-              Stop-Process -Id $clickaaProcess.Id -Force
+            if (-not $ustaadProcess.HasExited) {
+              Stop-Process -Id $ustaadProcess.Id -Force
             }
           }
 
       - name: Upload Windows installers
         uses: actions/upload-artifact@v7
         with:
-          name: clickaa-windows-installers
-          path: windows/release/Clickaa-Setup-*.exe
+          name: ustaad-windows-installers
+          path: windows/release/Ustaad-Setup-*.exe
           if-no-files-found: error
 
       - name: Publish Windows GitHub release
@@ -148,12 +148,12 @@ jobs:
             throw "Release tag must match package version: $expectedReleaseTag"
           }
 
-          $installerPaths = Get-ChildItem "windows/release/Clickaa-Setup-*.exe"
+          $installerPaths = Get-ChildItem "windows/release/Ustaad-Setup-*.exe"
           if ($installerPaths.Count -ne 2) {
             throw "Expected exactly two Windows installers, found $($installerPaths.Count)."
           }
 
-          $releaseNotesPath = Join-Path $env:RUNNER_TEMP "clickaa-windows-release-notes.md"
+          $releaseNotesPath = Join-Path $env:RUNNER_TEMP "ustaad-windows-release-notes.md"
 
           # Say what is actually true of this build rather than assuming it is
           # unsigned, so the notes never promise a warning that will not appear
@@ -165,9 +165,9 @@ jobs:
           }
 
           @"
-          Clickaa for Windows $($packageManifest.version).
+          Ustaad for Windows $($packageManifest.version).
 
-          This release contains per-user NSIS installers for Windows x64 and ARM64. After installation, open Clickaa from the notification area, then paste either your own Gemini API key or a deployed Cloudflare Worker URL and select **save & test**.
+          This release contains per-user NSIS installers for Windows x64 and ARM64. After installation, open Ustaad from the notification area, then paste either your own Gemini API key or a deployed Cloudflare Worker URL and select **save & test**.
 
           $signingNote
           "@ | Set-Content $releaseNotesPath
@@ -175,7 +175,7 @@ jobs:
           $releaseArguments = @(
             "release", "create", $env:RELEASE_TAG,
             "--target", $env:GITHUB_SHA,
-            "--title", "Clickaa for Windows $($packageManifest.version)",
+            "--title", "Ustaad for Windows $($packageManifest.version)",
             "--notes-file", $releaseNotesPath
           ) + $installerPaths.FullName
 
@@ -189,5 +189,5 @@ jobs:
         uses: softprops/action-gh-release@v3
         with:
           tag_name: ${{ github.event.release.tag_name }}
-          files: windows/release/Clickaa-Setup-*.exe
+          files: windows/release/Ustaad-Setup-*.exe
           fail_on_unmatched_files: true

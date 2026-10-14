@@ -1,23 +1,37 @@
-# Clickaa for Windows
+# Ustaad for Windows
 
-Clickaa is the voice companion that lives on your Windows desktop: hold a key, ask, and it answers out loud, points at things on your screen, and acts on your PC.
+Ustaad is the voice companion that lives on your Windows desktop: hold a key, ask, and it answers out loud, points at things on your screen, and acts on your PC.
 
 - Hold **Ctrl + Alt** globally to ask about whatever is on your screen.
 - Hold **Ctrl + Windows** to dictate: talk however you like, and cleaned, punctuated text lands in the app you are already typing in.
 - Hold **Ctrl + Shift** and circle anything on screen with the mouse to ask about just that part.
-- Press **Ctrl + Alt + S** and drag over any part of the screen: those pixels land on your clipboard and in `Pictures\Clickaa Snips`.
-- **Skills** grow out of repetition: do the same task three times and Clickaa offers to save it by name ("save it as my morning videos?"). It only saves when you press the button, skills are renameable in **plans → skills**, and every run still checks the screen and asks before it clicks or types.
-- **Presence**: Clickaa wakes up on its own. A **morning brief** at the time you pick gathers today's routines and reminders, your open to-dos (overdue ones named) and what ran while you slept; an **evening recap** says what it did today, what is still open and what is coming tomorrow. The island's reminders card shows when the next one lands, the panel's **presence** card sets both times, and **check in now** delivers one on the spot. A brief is written from what is already on this PC — no model call, no network — so it works offline and cannot invent anything. A check-in whose moment passed while the PC was asleep is delivered late, and only within four hours: a morning brief at eight at night is not a brief.
-- **System access** is two switches in **soul → abilities**, both off until you ask. Tier 1 covers read-only diagnostics, registry reads and files inside your own six folders, each confirmed per action; Tier 2 covers arbitrary commands that change the PC, with its own warning. Clickaa refuses credential stores, browser password databases, elevation and anything that weakens Windows security whatever is switched on, and every attempt lands in an audit log in **memory → system access** with the raw command visible. **Ctrl + Alt + Q** stops everything mid-task.
-- Say **"clickaa"** (once switched on) and the island comes up with the microphone already open: keep talking, and Clickaa submits on its own when you stop. It listens with the speech recognizer Windows already ships, so no audio leaves the machine, and the tray can mute it instantly.
+- Press **Ctrl + Alt + S** and drag over any part of the screen: those pixels land on your clipboard and in `Pictures\Ustaad Snips`.
+- **Skills** grow out of repetition: do the same task three times and Ustaad offers to save it by name ("save it as my morning videos?"). It only saves when you press the button, skills are renameable in **plans → skills**, and every run still checks the screen and asks before it clicks or types.
+- **Presence**: Ustaad wakes up on its own. A **morning brief** at the time you pick gathers today's routines and reminders, your open to-dos (overdue ones named) and what ran while you slept; an **evening recap** says what it did today, what is still open and what is coming tomorrow. The island's reminders card shows when the next one lands, the panel's **presence** card sets both times, and **check in now** delivers one on the spot. A brief is written from what is already on this PC — no model call, no network — so it works offline and cannot invent anything. A check-in whose moment passed while the PC was asleep is delivered late, and only within four hours: a morning brief at eight at night is not a brief.
+- **System access** is two switches in **soul → abilities**, both off until you ask. Tier 1 covers read-only diagnostics, registry reads and files inside your own six folders, each confirmed per action; Tier 2 covers arbitrary commands that change the PC, with its own warning. Ustaad refuses credential stores, browser password databases, elevation and anything that weakens Windows security whatever is switched on, and every attempt lands in an audit log in **memory → system access** with the raw command visible. **Ctrl + Alt + Q** stops everything mid-task.
+- Say **"ustaad"** (once switched on) and the island comes up with the microphone already open: keep talking, and Ustaad submits on its own when you stop. It listens with the speech recognizer Windows already ships, so no audio leaves the machine, and the tray can mute it instantly.
 - Give it a **task** rather than a single order — "go to youtube and play anything", "open my orders and check the last one" — and it works step by step: it clicks real buttons, looks at the screen to check what happened, and corrects itself when a step did not work. One approval covers the whole task; **Escape** stops it mid-task.
-- Ask Clickaa to **summarise, tighten, grammar-check or translate** whatever you copied, and the clipboard is rewritten in place with one click to put the old text back.
+- Ask Ustaad to **summarise, tighten, grammar-check or translate** whatever you copied, and the clipboard is rewritten in place with one click to put the old text back.
 - **Timers** ("set a timer for 12 minutes") tick down in the island and end with a notification, a chime-free spoken line, and a stop button.
 - **Snippets** ("save this as my address", then "insert my address") type a saved phrase into whatever window has focus.
 - Keep a transparent, click-through blue cursor next to the pointer that flies to the screen element it mentions.
 - Jump to a spoken answer with the **island**, the notch at the top of every screen: now playing, to-do list, reminders and routines, clipboard, launchable apps, wallpapers and quick switches.
-- Say "remember my brother's birthday is 4 March", "every morning at 9 open Unity and Spotify", or "search how to cook spaghetti on YouTube" and Clickaa keeps it and does it.
+- Say "remember my brother's birthday is 4 March", "every morning at 9 open Unity and Spotify", or "search how to cook spaghetti on YouTube" and Ustaad keeps it and does it.
 - Anything that touches your PC (**open apps, type text, press keys, change the wallpaper**) waits for a quick yes — in the island, or by saying "yes" out loud. Reminders, routines, to-dos and memory never interrupt.
+
+## This build is called Ustaad
+
+The app was **Clickaa**, and **Clicky** before that. Nothing about how it works changed with the name: on first launch Ustaad copies your settings, to-do list, schedules, memory, clipboard history, saved skills and snippets out of the older folder (`%APPDATA%\Clickaa`, then `%APPDATA%\Clicky`) and leaves the old folder in place. An existing file always wins, so the import can never overwrite newer settings.
+
+Because the Windows installer keys off the app id, an older Clickaa install should be uninstalled before installing Ustaad.
+
+## The interface
+
+The surface language is **neumorphism**: shapes are moulded out of one background rather than drawn on top of it. Raised controls carry a soft highlight from the top-left and a shade to the bottom-right, and anything pressed — inputs, toggles, the active tab, a button mid-click — carries the same two shadows turned inward. There are no borders separating things that share a surface, and text contrast is never sacrificed to the effect.
+
+Practically, that means: the tabs are an inset track with the active one raised out of it, buttons physically press down when clicked, the microphone button sinks while it listens, and every card is the same slab of surface lifted by light rather than a differently coloured box.
+
+The panel also opens with a **three-step start card** — connect a brain, hold a key and talk, then let it work — that ticks each step off from real state and removes itself once all three are done.
 
 ## What a task looks like
 
@@ -29,25 +43,25 @@ opening youtube now.
 <actions>[{"type":"open_url","url":"https://youtube.com"}]</actions>
 ```
 
-Clickaa then does one step, takes a fresh screenshot of every display, and asks the model a single question: is the goal met? The answer is `DONE`, `NEXT` (one more step, usually a `click_at` on a spot read off that screenshot) or `GIVE_UP`. The loop is bounded — 8 steps, 2 re-plans per step, 75 seconds — and a model that asks for the identical step twice is treated as stuck and handed back to you. Playback goals skip the screenshot question entirely: Clickaa asks Windows what is playing, which is cheaper and much harder to get wrong.
+Ustaad then does one step, takes a fresh screenshot of every display, and asks the model a single question: is the goal met? The answer is `DONE`, `NEXT` (one more step, usually a `click_at` on a spot read off that screenshot) or `GIVE_UP`. The loop is bounded — 8 steps, 2 re-plans per step, 75 seconds — and a model that asks for the identical step twice is treated as stuck and handed back to you. Playback goals skip the screenshot question entirely: Ustaad asks Windows what is playing, which is cheaper and much harder to get wrong.
 
-## Two ways to give Clickaa a brain
+## Two ways to give Ustaad a brain
 
-Clickaa needs a model to think with. Pick either, in the panel's **setup** tab:
+Ustaad needs a model to think with. Pick either, in the panel's **setup** tab:
 
-1. **Your own Gemini API key** — make a free key at <https://aistudio.google.com/api-keys>, paste it into **setup → your own gemini key**, and press **save & test**. Talking, seeing your screen, dictation and acting all run on that one key, stored on this PC only, in `%APPDATA%\Clickaa\settings.json`. No Worker, no other account.
+1. **Your own Gemini API key** — make a free key at <https://aistudio.google.com/api-keys>, paste it into **setup → your own gemini key**, and press **save & test**. Talking, seeing your screen, dictation and acting all run on that one key, stored on this PC only, in `%APPDATA%\Ustaad\settings.json`. No Worker, no other account.
 2. **A deployed Cloudflare Worker** — the original path, which keeps the Claude, AssemblyAI and ElevenLabs keys off this PC (see the repository's root `README.md`). Paste the Worker base URL into **setup → cloudflare worker**.
 
-If both are configured, the provider selected in **setup** wins; if that provider has no key or URL yet, Clickaa uses the other one instead of failing.
+If both are configured, the provider selected in **setup** wins; if that provider has no key or URL yet, Ustaad uses the other one instead of failing.
 
 ## Requirements
 
 - Windows 10 version 22H2 or Windows 11 (64-bit x64 or ARM64)
 - Node.js 22.12 or newer when building from source
-- A Gemini API key **or** a deployed Clickaa Cloudflare Worker
+- A Gemini API key **or** a deployed Ustaad Cloudflare Worker
 - Microphone access when Windows asks on the first interaction
 
-Clickaa needs no Accessibility or Screen Recording permission: it captures the desktop through Electron's Windows capture API, and only sends a screenshot while an interaction you started is running.
+Ustaad needs no Accessibility or Screen Recording permission: it captures the desktop through Electron's Windows capture API, and only sends a screenshot while an interaction you started is running.
 
 ## Run from source
 
@@ -59,7 +73,7 @@ npm install
 npm run dev
 ```
 
-Clickaa appears in the Windows notification area. On first launch its panel opens on the **setup** tab:
+Ustaad appears in the Windows notification area. On first launch its panel opens on the **setup** tab:
 
 1. Make a key at <https://aistudio.google.com/api-keys> (or deploy the Worker).
 2. Paste it and press **save & test**.
@@ -80,10 +94,10 @@ npm run package:win
 
 The NSIS installers are written to `windows/release/`:
 
-- `Clickaa-Setup-<version>-x64.exe`
-- `Clickaa-Setup-<version>-arm64.exe`
+- `Ustaad-Setup-<version>-x64.exe`
+- `Ustaad-Setup-<version>-arm64.exe`
 
-The installer is per-user, offers an install location, creates Start Menu and desktop shortcuts, and preserves Clickaa's settings on uninstall. The app can register itself to start when the user signs in; this is controllable in the panel.
+The installer is per-user, offers an install location, creates Start Menu and desktop shortcuts, and preserves Ustaad's settings on uninstall. The app can register itself to start when the user signs in; this is controllable in the panel.
 
 CI also launches the packaged x64 application for ten seconds before accepting a build. This catches missing native binaries, invalid preload paths, and main-process startup crashes that compilation alone cannot detect.
 
@@ -106,7 +120,7 @@ Nothing in this repository requires a certificate. With the two signing secrets 
 Windows refuses an unsigned installer in two different ways, and they are not the same problem:
 
 - **SmartScreen** shows "Windows protected your PC", and **More info → Run anyway** clears it. That is a speed bump.
-- **Smart App Control**, on by default on clean Windows 11 installs (22H2 and later), blocks unsigned apps outright. Its dialog offers **Okay** and **Get apps from the Store** and nothing else: there is no per-app exception, and adding Clickaa to Defender exclusions does not help because Smart App Control is a separate feature. It allows an app when Microsoft's cloud intelligence already recognizes it, or when the app is signed with a certificate from a CA in the Microsoft Trusted Root Program.
+- **Smart App Control**, on by default on clean Windows 11 installs (22H2 and later), blocks unsigned apps outright. Its dialog offers **Okay** and **Get apps from the Store** and nothing else: there is no per-app exception, and adding Ustaad to Defender exclusions does not help because Smart App Control is a separate feature. It allows an app when Microsoft's cloud intelligence already recognizes it, or when the app is signed with a certificate from a CA in the Microsoft Trusted Root Program.
 
 Two signing providers are wired up. Set up one, or neither.
 
@@ -181,7 +195,7 @@ The tests cover configuration and key validation, to-do, memory and schedule sto
 windows/
   src/main/
     main.ts                    Electron lifecycle, tray, and secure IPC
-    clickaa-controller.ts      interactions, actions, confirmations, scheduler
+    ustaad-controller.ts      interactions, actions, confirmations, scheduler
     desktop-windows.ts         tray, panel, island, and per-monitor overlays
     brain-router.ts            Gemini key vs Cloudflare Worker, speech fallback
     gemini-client.ts           Gemini chat, speech, transcription, key checks
@@ -198,7 +212,7 @@ windows/
     briefing.ts                the morning brief and evening recap, built from local data
     skill-store.ts             tasks the user saved by name
     skill-suggestions.ts       when repeating a task becomes an offer to save it
-    wake-word-listener.ts      the offline "clickaa" listener and its lifecycle
+    wake-word-listener.ts      the offline "ustaad" listener and its lifecycle
     wake-word-script.ts        the System.Speech helper that hears its own name
     screen-capture.ts          multi-monitor capture and circled-region crops
     pointing.ts                [POINT] parsing and Windows coordinate mapping
@@ -215,9 +229,9 @@ The Electron renderers are sandboxed with context isolation and no Node integrat
 
 ## Shortcut details
 
-Clickaa tracks physical key-down and key-up events through `uiohook-napi`, which is necessary for true push-to-talk behavior. Either Control key works, and the talk shortcut requires **left Alt**. Requiring left Alt intentionally avoids triggering on the Windows AltGr sequence used by many international keyboard layouts. **Escape** cancels a circling session, closes a snip, and stops a running task.
+Ustaad tracks physical key-down and key-up events through `uiohook-napi`, which is necessary for true push-to-talk behavior. Either Control key works, and the talk shortcut requires **left Alt**. Requiring left Alt intentionally avoids triggering on the Windows AltGr sequence used by many international keyboard layouts. **Escape** cancels a circling session, closes a snip, and stops a running task.
 
-The wake word is **off until you switch it on** in **setup → wake word**. When it is on, saying the name summons the island and opens one listening window: silence for a moment closes it again without sending anything, and speech is submitted after a short pause. The microphone light in the island's notch stays visible the whole time Clickaa is listening, and the tray menu can mute it without changing the setting.
+The wake word is **off until you switch it on** in **setup → wake word**. When it is on, saying the name summons the island and opens one listening window: silence for a moment closes it again without sending anything, and speech is submitted after a short pause. The microphone light in the island's notch stays visible the whole time Ustaad is listening, and the tray menu can mute it without changing the setting.
 
 The dictation shortcut is configurable in **setup → keys**: **Ctrl + Windows** (default), **Ctrl + Shift + Space**, or **Caps Lock**. Windows itself opens the Start menu when Ctrl + Windows is released; if that bothers you, pick another shortcut.
 
@@ -225,18 +239,18 @@ If the global listener cannot start, the tray panel remains usable through its *
 
 ## Troubleshooting
 
-- **"Smart App Control blocked an app that may be unsafe" while installing:** this is Smart App Control, not SmartScreen, and it has no **Run anyway** option to click. Check **Windows Security → App & browser control → Smart App Control settings**. On Windows 11 with the April 2026 update (24H2/25H2, build 26100.8116 or later) it can be switched off and back on freely; on older builds, switching it off is one-way until Windows is reinstalled, so decide with that in mind. Adding Clickaa to Defender exclusions will not help — Smart App Control is a separate feature with no per-app exception. Before running an unsigned installer, confirm it is the file CI built with `Get-FileHash .\Clickaa-Setup-1.1.0-x64.exe -Algorithm SHA256` and compare it against the digest on the release page. Running from source (`npm run dev`) may or may not be allowed, since Smart App Control judges every unsigned binary it loads. Signing the builds is the real fix; see **Code signing** above.
+- **"Smart App Control blocked an app that may be unsafe" while installing:** this is Smart App Control, not SmartScreen, and it has no **Run anyway** option to click. Check **Windows Security → App & browser control → Smart App Control settings**. On Windows 11 with the April 2026 update (24H2/25H2, build 26100.8116 or later) it can be switched off and back on freely; on older builds, switching it off is one-way until Windows is reinstalled, so decide with that in mind. Adding Ustaad to Defender exclusions will not help — Smart App Control is a separate feature with no per-app exception. Before running an unsigned installer, confirm it is the file CI built with `Get-FileHash .\Ustaad-Setup-1.1.0-x64.exe -Algorithm SHA256` and compare it against the digest on the release page. Running from source (`npm run dev`) may or may not be allowed, since Smart App Control judges every unsigned binary it loads. Signing the builds is the real fix; see **Code signing** above.
 - **The Smart App Control toggle is greyed out:** the registry is the same switch by a different door. Set `HKLM\SYSTEM\CurrentControlSet\Control\CI\Policy` → `VerifiedAndReputablePolicyState` to `0` (off), `1` (on/enforced) or `2` (evaluation), then run `CiTool.exe -r` to refresh the policy:
   ```powershell
   reg add "HKLM\SYSTEM\CurrentControlSet\Control\CI\Policy" /v VerifiedAndReputablePolicyState /t REG_DWORD /d 0 /f
   CiTool.exe -r
   ```
-  Check `winver` first: builds 26100.8116+ and 26200.8116+ (Windows 11 24H2/25H2 with the April 2026 update) have the reversible in-app toggle, and on those the registry edit is unnecessary. On older builds the registry route is known to revert on reboot, and turning it back on afterwards is unreliable — so make a restore point and treat it as a decision, not a tweak. This is machine-wide: it switches the guard off for every unknown unsigned program, not just Clickaa. Windows Defender keeps scanning regardless.
+  Check `winver` first: builds 26100.8116+ and 26200.8116+ (Windows 11 24H2/25H2 with the April 2026 update) have the reversible in-app toggle, and on those the registry edit is unnecessary. On older builds the registry route is known to revert on reboot, and turning it back on afterwards is unreliable — so make a restore point and treat it as a decision, not a tweak. This is machine-wide: it switches the guard off for every unknown unsigned program, not just Ustaad. Windows Defender keeps scanning regardless.
 - **The panel says the brain is not connected:** paste a full Gemini key (it starts with `AIza`), or a Worker base URL without `/chat` or another route.
 - **Gemini rejects the key:** make sure the key is from <https://aistudio.google.com/api-keys> and, if you are in the EEA, UK or Switzerland, that the project has billing enabled.
 - **No microphone prompt appeared:** open **Settings → Privacy & security → Microphone** and allow desktop apps to access the microphone.
-- **Ctrl + Alt does nothing:** exit and restart Clickaa. Security tools that block global keyboard hooks may require Clickaa to be allow-listed; the hold-to-talk button remains available.
+- **Ctrl + Alt does nothing:** exit and restart Ustaad. Security tools that block global keyboard hooks may require Ustaad to be allow-listed; the hold-to-talk button remains available.
 - **Windows opens the Start menu while dictating:** change the dictation shortcut in **setup → keys**.
 - **The wrong monitor is targeted:** run `npm test` first, then report the monitor layout and Windows display scaling values.
 - **An action ran that you did not want:** open the island and press **undo** on the entry; clipboard writes, typed text and window moves are all reversible.
-- **The app is still running after the panel closes:** this is expected. Use **Quit Clickaa** from the tray icon's context menu.
+- **The app is still running after the panel closes:** this is expected. Use **Quit Ustaad** from the tray icon's context menu.

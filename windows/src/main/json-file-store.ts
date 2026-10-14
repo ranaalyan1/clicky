@@ -2,7 +2,7 @@ import { mkdirSync, readFileSync, renameSync, rmSync, writeFileSync } from "node
 import { dirname } from "node:path";
 
 /**
- * Small atomic JSON persistence helper shared by Clickaa's stores.
+ * Small atomic JSON persistence helper shared by Ustaad's stores.
  *
  * Windows will not reliably replace an existing file with `renameSync`, so the
  * complete temporary file is written first and the destination is removed only

@@ -33,7 +33,7 @@ export function encodePcm16ToWav(
 
 /**
  * Gemini text-to-speech returns raw 16-bit PCM at 24 kHz, which no HTML audio
- * element can play, so Clickaa wraps it before playback.
+ * element can play, so Ustaad wraps it before playback.
  */
 export function wrapGeminiSpeechAudio(base64PcmAudio: string, sampleRate = 24_000): {
   audioData: Buffer;

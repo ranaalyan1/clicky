@@ -1,6 +1,6 @@
 import { spawn } from "node:child_process";
 import { clipboard, shell } from "electron";
-import { AbilitySettings, CapturedDisplayImage, ClickaaAction } from "../shared/contracts";
+import { AbilitySettings, CapturedDisplayImage, UstaadAction } from "../shared/contracts";
 import { isAppChoiceAmbiguous, LaunchableApp } from "./app-name-matching";
 import { buildSearchUrl } from "./web-search";
 import { MemoryStore } from "./memory-store";
@@ -13,11 +13,11 @@ import { decideSystemAccess } from "./system-access";
 import { SystemAccessRunner } from "./system-access-runner";
 import { TodoStore } from "./todo-store";
 import { mapImageCoordinateToWindowsDesktop, selectPointingDisplay } from "./pointing";
-import { ClickaaWindowsBridge } from "./windows-bridge";
+import { UstaadWindowsBridge } from "./windows-bridge";
 
 export interface ActionChoice {
   label: string;
-  action: ClickaaAction;
+  action: UstaadAction;
 }
 
 export interface ActionExecutionOutcome {
@@ -31,7 +31,7 @@ export interface ActionExecutionOutcome {
 }
 
 export interface ActionExecutorDependencies {
-  bridge: ClickaaWindowsBridge;
+  bridge: UstaadWindowsBridge;
   appIndex: StartMenuAppIndex;
   todoStore: TodoStore;
   memoryStore: MemoryStore;
@@ -73,7 +73,7 @@ const pasteInsteadOfTypingThreshold = 400;
  * always comes back as a readable sentence instead of an exception that could
  * interrupt a spoken reply.
  */
-export class ClickaaActionExecutor {
+export class UstaadActionExecutor {
   /**
    * The screenshots the model was shown for the current request. Clicks are
    * expressed in that pixel space, so this is what makes them land correctly.
@@ -89,7 +89,7 @@ export class ClickaaActionExecutor {
     this.clickCoordinateSpace = capturedDisplays;
   }
 
-  async execute(action: ClickaaAction): Promise<ActionExecutionOutcome> {
+  async execute(action: UstaadAction): Promise<ActionExecutionOutcome> {
     switch (action.type) {
       case "open_app":
         return this.openApp(action.name);
@@ -170,25 +170,25 @@ export class ClickaaActionExecutor {
         return this.insertSnippet(action.name);
       case "open_panel":
         this.dependencies.showPanel(action.page);
-        return completedOutcome("opened the Clickaa panel");
+        return completedOutcome("opened the Ustaad panel");
       /* Timers and clipboard rewrites need state the controller owns; it runs
          them before the executor is ever reached. */
       case "timer_start":
       case "timer_cancel":
       case "screenshot_region":
       case "clipboard_transform":
-        return failedOutcome("that action is handled by Clickaa itself");
+        return failedOutcome("that action is handled by Ustaad itself");
       default:
         return failedOutcome("that action is not supported yet");
     }
   }
 
   /**
-   * Clicks a point the model picked out of a screenshot. Clickaa hands the very
+   * Clicks a point the model picked out of a screenshot. Ustaad hands the very
    * captures the model saw to setClickCoordinateSpace, so those pixels map back
    * onto the right monitor at the right scale.
    */
-  private async clickAt(action: Extract<ClickaaAction, { type: "click_at" }>): Promise<ActionExecutionOutcome> {
+  private async clickAt(action: Extract<UstaadAction, { type: "click_at" }>): Promise<ActionExecutionOutcome> {
     const capturedDisplays = this.clickCoordinateSpace;
     if (!capturedDisplays.length) {
       return failedOutcome("I do not have a screenshot to place that click on.");
@@ -279,7 +279,7 @@ export class ClickaaActionExecutor {
     };
   }
 
-  private async manageFile(action: Extract<ClickaaAction, { type: "manage_file" }>): Promise<ActionExecutionOutcome> {
+  private async manageFile(action: Extract<UstaadAction, { type: "manage_file" }>): Promise<ActionExecutionOutcome> {
     const decision = decideSystemAccess({
       request: { kind: "file", path: action.path, operation: action.operation },
       abilities: this.currentAbilities(),
@@ -616,7 +616,7 @@ export class ClickaaActionExecutor {
     name: string,
     timeOfDay: string,
     repeat: "none" | "daily" | "weekdays" | "weekends",
-    routineActions: ClickaaAction[],
+    routineActions: UstaadAction[],
   ): ActionExecutionOutcome {
     const createdTask = this.dependencies.scheduleStore.add({
       name,
@@ -672,7 +672,7 @@ export class ClickaaActionExecutor {
         await this.dependencies.bridge.send({ command: "send_keys", keys: "escape" });
       }
     } catch (error) {
-      console.warn("Clickaa could not check which window has focus:", error);
+      console.warn("Ustaad could not check which window has focus:", error);
     }
   }
 }

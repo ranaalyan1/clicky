@@ -1,7 +1,7 @@
 /**
  * Local wall-clock helpers.
  *
- * Every timestamp Clickaa stores or shows is a local-time ISO string without a
+ * Every timestamp Ustaad stores or shows is a local-time ISO string without a
  * timezone suffix (`2026-11-10T11:00:00`). The user speaks in wall-clock terms
  * ("tomorrow at eleven"), so keeping the wall clock intact avoids daylight
  * saving surprises when a reminder fires.

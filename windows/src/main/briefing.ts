@@ -1,9 +1,9 @@
 /**
- * What Clickaa says when it wakes up on its own.
+ * What Ustaad says when it wakes up on its own.
  *
  * The digest is assembled from what is already on this PC — schedules, to-dos
  * and the activity feed — so a check-in costs nothing, works with no network,
- * and cannot hallucinate: every line is something Clickaa can prove it knows.
+ * and cannot hallucinate: every line is something Ustaad can prove it knows.
  * The model is not asked to write this, which is also why it still works when
  * the brain is unreachable.
  */

@@ -136,7 +136,7 @@ html, body { width: 100%; height: 100%; margin: 0; overflow: hidden; background:
 }
 .point-label:not(:empty) { opacity: 1; transform: translateY(0); }
 
-/* Keep bubbles readable when Clickaa is near the right edge. */
+/* Keep bubbles readable when Ustaad is near the right edge. */
 .buddy.flip-bubble .response-stack { left: auto; right: 31px; align-items: flex-end; }
 .buddy.flip-bubble .response-bubble { border-radius: 13px 13px 4px 13px; }
 .buddy.flip-bubble .point-label { margin-left: 0; margin-right: 4px; }

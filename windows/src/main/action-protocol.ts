@@ -3,8 +3,8 @@ import {
   AbilityId,
   AbilitySettings,
   ClipboardTransformOperation,
-  ClickaaAction,
-  ClickaaActionType,
+  UstaadAction,
+  UstaadActionType,
   ConfirmationMode,
   SearchTarget,
   searchTargets,
@@ -14,7 +14,7 @@ import {
    island and the main process can never disagree about what exists. */
 
 /**
- * Clickaa's action protocol.
+ * Ustaad's action protocol.
  *
  * The model finishes its spoken answer with a single machine-readable block:
  *
@@ -38,10 +38,10 @@ export const actionBlockClosingTag = "</actions>";
 
 export interface ParsedModelResponse {
   spokenText: string;
-  actions: ClickaaAction[];
+  actions: UstaadAction[];
   problems: string[];
   /**
-   * The finished result the user asked for, when the reply expects Clickaa to
+   * The finished result the user asked for, when the reply expects Ustaad to
    * keep working (a page to load, a video to start). The agent loop verifies
    * against this; a reply without it is a one-shot answer.
    */
@@ -49,14 +49,14 @@ export interface ParsedModelResponse {
 }
 
 interface ActionDefinition {
-  type: ClickaaActionType;
+  type: UstaadActionType;
   risk: ActionRisk;
   /** The ability that must be enabled before this action may run at all. */
   requiredAbility: AbilityId;
   /** How the confirmation card describes the action to the user. */
-  describe: (action: ClickaaAction) => string;
+  describe: (action: UstaadAction) => string;
   /** Turns untrusted model output into a validated action, or explains why not. */
-  normalize: (rawAction: Record<string, unknown>) => { action: ClickaaAction | null; problem: string | null };
+  normalize: (rawAction: Record<string, unknown>) => { action: UstaadAction | null; problem: string | null };
 }
 
 function readRequiredText(rawAction: Record<string, unknown>, key: string): string | null {
@@ -111,7 +111,7 @@ export function isAllowedAutomationUrl(rawUrl: string): boolean {
   }
 }
 
-const actionDefinitions: Record<ClickaaActionType, ActionDefinition> = {
+const actionDefinitions: Record<UstaadActionType, ActionDefinition> = {
   open_app: {
     type: "open_app",
     risk: "confirm",
@@ -358,7 +358,7 @@ const actionDefinitions: Record<ClickaaActionType, ActionDefinition> = {
       if (!name || !timeOfDay || !/^\d{1,2}:\d{2}$/u.test(timeOfDay)) {
         return { action: null, problem: "routine_add needs a name and a timeOfDay like 09:00" };
       }
-      const innerActions = parseClickaaActions(rawAction.actions).actions;
+      const innerActions = parseUstaadActions(rawAction.actions).actions;
       if (!innerActions.length) {
         return { action: null, problem: "routine_add needs the steps to run" };
       }
@@ -668,7 +668,7 @@ const actionDefinitions: Record<ClickaaActionType, ActionDefinition> = {
     type: "open_panel",
     risk: "safe",
     requiredAbility: "automation",
-    describe: (action) => `open the Clickaa panel (${(action as { page: string }).page})`,
+    describe: (action) => `open the Ustaad panel (${(action as { page: string }).page})`,
     normalize: (rawAction) => {
       const allowedPages = ["home", "soul", "plans", "memory", "setup"];
       const page = typeof rawAction.page === "string" && allowedPages.includes(rawAction.page)
@@ -680,20 +680,20 @@ const actionDefinitions: Record<ClickaaActionType, ActionDefinition> = {
 };
 
 /** Action types that change something on the user's PC need a confirmation. */
-export function getActionRisk(actionType: ClickaaActionType): ActionRisk {
+export function getActionRisk(actionType: UstaadActionType): ActionRisk {
   return actionDefinitions[actionType].risk;
 }
 
-export function getActionRequiredAbility(actionType: ClickaaActionType): AbilityId {
+export function getActionRequiredAbility(actionType: UstaadActionType): AbilityId {
   return actionDefinitions[actionType].requiredAbility;
 }
 
 /** Human phrasing for the confirmation card and the activity feed. */
-export function describeAction(action: ClickaaAction): string {
+export function describeAction(action: UstaadAction): string {
   return actionDefinitions[action.type].describe(action);
 }
 
-export function describeActions(actions: ClickaaAction[]): string {
+export function describeActions(actions: UstaadAction[]): string {
   return actions.map(describeAction).join(", then ");
 }
 
@@ -728,8 +728,8 @@ export function splitSpokenTextFromActionBlock(modelResponseText: string): {
 }
 
 /** Parses an `<actions>` payload (or a raw array) into validated actions. */
-export function parseClickaaActions(rawPayload: unknown): { actions: ClickaaAction[]; problems: string[] } {
-  const actions: ClickaaAction[] = [];
+export function parseUstaadActions(rawPayload: unknown): { actions: UstaadAction[]; problems: string[] } {
+  const actions: UstaadAction[] = [];
   const problems: string[] = [];
 
   if (rawPayload === null || rawPayload === undefined) {
@@ -761,7 +761,7 @@ export function parseClickaaActions(rawPayload: unknown): { actions: ClickaaActi
 
     const actionRecord = rawAction as Record<string, unknown>;
     const actionType = typeof actionRecord.type === "string" ? actionRecord.type : "";
-    const actionDefinition = actionDefinitions[actionType as ClickaaActionType];
+    const actionDefinition = actionDefinitions[actionType as UstaadActionType];
     if (!actionDefinition) {
       problems.push(`unknown action type "${actionType.slice(0, 40)}"`);
       continue;
@@ -786,7 +786,7 @@ export function parseModelResponse(modelResponseText: string): ParsedModelRespon
     return { spokenText, actions: [], problems: [], taskGoal };
   }
 
-  const { actions, problems } = parseClickaaActions(serializedActions);
+  const { actions, problems } = parseUstaadActions(serializedActions);
   return { spokenText, actions, problems, taskGoal };
 }
 
@@ -827,9 +827,9 @@ export function splitTaskGoalFromResponse(modelResponseText: string): {
  * for that action type or for everything.
  */
 export function actionNeedsConfirmation(
-  action: ClickaaAction,
+  action: UstaadAction,
   confirmationMode: ConfirmationMode,
-  autoApprovedActionTypes: ClickaaActionType[],
+  autoApprovedActionTypes: UstaadActionType[],
 ): boolean {
   if (confirmationMode === "never") {
     return false;
@@ -845,11 +845,11 @@ export function actionNeedsConfirmation(
 
 /** Drops actions whose ability the user switched off, explaining each one. */
 export function filterActionsByAbilities(
-  actions: ClickaaAction[],
+  actions: UstaadAction[],
   abilities: AbilitySettings,
-): { allowedActions: ClickaaAction[]; blockedActions: Array<{ action: ClickaaAction; ability: AbilityId }> } {
-  const allowedActions: ClickaaAction[] = [];
-  const blockedActions: Array<{ action: ClickaaAction; ability: AbilityId }> = [];
+): { allowedActions: UstaadAction[]; blockedActions: Array<{ action: UstaadAction; ability: AbilityId }> } {
+  const allowedActions: UstaadAction[] = [];
+  const blockedActions: Array<{ action: UstaadAction; ability: AbilityId }> = [];
 
   for (const action of actions) {
     const requiredAbility = getActionRequiredAbility(action.type);
@@ -915,8 +915,8 @@ export function buildActionProtocolInstructions(abilities: AbilitySettings): str
 
 - read_registry: {"type":"read_registry","path":"HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Run"} — reads one registry key and its values. read-only, never a credential store.
 - manage_file: {"type":"manage_file","operation":"read","path":"C:\\Users\\me\\Documents\\notes.txt"} — reads, lists or writes one file inside the user's own Documents, Downloads, Desktop, Pictures, Videos or Music folder. nothing outside those folders will run, and writes ask first.
-- run_command: {"type":"run_command","command":"Get-Process | Sort-Object CPU -Descending | Select-Object -First 5","reason":"finding what is using the cpu"} — runs one PowerShell command. read-only diagnostics run with the first switch on; anything that changes the pc, reaches the network or installs software needs the separate arbitrary-commands switch, and Clickaa refuses credentials, elevation and anything that weakens windows security whatever is switched on. always include "reason", and prefer the read-only diagnostics: Get-Date, Get-Process, Get-Service, Get-ChildItem, Get-Volume, ipconfig, systeminfo, tasklist, whoami, ping, ping's cousins, and pipes made only of those.
-- never try to read saved passwords, browser login data, .ssh keys or the registry's SAM or SECURITY hives: Clickaa blocks those, and asking wastes the user's time.`);
+- run_command: {"type":"run_command","command":"Get-Process | Sort-Object CPU -Descending | Select-Object -First 5","reason":"finding what is using the cpu"} — runs one PowerShell command. read-only diagnostics run with the first switch on; anything that changes the pc, reaches the network or installs software needs the separate arbitrary-commands switch, and Ustaad refuses credentials, elevation and anything that weakens windows security whatever is switched on. always include "reason", and prefer the read-only diagnostics: Get-Date, Get-Process, Get-Service, Get-ChildItem, Get-Volume, ipconfig, systeminfo, tasklist, whoami, ping, ping's cousins, and pipes made only of those.
+- never try to read saved passwords, browser login data, .ssh keys or the registry's SAM or SECURITY hives: Ustaad blocks those, and asking wastes the user's time.`);
   }
   }
 
@@ -927,9 +927,9 @@ if the user asks for something that cannot be finished in one action — "go to 
 
 <task>play a video on youtube</task><actions>[{"type":"open_url","url":"https://youtube.com"}]</actions>
 
-Clickaa will run that first step, look at the screen, and continue on its own until the goal is met. so:
+Ustaad will run that first step, look at the screen, and continue on its own until the goal is met. so:
 - put the goal in <task>, never the whole plan, and never the same thing as the <actions> step
-- prefer one or two actions per step; Clickaa looks in between
+- prefer one or two actions per step; Ustaad looks in between
 - use click_at with coordinates taken from the screenshot to click real things
 - use wait when a page is clearly still loading
 - the goal in <task> is what the user asked for, phrased as the finished result`);
