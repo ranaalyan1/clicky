@@ -15,6 +15,7 @@ import {
   IslandToggleKey,
   NowPlayingInfo,
   RegionSelectorSelection,
+  WakeWordSurfaceState,
 } from "../shared/contracts";
 import {
   actionNeedsConfirmation,
@@ -42,6 +43,7 @@ import {
 } from "./dictation-prompts";
 import { formatClockTime, formatFriendlyDateTime, formatLocalIso } from "./local-time";
 import { captureWindowsDesktopRegionPng } from "./screen-capture";
+import { WakeWordDetection, WakeWordListener, WakeWordListenerState } from "./wake-word-listener";
 import { ShortcutId } from "./shortcut-registry";
 import { mapImageCoordinateToWindowsDesktop, parsePointingTag, selectPointingDisplay } from "./pointing";
 import { ScheduleStore } from "./schedule-store";
@@ -60,6 +62,18 @@ const schedulerTickMilliseconds = 20_000;
 const clipboardPollMilliseconds = 900;
 const nowPlayingPollMilliseconds = 3_000;
 const confirmationTimeoutMilliseconds = 45_000;
+
+/**
+ * How long the listening window after the wake word stays open. The first
+ * number is generous enough for "Clickaa ..." pauses, and the last two stop
+ * Clickaa from holding the microphone open when the name was a false start.
+ */
+const wakeFollowUpSilenceWindows = {
+  speechLevel: 0.08,
+  afterSpeech: 1_800,
+  noSpeech: 4_000,
+  maximum: 15_000,
+};
 
 interface UndoableAction {
   label: string;
@@ -110,6 +124,14 @@ export class ClickaaController {
   private lastClipboardText = "";
   private activeTimers: ActiveTimer[] = [];
   private isSnipInFlight = false;
+  private readonly wakeWordListener: WakeWordListener;
+  private wakeWordState: WakeWordSurfaceState = "off";
+  private wakeWordMessage = "";
+  /** Runtime mute: the tray switch that silences the microphone without losing the setting. */
+  private wakeWordMuted = false;
+  private wakeFollowUpTimer: NodeJS.Timeout | null = null;
+  private wakeFollowUpStartedAtMs = 0;
+  private wakeFollowUpHeardSpeechAtMs = 0;
   private timerTickTimer: NodeJS.Timeout | null = null;
   private latestNowPlaying: NowPlayingInfo | null = null;
   private readonly runningScheduledTaskIds = new Set<string>();
@@ -144,6 +166,11 @@ export class ClickaaController {
       now: () => new Date(),
     });
 
+    this.wakeWordListener = new WakeWordListener(userDataDirectory, {
+      onStateChanged: (state, message) => this.handleWakeWordListenerState(state, message),
+      onWakeWordDetected: (detection) => this.handleWakeWordDetected(detection),
+    });
+
     const config = configStore.getConfig();
     this.publicState = {
       voiceState: "idle",
@@ -166,6 +193,9 @@ export class ClickaaController {
       automationPaused: config.automationPaused,
       islandEnabled: config.islandEnabled,
       clipboardHistoryEnabled: config.clipboardHistoryEnabled,
+      wakeWordState: "off",
+      wakeWordMessage: "",
+      wakeWordMuted: false,
       config,
     };
   }
@@ -196,9 +226,12 @@ export class ClickaaController {
       console.warn("Clickaa could not start its Windows helper:", error);
     });
     void this.refreshAppIndex();
+    this.synchronizeWakeWordListener();
   }
 
   stop(): void {
+    this.endWakeFollowUp();
+    this.wakeWordListener.stop();
     this.cancelActiveWork();
     this.clearTransientOverlayHideTimer();
     this.stopTimers();
@@ -1192,6 +1225,14 @@ export class ClickaaController {
       return;
     }
     this.publicState.audioPowerLevel = Math.max(0, Math.min(audioPowerLevel, 1));
+
+    if (
+      this.isWakeFollowUpActive()
+      && this.publicState.audioPowerLevel >= wakeFollowUpSilenceWindows.speechLevel
+    ) {
+      this.wakeFollowUpHeardSpeechAtMs = Date.now();
+    }
+
     this.publishState();
     this.desktopWindows.publishIslandState(this.buildIslandState());
   }
@@ -1284,6 +1325,14 @@ export class ClickaaController {
       if (updatedConfig.islandShowNowPlaying) {
         this.startNowPlayingWatcher();
       }
+    }
+
+    if (
+      previousConfig.abilities.wakeWord !== updatedConfig.abilities.wakeWord
+      || previousConfig.automationPaused !== updatedConfig.automationPaused
+      || previousConfig.wakeWordProvider !== updatedConfig.wakeWordProvider
+    ) {
+      this.synchronizeWakeWordListener();
     }
 
     this.publishState();
@@ -1477,6 +1526,172 @@ export class ClickaaController {
     this.isIslandCurrentlyExpanded = isExpanded;
     this.desktopWindows.setIslandExpanded(isExpanded);
     this.publishIslandState();
+  }
+
+  /* ---------------------------------------------------------------------- */
+  /* Wake word                                                              */
+  /* ---------------------------------------------------------------------- */
+
+  /**
+   * Runs the offline listener exactly when the user has asked for it: switched
+   * on, not muted, and not paused. Every other combination leaves the
+   * microphone closed.
+   */
+  synchronizeWakeWordListener(): void {
+    const config = this.configStore.getConfig();
+    const shouldListen = config.abilities.wakeWord
+      && !this.wakeWordMuted
+      && !config.automationPaused
+      && config.wakeWordProvider === "offline";
+
+    if (!shouldListen) {
+      this.wakeWordListener.stop();
+      this.wakeWordState = "off";
+      this.wakeWordMessage = config.abilities.wakeWord
+        ? this.wakeWordMuted
+          ? "the microphone is muted from the tray"
+          : config.automationPaused
+            ? "listening stops while actions are paused"
+            : config.wakeWordProvider === "cloud"
+              ? "the cloud wake word is not switched on in this build yet"
+              : ""
+        : "";
+      this.publishState();
+      this.publishIslandState();
+      return;
+    }
+
+    this.wakeWordListener.start();
+  }
+
+  /** The tray switch: silence the microphone without changing the setting. */
+  toggleWakeWordMuted(): void {
+    this.wakeWordMuted = !this.wakeWordMuted;
+    this.publicState.wakeWordMuted = this.wakeWordMuted;
+    this.activityFeed.record(
+      "system",
+      this.wakeWordMuted ? "wake word muted" : "wake word listening again",
+      this.wakeWordMuted
+        ? "Clickaa is not listening for its name until you unmute it"
+        : "say \"clickaa\" to summon the island",
+      false,
+    );
+    this.synchronizeWakeWordListener();
+    this.publishState();
+    this.publishIslandState();
+  }
+
+  isWakeWordMuted(): boolean {
+    return this.wakeWordMuted;
+  }
+
+  private handleWakeWordListenerState(state: WakeWordListenerState, message: string): void {
+    this.wakeWordState = state === "stopped" ? "off" : state;
+    this.wakeWordMessage = message;
+    this.publicState.wakeWordState = this.wakeWordState;
+    this.publicState.wakeWordMessage = message;
+    this.publishState();
+    this.publishIslandState();
+  }
+
+  /**
+   * "Clickaa" on its own summons the island and opens the microphone for one
+   * follow-up: the user can keep talking, and Clickaa submits by itself once
+   * they stop.
+   */
+  private handleWakeWordDetected(detection: WakeWordDetection): void {
+    if (this.wakeWordMuted || this.activeInteractionKind !== null || this.isSnipInFlight) {
+      return;
+    }
+    if (this.publicState.voiceState !== "idle") {
+      return;
+    }
+
+    this.activityFeed.record(
+      "system",
+      `heard "${detection.phrase}"`,
+      `${detection.confidence}% confidence, on this pc`,
+      false,
+    );
+    this.desktopWindows.revealIsland();
+    this.desktopWindows.openIsland();
+    this.publishIslandState();
+    void this.beginWakeFollowUp();
+  }
+
+  /**
+   * One listening window after the wake word. It ends on silence, and it ends
+   * quietly when the user said the wake word and then said nothing else.
+   */
+  private async beginWakeFollowUp(): Promise<void> {
+    await this.beginInteraction("talk");
+    if (this.activeInteractionKind !== "talk") {
+      return;
+    }
+
+    this.wakeFollowUpStartedAtMs = Date.now();
+    this.wakeFollowUpHeardSpeechAtMs = 0;
+    this.startWakeFollowUpWatchdog();
+  }
+
+  private startWakeFollowUpWatchdog(): void {
+    this.clearWakeFollowUpWatchdog();
+    this.wakeFollowUpTimer = setInterval(() => {
+      const now = Date.now();
+      const elapsedMilliseconds = now - this.wakeFollowUpStartedAtMs;
+
+      if (!this.wakeFollowUpHeardSpeechAtMs) {
+        if (elapsedMilliseconds > wakeFollowUpSilenceWindows.noSpeech) {
+          this.endWakeFollowUp({ submit: false });
+        }
+        return;
+      }
+
+      if (now - this.wakeFollowUpHeardSpeechAtMs > wakeFollowUpSilenceWindows.afterSpeech) {
+        this.endWakeFollowUp({ submit: true });
+        return;
+      }
+
+      if (elapsedMilliseconds > wakeFollowUpSilenceWindows.maximum) {
+        this.endWakeFollowUp({ submit: true });
+      }
+    }, 150);
+  }
+
+  private clearWakeFollowUpWatchdog(): void {
+    if (this.wakeFollowUpTimer) {
+      clearInterval(this.wakeFollowUpTimer);
+      this.wakeFollowUpTimer = null;
+    }
+  }
+
+  private endWakeFollowUp(options: { submit: boolean } = { submit: false }): void {
+    const wasActive = this.wakeFollowUpStartedAtMs > 0;
+    this.clearWakeFollowUpWatchdog();
+    this.wakeFollowUpStartedAtMs = 0;
+    this.wakeFollowUpHeardSpeechAtMs = 0;
+
+    if (!wasActive || this.activeInteractionKind !== "talk") {
+      return;
+    }
+
+    if (options.submit) {
+      void this.finishListening();
+      return;
+    }
+
+    // The user called Clickaa's name and stopped there. Close the microphone
+    // without sending anything anywhere, and leave the island open.
+    this.cancelActiveWork();
+    this.publicState.voiceState = "idle";
+    this.publicState.interactionKind = null;
+    this.desktopWindows.updateOverlayMode({ interactionKind: null, hint: "", typedText: "" });
+    this.publishState();
+    this.publishIslandState();
+  }
+
+  private isWakeFollowUpActive(): boolean {
+    return this.wakeFollowUpStartedAtMs > 0;
   }
 
   /* ---------------------------------------------------------------------- */
@@ -1860,6 +2075,9 @@ export class ClickaaController {
       presentation: this.desktopWindows.getIslandPresentation(),
       activeTimers: this.activeTimers,
       snippets: this.snippetStore.list().slice(0, 20),
+      wakeWordState: this.wakeWordState,
+      wakeWordMuted: this.wakeWordMuted,
+      wakeWordMessage: this.wakeWordMessage,
       cursorEnabled: config.cursorEnabled,
       automationPaused: config.automationPaused,
       status: {

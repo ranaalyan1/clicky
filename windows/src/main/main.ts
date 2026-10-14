@@ -335,6 +335,7 @@ async function startClickaa(): Promise<void> {
     onToggleCursor: () => clickaaController?.toggleCursorEnabled(),
     onToggleIsland: () => clickaaController?.toggleIslandEnabled(),
     onToggleAutomationPaused: () => clickaaController?.toggleAutomationPaused(),
+    onToggleWakeWordMuted: () => clickaaController?.toggleWakeWordMuted(),
     onQuit: () => {
       isQuitting = true;
       app.quit();

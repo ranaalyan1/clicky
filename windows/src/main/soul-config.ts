@@ -52,6 +52,9 @@ export const defaultAbilitySettings: AbilitySettings = {
   memory: true,
   clipboardHistory: true,
   island: true,
+  // Off by default: an always-open microphone is the user's decision to make,
+  // never something Clickaa switches on for them.
+  wakeWord: false,
 };
 
 export interface PersonalityPresetDefinition {

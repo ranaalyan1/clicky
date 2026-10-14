@@ -50,6 +50,7 @@ const element = {
   musicArtist: requireElement<HTMLElement>("music-artist"),
   activityList: requireElement<HTMLElement>("activity-list"),
   shortcutList: requireElement<HTMLElement>("shortcut-list"),
+  wakeIndicator: requireElement<HTMLElement>("wake-indicator"),
   timerCard: requireElement<HTMLElement>("timer-card"),
   timerSummary: requireElement<HTMLElement>("timer-summary"),
   timerList: requireElement<HTMLElement>("timer-list"),
@@ -257,6 +258,39 @@ function formatTimerRemaining(remainingSeconds: number): string {
     return `${hours}:${String(minutes).padStart(2, "0")}:${paddedSeconds}`;
   }
   return `${minutes}:${paddedSeconds}`;
+}
+
+/**
+ * The microphone light. It only appears when Clickaa is actually listening for
+ * its name, and it is muted-coloured when the tray switch has silenced it, so
+ * the answer to "is it listening to me?" is never a guess.
+ */
+function renderWakeIndicator(islandState: IslandState): void {
+  const isOn = islandState.wakeWordState !== "off"
+    || islandState.wakeWordMuted;
+  element.wakeIndicator.hidden = !isOn;
+  if (!isOn) {
+    return;
+  }
+
+  const stateLabels: Record<IslandState["wakeWordState"], string> = {
+    off: "wake word off",
+    starting: "wake word starting",
+    listening: "listening for clickaa",
+    unavailable: "wake word unavailable",
+    error: "wake word stopped",
+  };
+  const stateLabel = islandState.wakeWordMuted
+    ? "microphone muted"
+    : stateLabels[islandState.wakeWordState];
+
+  element.wakeIndicator.dataset.wakeState = islandState.wakeWordMuted
+    ? "muted"
+    : islandState.wakeWordState;
+  element.wakeIndicator.title = islandState.wakeWordMessage
+    ? `${stateLabel} - ${islandState.wakeWordMessage}`
+    : stateLabel;
+  element.wakeIndicator.setAttribute("aria-label", stateLabel);
 }
 
 function renderTimers(islandState: IslandState): void {
@@ -530,6 +564,7 @@ function renderIsland(islandState: IslandState): void {
   element.body.dataset.presentation = islandState.presentation;
   element.body.dataset.expanded = String(islandState.isExpanded);
   renderNotch(islandState);
+  renderWakeIndicator(islandState);
   renderConfirmations(islandState);
   renderTimers(islandState);
   renderSnippets(islandState);

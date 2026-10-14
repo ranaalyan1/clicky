@@ -144,6 +144,37 @@ body[data-voice-state="listening"] .notch-wave i:nth-child(4) { animation-delay:
 body[data-voice-state="listening"] .notch-wave i:nth-child(5) { animation-delay: 0.4s; }
 @keyframes notch-wave { 0%, 100% { height: 3px; } 50% { height: 12px; } }
 
+/* The microphone light: a small dot that breathes while Clickaa is listening
+   for its name, and goes grey with a slash-coloured ring when muted. */
+.wake-indicator {
+  width: 6px;
+  height: 6px;
+  flex: 0 0 6px;
+  border-radius: 50%;
+  background: var(--clickaa-accent);
+  box-shadow: 0 0 6px rgba(69, 150, 255, 0.7);
+}
+
+.wake-indicator[data-wake-state="starting"] { animation: wake-breathe 1.6s ease-in-out infinite; }
+.wake-indicator[data-wake-state="listening"] { animation: wake-breathe 2.6s ease-in-out infinite; }
+
+.wake-indicator[data-wake-state="muted"],
+.wake-indicator[data-wake-state="unavailable"],
+.wake-indicator[data-wake-state="error"] {
+  background: var(--clickaa-ink-faint);
+  box-shadow: none;
+  outline: 1px solid var(--clickaa-line-strong);
+  outline-offset: 1px;
+}
+
+@keyframes wake-breathe {
+  50% { opacity: 0.45; transform: scale(0.82); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .wake-indicator { animation: none !important; }
+}
+
 /* ----------------------------------------------------------- expanded ---- */
 
 .expanded-body {

@@ -52,6 +52,7 @@ export interface DesktopWindowCallbacks {
   onToggleCursor: () => void;
   onToggleIsland: () => void;
   onToggleAutomationPaused: () => void;
+  onToggleWakeWordMuted: () => void;
   onQuit: () => void;
 }
 
@@ -128,7 +129,9 @@ export class ClickaaDesktopWindows {
     const trayMenuNeedsRefresh = this.latestPublicState === null
       || this.latestPublicState.cursorEnabled !== publicState.cursorEnabled
       || this.latestPublicState.islandEnabled !== publicState.islandEnabled
-      || this.latestPublicState.automationPaused !== publicState.automationPaused;
+      || this.latestPublicState.automationPaused !== publicState.automationPaused
+      || this.latestPublicState.wakeWordMuted !== publicState.wakeWordMuted
+      || this.latestPublicState.wakeWordState !== publicState.wakeWordState;
 
     this.latestPublicState = publicState;
     this.sendToPanel("clickaa:state", publicState);
@@ -707,6 +710,8 @@ export class ClickaaDesktopWindows {
     const cursorEnabled = this.latestPublicState?.cursorEnabled ?? true;
     const islandEnabled = this.latestPublicState?.islandEnabled ?? true;
     const automationPaused = this.latestPublicState?.automationPaused ?? false;
+    const wakeWordListening = this.latestPublicState?.wakeWordState === "listening";
+    const wakeWordMuted = this.latestPublicState?.wakeWordMuted ?? false;
 
     this.tray.setContextMenu(Menu.buildFromTemplate([
       {
@@ -731,6 +736,13 @@ export class ClickaaDesktopWindows {
         type: "checkbox",
         checked: automationPaused,
         click: () => this.callbacks.onToggleAutomationPaused(),
+      },
+      { type: "separator" },
+      {
+        label: wakeWordListening ? "Wake word is listening - mute it" : "Mute the wake word",
+        type: "checkbox",
+        checked: wakeWordMuted,
+        click: () => this.callbacks.onToggleWakeWordMuted(),
       },
       { type: "separator" },
       {

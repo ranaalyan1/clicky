@@ -135,6 +135,10 @@ const element = {
   launchToggle: requireElement<HTMLInputElement>("launch-toggle"),
   islandSummonToggle: requireElement<HTMLInputElement>("island-summon-toggle"),
   islandAlwaysToggle: requireElement<HTMLInputElement>("island-always-toggle"),
+  wakeWordToggle: requireElement<HTMLInputElement>("wake-word-toggle"),
+  wakeWordProvider: requireElement<HTMLSelectElement>("wake-word-provider"),
+  wakeWordStateChip: requireElement<HTMLElement>("wake-word-state-chip"),
+  wakeWordStatus: requireElement<HTMLElement>("wake-word-status"),
   islandMusicToggle: requireElement<HTMLInputElement>("island-music-toggle"),
   islandClipboardToggle: requireElement<HTMLInputElement>("island-clipboard-toggle"),
   refreshAppsButton: requireElement<HTMLButtonElement>("refresh-apps-button"),
@@ -350,6 +354,10 @@ function renderSetup(state: ClickaaPublicState): void {
   element.launchToggle.checked = config.launchAtLogin;
   element.islandSummonToggle.checked = config.islandSummonEnabled;
   element.islandAlwaysToggle.checked = config.islandAlwaysVisible;
+  element.wakeWordToggle.checked = config.abilities.wakeWord;
+  element.wakeWordProvider.value = config.wakeWordProvider;
+  element.wakeWordStateChip.textContent = describeWakeWordState(state, config);
+  element.wakeWordStatus.textContent = describeWakeWordStatus(state, config);
   element.islandMusicToggle.checked = config.islandShowNowPlaying;
   element.islandClipboardToggle.checked = config.islandShowClipboard;
 
@@ -361,6 +369,36 @@ function renderSetup(state: ClickaaPublicState): void {
 /* -------------------------------------------------------------------------- */
 /* Settings writes                                                            */
 /* -------------------------------------------------------------------------- */
+
+function describeWakeWordState(state: ClickaaPublicState, config: ClickaaUserConfig): string {
+  if (!config.abilities.wakeWord) {
+    return "off";
+  }
+  if (state.wakeWordMuted) {
+    return "muted";
+  }
+
+  const stateLabels: Record<ClickaaPublicState["wakeWordState"], string> = {
+    off: "off",
+    starting: "starting",
+    listening: "listening",
+    unavailable: "unavailable",
+    error: "needs attention",
+  };
+  return stateLabels[state.wakeWordState];
+}
+
+function describeWakeWordStatus(state: ClickaaPublicState, config: ClickaaUserConfig): string {
+  if (state.wakeWordMuted) {
+    return "muted from the tray. right-click the tray icon and unmute it to start listening again.";
+  }
+  if (state.wakeWordMessage) {
+    return state.wakeWordMessage;
+  }
+  return config.abilities.wakeWord
+    ? "waiting for you to say the name."
+    : "switched off, so the microphone is closed.";
+}
 
 async function saveSettings(settingsUpdates: Partial<ClickaaUserConfig>): Promise<void> {
   try {
@@ -721,6 +759,17 @@ element.speakScheduledToggle.addEventListener("change", () => {
 element.launchToggle.addEventListener("change", () => void saveSettings({ launchAtLogin: element.launchToggle.checked }));
 element.islandSummonToggle.addEventListener("change", () => {
   void saveSettings({ islandSummonEnabled: element.islandSummonToggle.checked });
+});
+element.wakeWordToggle.addEventListener("change", () => {
+  void saveSettings({
+    abilities: {
+      ...(latestState?.config.abilities ?? {}),
+      wakeWord: element.wakeWordToggle.checked,
+    } as ClickaaUserConfig["abilities"],
+  });
+});
+element.wakeWordProvider.addEventListener("change", () => {
+  void saveSettings({ wakeWordProvider: element.wakeWordProvider.value as ClickaaUserConfig["wakeWordProvider"] });
 });
 element.islandAlwaysToggle.addEventListener("change", () => {
   void saveSettings({ islandAlwaysVisible: element.islandAlwaysToggle.checked });

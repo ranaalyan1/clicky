@@ -12,6 +12,8 @@ import {
   SoulSettings,
   supportedClaudeModels,
   SupportedClaudeModel,
+  wakeWordProviderIds,
+  WakeWordProviderId,
 } from "../shared/contracts";
 import { JsonFileStore } from "./json-file-store";
 import {
@@ -43,6 +45,7 @@ export const defaultClickaaUserConfig: ClickaaUserConfig = {
   islandShowNowPlaying: true,
   islandShowClipboard: true,
   clipboardHistoryEnabled: true,
+  wakeWordProvider: "offline",
   soul: { ...defaultSoulSettings },
   abilities: { ...defaultAbilitySettings },
 };
@@ -113,6 +116,13 @@ function isSupportedBrainProvider(candidateProvider: unknown): candidateProvider
     && (brainProviderIds as readonly string[]).includes(candidateProvider);
 }
 
+function isSupportedWakeWordProvider(
+  candidateProvider: unknown,
+): candidateProvider is WakeWordProviderId {
+  return typeof candidateProvider === "string"
+    && (wakeWordProviderIds as readonly string[]).includes(candidateProvider);
+}
+
 function isSupportedDictationShortcut(candidateShortcut: unknown): candidateShortcut is DictationShortcutId {
   return typeof candidateShortcut === "string"
     && (dictationShortcutIds as readonly string[]).includes(candidateShortcut);
@@ -164,6 +174,9 @@ export function sanitizeStoredConfig(storedConfig: unknown): ClickaaUserConfig {
     automationPaused: readBoolean(possibleConfig.automationPaused, defaultClickaaUserConfig.automationPaused),
     confirmationMode: sanitizeConfirmationMode(possibleConfig.confirmationMode),
     autoApprovedActionTypes: sanitizeAutoApprovedActionTypes(possibleConfig.autoApprovedActionTypes),
+    wakeWordProvider: isSupportedWakeWordProvider(possibleConfig.wakeWordProvider)
+      ? possibleConfig.wakeWordProvider
+      : defaultClickaaUserConfig.wakeWordProvider,
     dictationShortcut: isSupportedDictationShortcut(possibleConfig.dictationShortcut)
       ? possibleConfig.dictationShortcut
       : defaultClickaaUserConfig.dictationShortcut,
@@ -246,6 +259,9 @@ export class ClickaaConfigStore {
     }
     if ("dictationShortcut" in configUpdates && !isSupportedDictationShortcut(updatedConfig.dictationShortcut)) {
       throw new Error("That dictation shortcut is not supported by this version of Clickaa.");
+    }
+    if ("wakeWordProvider" in configUpdates && !isSupportedWakeWordProvider(updatedConfig.wakeWordProvider)) {
+      throw new Error("That wake word mode is not supported by this version of Clickaa.");
     }
 
     const sanitizedConfig = sanitizeStoredConfig(updatedConfig);

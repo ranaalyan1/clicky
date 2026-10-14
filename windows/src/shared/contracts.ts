@@ -75,9 +75,21 @@ export const abilityIds = [
   "memory",
   "clipboardHistory",
   "island",
+  "wakeWord",
 ] as const;
 export type AbilityId = (typeof abilityIds)[number];
 export type AbilitySettings = Record<AbilityId, boolean>;
+
+/**
+ * Where Clickaa listens for its name. "offline" uses the speech recognizer
+ * Windows already ships, so no audio leaves the machine. "cloud" keeps a local
+ * loudness gate and only sends the clip that followed speech.
+ */
+export const wakeWordProviderIds = ["offline", "cloud"] as const;
+export type WakeWordProviderId = (typeof wakeWordProviderIds)[number];
+
+/** How the wake word surface reports itself to the island and the panel. */
+export type WakeWordSurfaceState = "off" | "starting" | "listening" | "unavailable" | "error";
 
 export const confirmationModes = ["risky", "all", "never"] as const;
 export type ConfirmationMode = (typeof confirmationModes)[number];
@@ -380,6 +392,8 @@ export interface ClickaaUserConfig {
   islandShowClipboard: boolean;
   clipboardHistoryEnabled: boolean;
 
+  wakeWordProvider: WakeWordProviderId;
+
   soul: SoulSettings;
   abilities: AbilitySettings;
 }
@@ -492,6 +506,9 @@ export interface ClickaaPublicState {
   automationPaused: boolean;
   islandEnabled: boolean;
   clipboardHistoryEnabled: boolean;
+  wakeWordState: WakeWordSurfaceState;
+  wakeWordMessage: string;
+  wakeWordMuted: boolean;
   config: ClickaaUserConfig;
 }
 
@@ -534,6 +551,10 @@ export interface IslandState {
   pendingConfirmations: PendingConfirmation[];
   activeTimers: ActiveTimer[];
   snippets: Snippet[];
+  wakeWordState: WakeWordSurfaceState;
+  wakeWordMuted: boolean;
+  /** Why the wake word is in that state, shown as the indicator's tooltip. */
+  wakeWordMessage: string;
   todos: TodoItem[];
   scheduledTasks: ScheduledTask[];
   memoryFacts: MemoryFact[];
