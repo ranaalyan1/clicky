@@ -10,6 +10,7 @@ import {
   searchTargets,
 } from "../shared/contracts";
 import { maximumPictureNameLength, maximumPicturePromptLength } from "./image-generation";
+import { maximumResearchQuestionLength } from "./research";
 
 /* The action list itself lives in the shared contracts file so the panel, the
    island and the main process can never disagree about what exists. */
@@ -132,6 +133,19 @@ const actionDefinitions: Record<UstaadActionType, ActionDefinition> = {
         },
         problem: null,
       };
+    },
+  },
+  research: {
+    type: "research",
+    risk: "safe",
+    requiredAbility: "webSearch",
+    describe: (action) => `look up "${(action as { question: string }).question}"`,
+    normalize: (rawAction) => {
+      const question = readRequiredText(rawAction, "question");
+      if (!question) {
+        return { action: null, problem: "research needs a question" };
+      }
+      return { action: { type: "research", question: question.slice(0, maximumResearchQuestionLength) }, problem: null };
     },
   },
   open_app: {
@@ -911,7 +925,8 @@ export function buildActionProtocolInstructions(abilities: AbilitySettings): str
   }
 
   if (abilities.webSearch) {
-    sections.push(`- search_web: {"type":"search_web","query":"gift wraps","target":"amazon"} — search the web. targets: default, google, youtube, amazon, bing, wikipedia. use this instead of open_url whenever the user says "search".`);
+    sections.push(`- research: {"type":"research","question":"how does vat registration work in pakistan for a small software business"} — look the question up and answer with the pages it came from, which the island shows under the answer. use it when the user asks you to find out, check, compare or explain something that is not about their own pc or their own words: "look up", "find out", "is it true that", "what do people say about", "check the latest". ask the whole question in one sentence, the way the user would type it into a search box, and never use it for something you already know or for anything about the user's own files.
+- search_web: {"type":"search_web","query":"gift wraps","target":"amazon"} — search the web. targets: default, google, youtube, amazon, bing, wikipedia. use this instead of open_url whenever the user says "search".`);
   }
 
   if (abilities.systemControl) {

@@ -240,6 +240,18 @@ function registerIpcHandlers(): void {
     }
     ustaadController?.dismissDrawnPicture();
   });
+  ipcMain.handle("island:open-research-source", (event, sourceUrl: string) => {
+    if (!islandSentEvent(event.sender.id)) {
+      throw new Error("IPC request rejected: sender is not the Ustaad island.");
+    }
+    return ustaadController?.openResearchSource(String(sourceUrl)) ?? "that source is not on the card any more.";
+  });
+  ipcMain.handle("island:dismiss-research", (event) => {
+    if (!islandSentEvent(event.sender.id)) {
+      throw new Error("IPC request rejected: sender is not the Ustaad island.");
+    }
+    ustaadController?.dismissResearch();
+  });
   ipcMain.handle("island:run-task-queue", (event) => {
     if (!islandSentEvent(event.sender.id)) {
       throw new Error("IPC request rejected: sender is not the Ustaad island.");

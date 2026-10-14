@@ -747,6 +747,72 @@ function renderDrawnPicture(islandState: IslandState): void {
 }
 
 /**
+ * The answer to something Ustaad looked up, with the pages it came from.
+ *
+ * The sources are buttons rather than links so they open in the user's own
+ * browser and never inside the island, and the numbered list is the whole
+ * point: an answer nobody can check is just a confident paragraph.
+ */
+function renderResearch(islandState: IslandState): void {
+  const research = islandState.research;
+  if (!research) {
+    return;
+  }
+
+  const card = document.createElement("div");
+  card.className = "confirmation-card research-card";
+
+  const title = document.createElement("p");
+  title.className = "confirmation-title";
+  title.textContent = `looked up "${research.question}"`;
+
+  const answer = document.createElement("div");
+  answer.className = "research-answer";
+  for (const paragraph of research.answerText.split(/\n{2,}/u).slice(0, 4)) {
+    const answerParagraph = document.createElement("p");
+    answerParagraph.textContent = paragraph;
+    answer.append(answerParagraph);
+  }
+  card.append(title, answer);
+
+  if (research.sources.length) {
+    const sourceList = document.createElement("div");
+    sourceList.className = "research-sources";
+    research.sources.forEach((source, sourceIndex) => {
+      const sourceButton = document.createElement("button");
+      sourceButton.type = "button";
+      sourceButton.className = "research-source";
+      sourceButton.textContent = `${sourceIndex + 1}. ${source.title}`;
+      sourceButton.title = source.url;
+      sourceButton.addEventListener("click", () => {
+        void window.ustaad.openResearchSource(source.url);
+      });
+      sourceList.append(sourceButton);
+    });
+    card.append(sourceList);
+  } else {
+    const noSources = document.createElement("p");
+    noSources.className = "confirmation-reason";
+    noSources.textContent = "no sources came back with this one, so treat it as a guess.";
+    card.append(noSources);
+  }
+
+  const buttonRow = document.createElement("div");
+  buttonRow.className = "confirmation-buttons";
+  const hideButton = document.createElement("button");
+  hideButton.type = "button";
+  hideButton.className = "confirmation-button";
+  hideButton.textContent = "hide";
+  hideButton.addEventListener("click", () => {
+    void window.ustaad.dismissResearch();
+  });
+  buttonRow.append(hideButton);
+  card.append(buttonRow);
+
+  element.confirmationStack.append(card);
+}
+
+/**
  * The repair card for a saved skill that keeps failing. It has three faces:
  * the offer, the wait while the model thinks, and the proposed new way. Only
  * "save the fix" changes the skill, and even then every run is confirmed.
@@ -856,6 +922,7 @@ function renderIsland(islandState: IslandState): void {
   renderSkillRepair(islandState);
   renderTaskQueue(islandState);
   renderDrawnPicture(islandState);
+  renderResearch(islandState);
   renderTimers(islandState);
   renderSnippets(islandState);
   renderActivityFeed(islandState.activityFeed);

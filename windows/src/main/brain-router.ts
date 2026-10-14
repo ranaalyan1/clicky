@@ -9,6 +9,7 @@ import { buildDictationCleanupUserPrompt, dictationCleanupSystemPrompt } from ".
 import { GeminiClient } from "./gemini-client";
 import { GeneratedPicturePayload } from "./image-generation";
 import { LocalBrainClient, normalizeLocalBrainBaseUrl } from "./local-brain-client";
+import { ResearchAnswer } from "./research";
 import { normalizeWorkerBaseUrl } from "./config-store";
 
 export type ResolvedSpeechProvider = "gemini" | "elevenlabs" | "windows";
@@ -171,6 +172,27 @@ export class BrainRouter {
     } catch (error) {
       return { ok: false, message: error instanceof Error ? error.message : String(error) };
     }
+  }
+
+  /**
+   * Looks a question up with the sources kept.
+   *
+   * Grounding is a Gemini feature — Claude behind the Worker has no equivalent
+   * — and offline mode has no internet to read, so both cases are answered
+   * with a sentence rather than a failure deeper down.
+   */
+  async researchWithSources(config: UstaadUserConfig, question: string): Promise<ResearchAnswer> {
+    if (config.offlineMode) {
+      throw new Error(
+        "offline mode is on, so i cannot look anything up: reading the web is the whole point of it. switch offline mode off when you want sources.",
+      );
+    }
+    if (!config.geminiApiKey) {
+      throw new Error(
+        "looking things up needs your own Gemini key, because the worker brain cannot search. paste one in the setup tab and ask again.",
+      );
+    }
+    return new GeminiClient(config.geminiApiKey).researchWithSources(question, config.geminiChatModel);
   }
 
   /**

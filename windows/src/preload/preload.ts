@@ -150,6 +150,8 @@ contextBridge.exposeInMainWorld("ustaad", {
   openDrawnPicture: (): Promise<string> => ipcRenderer.invoke("island:open-drawn-picture"),
   revealDrawnPicture: (): Promise<string> => ipcRenderer.invoke("island:reveal-drawn-picture"),
   dismissDrawnPicture: (): Promise<void> => ipcRenderer.invoke("island:dismiss-drawn-picture"),
+  openResearchSource: (sourceUrl: string): Promise<string> => ipcRenderer.invoke("island:open-research-source", sourceUrl),
+  dismissResearch: (): Promise<void> => ipcRenderer.invoke("island:dismiss-research"),
   runTaskQueue: (): Promise<string> => ipcRenderer.invoke("island:run-task-queue"),
   cancelQueuedTask: (taskId: string): Promise<string> => ipcRenderer.invoke("island:cancel-queued-task", taskId),
   clearTaskQueue: (): Promise<string> => ipcRenderer.invoke("island:clear-task-queue"),

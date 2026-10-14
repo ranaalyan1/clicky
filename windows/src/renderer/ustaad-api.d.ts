@@ -81,6 +81,8 @@ declare global {
       openDrawnPicture(): Promise<string>;
       revealDrawnPicture(): Promise<string>;
       dismissDrawnPicture(): Promise<void>;
+      openResearchSource(sourceUrl: string): Promise<string>;
+      dismissResearch(): Promise<void>;
       runTaskQueue(): Promise<string>;
       cancelQueuedTask(taskId: string): Promise<string>;
       clearTaskQueue(): Promise<string>;

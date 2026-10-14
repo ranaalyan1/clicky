@@ -306,6 +306,27 @@ export interface CreateImageAction {
   name: string | null;
 }
 
+/** "look up how vat works in pakistan and show me where you read it". */
+export interface ResearchAction {
+  type: "research";
+  question: string;
+}
+
+/** One page that an answer came from. */
+export interface ResearchSource {
+  title: string;
+  url: string;
+}
+
+/** An answer Ustaad looked up, with the pages it came from. */
+export interface ResearchCard {
+  id: string;
+  question: string;
+  answerText: string;
+  sources: ResearchSource[];
+  lookedUpAtIso: string;
+}
+
 /** "do my morning videos" — runs a task the user saved by name. */
 export interface RunSkillAction {
   type: "run_skill";
@@ -368,10 +389,12 @@ export type UstaadAction =
   | ManageFileAction
   | ReadRegistryAction
   | CreateImageAction
+  | ResearchAction
   | RunSkillAction;
 
 export type UstaadActionType =
   | "create_image"
+  | "research"
   | "open_app"
   | "open_url"
   | "search_web"
@@ -439,6 +462,7 @@ export const ustaadActionTypes: readonly UstaadActionType[] = [
   "manage_file",
   "read_registry",
   "create_image",
+  "research",
   "run_skill",
 ];
 
@@ -849,6 +873,8 @@ export interface IslandState {
   taskQueue: QueuedTask[];
   /** The last picture Ustaad drew, until the user hides it. */
   drawnPicture: GeneratedPicture | null;
+  /** The last answer Ustaad looked up, with its sources, until it is hidden. */
+  research: ResearchCard | null;
   /** Why the wake word is in that state, shown as the indicator's tooltip. */
   wakeWordMessage: string;
   todos: TodoItem[];

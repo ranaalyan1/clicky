@@ -20,6 +20,7 @@ import {
   PhoneBridgeStatus,
   GeneratedPicture,
   QueuedTask,
+  ResearchCard,
   RunHistoryEntry,
   RunHistorySearchResult,
   RunOutcome,
@@ -47,6 +48,7 @@ import {
   failedActionOutcome,
 } from "./system-actions";
 import { pictureFolderName, picturePreviewWidth, resolvePictureFileName } from "./image-generation";
+import { buildSpokenSummary } from "./research";
 import { ClipboardHistoryStore } from "./clipboard-history-store";
 import { ConfirmationQueue, interpretConfirmationAnswer } from "./confirmation-queue";
 import { UstaadConfigStore } from "./config-store";
@@ -159,6 +161,8 @@ export class UstaadController {
    * result the user is looking at, not something to restore next launch.
    */
   private drawnPicture: GeneratedPicture | null = null;
+  /** The last lookup, with its sources, until the user hides the card. */
+  private researchCard: ResearchCard | null = null;
   /** The queue entry the running task came from, so its outcome can be filed. */
   private currentQueuedTaskId: string | null = null;
   private readonly systemAccessRunner: SystemAccessRunner;
@@ -1030,6 +1034,8 @@ export class UstaadController {
         outcome = await this.runTimerAction(action);
       } else if (action.type === "clipboard_transform") {
         outcome = await this.runClipboardTransform(action.operation, action.targetLanguage);
+      } else if (action.type === "research") {
+        outcome = await this.researchQuestion(action.question);
       } else if (action.type === "create_image") {
         outcome = await this.drawPicture(action.prompt, action.name);
       } else if (action.type === "run_skill") {
@@ -1210,6 +1216,55 @@ export class UstaadController {
    * Rewrites whatever is on the clipboard and puts the result back, so the user
    * can paste it straight away. The previous text is kept for undo.
    */
+  /**
+   * Looks a question up and shows the answer with the pages it came from.
+   *
+   * The answer is spoken as well as shown, because looking something up is
+   * usually the middle of a conversation rather than the end of one, and the
+   * sources are the part that makes it checkable: they are opened in the
+   * user's own browser and never fetched by Ustaad itself.
+   */
+  private async researchQuestion(question: string): Promise<ActionExecutionOutcome> {
+    const config = this.configStore.getConfig();
+    if (!this.brainRouter.isConfigured(config)) {
+      return failedActionOutcome(this.brainRouter.configurationHint(config));
+    }
+
+    const researchAnswer = await this.brainRouter.researchWithSources(config, question);
+    this.researchCard = {
+      id: randomUUID(),
+      question,
+      answerText: researchAnswer.answerText,
+      sources: researchAnswer.sources,
+      lookedUpAtIso: new Date().toISOString(),
+    };
+    this.publishIslandState();
+    void this.speakResponse(this.activeInteractionId, buildSpokenSummary(researchAnswer.answerText));
+
+    return completedActionOutcome(
+      `looked up "${question}"`,
+      researchAnswer.sources.length
+        ? `sources: ${researchAnswer.sources.map((source) => source.title).join(", ")}`
+        : "the answer came back without sources, so treat it as a guess",
+    );
+  }
+
+  /** Opens one of the sources a lookup used, in the user's own browser. */
+  async openResearchSource(rawUrl: string): Promise<string> {
+    const sourceUrl = this.researchCard?.sources.find((source) => source.url === rawUrl)?.url;
+    if (!sourceUrl) {
+      return "that source is not on the card any more.";
+    }
+    await shell.openExternal(sourceUrl);
+    return "opened it.";
+  }
+
+  /** Hides the lookup card. The answer stays in the run history. */
+  dismissResearch(): void {
+    this.researchCard = null;
+    this.publishIslandState();
+  }
+
   /**
    * Draws one picture on the user's own key and saves it in their Pictures
    * folder, then shows it in the island.
@@ -3360,6 +3415,7 @@ export class UstaadController {
       skillRepair: this.currentSkillRepair,
       taskQueue: this.taskQueueStore.waiting(),
       drawnPicture: this.drawnPicture,
+      research: this.researchCard,
       cursorEnabled: config.cursorEnabled,
       automationPaused: config.automationPaused,
       status: {
