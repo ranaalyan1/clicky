@@ -55,6 +55,9 @@ export const defaultAbilitySettings: AbilitySettings = {
   island: true,
   // Off by default: an always-open microphone is the user's decision to make,
   // never something Ustaad switches on for them.
+  // Off by default, and read-only when on: a window onto the pc, not a remote
+  // control for it.
+  phoneWindow: false,
   wakeWord: false,
   // Both system-access tiers start off. Tier 1 is the ordinary one (read-only
   // diagnostics, files in the user's own folders); Tier 2 is arbitrary commands

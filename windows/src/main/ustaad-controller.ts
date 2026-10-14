@@ -1,4 +1,5 @@
 import { randomUUID } from "node:crypto";
+import { networkInterfaces } from "node:os";
 import { mkdir, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { app, clipboard, ClipboardItem } from "electron";
@@ -15,6 +16,8 @@ import {
   IslandToggleKey,
   NowPlayingInfo,
   RegionSelectorSelection,
+  PhoneBridgeInfo,
+  PhoneBridgeStatus,
   RunHistoryEntry,
   RunHistorySearchResult,
   Skill,
@@ -28,6 +31,8 @@ import {
 } from "./action-protocol";
 import { ActivityFeed, MemoryStore } from "./memory-store";
 import { RunHistoryStore } from "./run-history-store";
+import { PhoneBridgeStore } from "./phone-bridge-store";
+import { PhoneBridgeServer } from "./phone-bridge-server";
 import { AudioRecordingBuffer } from "./audio-recording-buffer";
 import { BrainRouter } from "./brain-router";
 import {
@@ -127,6 +132,9 @@ export class UstaadController {
   private readonly todoStore: TodoStore;
   private readonly memoryStore: MemoryStore;
   private readonly runHistoryStore: RunHistoryStore;
+  private readonly phoneBridgeStore: PhoneBridgeStore;
+  private phoneBridgeServer: PhoneBridgeServer | null = null;
+  private phoneBridgeErrorMessage: string | null = null;
   private readonly scheduleStore: ScheduleStore;
   private readonly presenceStore: PresenceStore;
   private readonly snippetStore: SnippetStore;
@@ -197,6 +205,7 @@ export class UstaadController {
     this.todoStore = new TodoStore(`${userDataDirectory}/todos.json`);
     this.memoryStore = new MemoryStore(`${userDataDirectory}/memory.json`);
     this.runHistoryStore = new RunHistoryStore(`${userDataDirectory}/run-history.json`);
+    this.phoneBridgeStore = new PhoneBridgeStore(`${userDataDirectory}/phone-bridge.json`);
     this.scheduleStore = new ScheduleStore(`${userDataDirectory}/schedules.json`);
     this.presenceStore = new PresenceStore(`${userDataDirectory}/presence.json`);
     this.snippetStore = new SnippetStore(`${userDataDirectory}/snippets.json`);
@@ -286,6 +295,13 @@ export class UstaadController {
       wakeWordMuted: false,
       auditLog: [],
       auditLogCounts: { allowed: 0, refused: 0, blocked: 0, failed: 0, total: 0 },
+      phoneBridge: {
+        isRunning: false,
+        address: "",
+        port: 0,
+        isReadOnly: true,
+        lastErrorMessage: null,
+      },
       config,
     };
   }
@@ -312,6 +328,8 @@ export class UstaadController {
     this.startNowPlayingWatcher();
     this.publishIslandState();
 
+    void this.syncPhoneBridge();
+
     void this.bridge.start().catch((error: unknown) => {
       console.warn("Ustaad could not start its Windows helper:", error);
     });
@@ -327,6 +345,8 @@ export class UstaadController {
     this.clearTransientOverlayHideTimer();
     this.stopTimers();
     this.bridge.stop();
+    void this.phoneBridgeServer?.stop();
+    this.phoneBridgeServer = null;
   }
 
   getPublicState(): UstaadPublicState {
@@ -1471,12 +1491,178 @@ export class UstaadController {
   }
 
   /* ---------------------------------------------------------------------- */
+  /* The phone window                                                       */
+  /* ---------------------------------------------------------------------- */
+
+  /**
+   * Opens or closes the phone window to match the switch in the panel.
+   *
+   * It is the same rule as the wake word: a listener that reaches beyond this
+   * machine is the user's decision, so switching the ability off really does
+   * close the socket rather than hiding a running server.
+   */
+  private async syncPhoneBridge(): Promise<void> {
+    const shouldRun = this.configStore.getConfig().abilities.phoneWindow;
+
+    if (!shouldRun) {
+      if (this.phoneBridgeServer) {
+        await this.phoneBridgeServer.stop();
+        this.phoneBridgeServer = null;
+      }
+      this.publishPhoneBridgeState();
+      return;
+    }
+
+    if (this.phoneBridgeServer?.isRunning) {
+      return;
+    }
+
+    const record = this.phoneBridgeStore.read();
+    const server = new PhoneBridgeServer({
+      port: record.port,
+      token: record.token,
+      onError: (errorMessage) => {
+        this.phoneBridgeErrorMessage = errorMessage;
+        this.publishPhoneBridgeState();
+      },
+      handlers: {
+        getStatus: () => this.buildPhoneBridgeStatus(),
+        ask: (requestText) => this.answerPhoneRequest(requestText),
+      },
+    });
+
+    try {
+      const boundPort = await server.start();
+      this.phoneBridgeServer = server;
+      this.phoneBridgeErrorMessage = null;
+      if (boundPort !== record.port) {
+        this.phoneBridgeStore.setPort(boundPort);
+      }
+    } catch (error) {
+      this.phoneBridgeErrorMessage = error instanceof Error ? error.message : String(error);
+      this.phoneBridgeServer = null;
+    }
+    this.publishPhoneBridgeState();
+  }
+
+  private publishPhoneBridgeState(): void {
+    this.publicState.phoneBridge = this.describePhoneBridge();
+    this.publishState();
+  }
+
+  private describePhoneBridge(): PhoneBridgeInfo {
+    const record = this.phoneBridgeStore.read();
+    const isRunning = this.phoneBridgeServer?.isRunning ?? false;
+    const port = this.phoneBridgeServer?.port ?? record.port;
+    return {
+      isRunning,
+      address: isRunning ? this.buildPhoneBridgeAddress(port, record.token) : "",
+      port,
+      isReadOnly: true,
+      lastErrorMessage: this.phoneBridgeErrorMessage,
+    };
+  }
+
+  /**
+   * The phone opens this over the local network, so the address has to be the
+   * machine's address on that network rather than localhost.
+   */
+  private buildPhoneBridgeAddress(port: number, token: string): string {
+    for (const interfaceAddresses of Object.values(networkInterfaces())) {
+      for (const address of interfaceAddresses ?? []) {
+        if (address.family === "IPv4" && !address.internal) {
+          return `http://${address.address}:${port}/?token=${token}`;
+        }
+      }
+    }
+    return `http://localhost:${port}/?token=${token}`;
+  }
+
+  /** Throws away the old link: any phone still holding it stops working. */
+  rotatePhoneBridgeToken(): void {
+    if (!this.configStore.getConfig().abilities.phoneWindow) {
+      return;
+    }
+    this.phoneBridgeStore.rotateToken();
+    if (this.phoneBridgeServer) {
+      void this.phoneBridgeServer.stop().then(() => {
+        this.phoneBridgeServer = null;
+        return this.syncPhoneBridge();
+      });
+      return;
+    }
+    this.publishPhoneBridgeState();
+  }
+
+  private buildPhoneBridgeStatus(): PhoneBridgeStatus {
+    const config = this.configStore.getConfig();
+    return {
+      assistantName: config.soul.assistantName,
+      isConfigured: this.brainRouter.isConfigured(config),
+      voiceState: this.publicState.voiceState,
+      lastTranscript: this.publicState.lastTranscript,
+      responseText: this.publicState.responseText,
+      openTodos: config.abilities.toDoList ? this.todoStore.summarizeOpenItems(8) : [],
+      nextScheduledTasks: config.abilities.scheduling
+        ? this.scheduleStore.listNextRunsDescription(5)
+        : [],
+      pendingConfirmationCount: this.confirmationQueue.list().length,
+    };
+  }
+
+  /**
+   * A question asked from the phone.
+   *
+   * It reads exactly like a spoken question — same soul, same memory, same
+   * screen if the user lets Ustaad see it — and then stops. The reply is text
+   * and nothing else: no actions, no confirmations answered, no system access.
+   * A phone that can ask is a window; a phone that can act is a liability.
+   */
+  private async answerPhoneRequest(requestText: string): Promise<string> {
+    const config = this.configStore.getConfig();
+    if (!this.brainRouter.isConfigured(config)) {
+      return "the pc has no brain connected yet. open ustaad here and paste a gemini key, then ask again.";
+    }
+
+    const images = await this.captureInteractionImages("talk");
+    const responseText = await this.brainRouter.streamResponse(config, {
+      systemPrompt: this.buildPromptForInteraction(config, "talk", images.length > 0),
+      userPrompt: requestText,
+      images: images.map(toBrainImage),
+      conversationHistory: [...this.conversationHistory],
+      signal: new AbortController().signal,
+    });
+
+    const parsedResponse = parseModelResponse(responseText);
+    const spokenText = parsePointingTag(parsedResponse.spokenText).spokenText || parsedResponse.spokenText;
+    const replyText = spokenText.trim() || "I did not get an answer back from the model.";
+
+    this.recordRun({
+      request: requestText,
+      kind: "reply",
+      outcome: "completed",
+      note: "asked from the phone window",
+      stepsTaken: 0,
+      response: replyText,
+    });
+
+    if (parsedResponse.taskGoal || parsedResponse.actions?.length) {
+      return `${replyText}\n\n(that would need the pc: this came from your phone, so nothing was run.)`;
+    }
+    return replyText;
+  }
+
+  /* ---------------------------------------------------------------------- */
   /* Settings                                                               */
   /* ---------------------------------------------------------------------- */
 
   updateSettings(settingsUpdates: Partial<UstaadUserConfig>): UstaadPublicState {
     const previousConfig = this.configStore.getConfig();
     const updatedConfig = this.configStore.updateConfig(settingsUpdates);
+
+    if (previousConfig.abilities.phoneWindow !== updatedConfig.abilities.phoneWindow) {
+      void this.syncPhoneBridge();
+    }
 
     this.publicState.configured = this.brainRouter.isConfigured(updatedConfig);
     this.publicState.configurationHint = this.brainRouter.configurationHint(updatedConfig);

@@ -382,6 +382,30 @@
 
       <!-- ------------------------------------------------------------------ -->
       <section class="page" data-page="setup">
+        <!-- The phone window: a link the user opens on their own wi-fi. The
+             switch itself lives with the other abilities, because opening a
+             socket off this machine is an ability, not a setting. -->
+        <section class="card">
+          <div class="section-heading-row">
+            <div>
+              <p class="eyebrow">phone window</p>
+              <h2>ustaad on your phone</h2>
+            </div>
+            <label class="toggle-control">
+              <input id="phone-bridge-toggle" type="checkbox">
+              <span></span>
+            </label>
+          </div>
+          <p class="field-hint">your own wi-fi, and only with the link below. a question that comes from a phone is answered and nothing more: it never clicks, types, opens, deletes or approves anything.</p>
+          <div id="phone-bridge-row" class="inline-form" hidden>
+            <input id="phone-bridge-address" class="text-field" type="text" readonly spellcheck="false">
+          </div>
+          <div class="button-row" id="phone-bridge-actions" hidden>
+            <button id="phone-bridge-rotate-button" class="ghost-button" type="button">new link (unpairs every phone)</button>
+          </div>
+          <p id="phone-bridge-note" class="field-hint"></p>
+        </section>
+
         <section class="card">
           <div class="section-heading-row">
             <div>

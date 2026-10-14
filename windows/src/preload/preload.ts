@@ -95,6 +95,7 @@ contextBridge.exposeInMainWorld("ustaad", {
     return ipcRenderer.invoke("panel:search-run-history", query);
   },
   clearRunHistory: (): void => ipcRenderer.send("panel:clear-run-history"),
+  rotatePhoneBridgeToken: (): void => ipcRenderer.send("panel:rotate-phone-token"),
 
   /* Cursor overlay ------------------------------------------------------- */
   sendPointingAnimationCompleted: (interactionId: number): void => {

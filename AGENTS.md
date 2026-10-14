@@ -62,6 +62,8 @@ Worker vars: `ELEVENLABS_VOICE_ID`
 
 **System Access Tiers**: Two separate abilities, both off by default. Tier 1 is read-only diagnostics, registry reads, and files inside the user's own six folders. Tier 2 is arbitrary commands that change the PC, with its own warning wording and its own confirmation. Credentials, elevation, and anything that weakens Windows security are refused whatever is switched on.
 
+**Phone Window**: `phone-bridge-server.ts` is a plain `node:http` server — no framework, no dependency — that speaks three routes (`GET /` for the one-page window, `GET /api/status` for what is already on the PC, `POST /api/ask` for a typed question). Everything else is 404, and **no route can act**: a phone question is answered through the same capture, prompt and parse path as a spoken one, with actions stripped, so the read-only promise is a property of the routes rather than a rule the model is asked to respect. The pairing token is compared with `timingSafeEqual`, the address is bound to the LAN, each source address gets 60 requests a minute, bodies are capped at 4 KB, and the page carries a `default-src 'none'` CSP so it loads nothing from anywhere. It starts only while the `phoneWindow` ability is on and stops when the ability is switched off or the app quits.
+
 ## Key Files
 
 | File | Lines | Purpose |
@@ -93,6 +95,9 @@ Worker vars: `ELEVENLABS_VOICE_ID`
 | `windows/src/main/clipboard-history-store.ts` | ~95 | Recent clipboard text, on this PC only. |
 | `windows/src/main/memory-store.ts` | ~170 | Remembered facts and the island's activity feed. |
 | `windows/src/main/run-history-store.ts` | ~190 | What Ustaad was asked and what it did about it: a plain `run-history.json`, newest first, capped at 300 runs, searched in memory with `scoreTextMatch` rather than a database. Follows the memory ability — off means nothing is written. |
+| `windows/src/main/phone-bridge-store.ts` | ~81 | The pairing token and port for the phone window, in `phone-bridge.json`; rotating it is what unpairs every phone. |
+| `windows/src/main/phone-bridge-server.ts` | ~312 | The local HTTP server behind the phone window: token check, request budget, size caps, and three routes that cannot act. |
+| `windows/src/main/phone-bridge-page.ts` | ~185 | The single self-contained page a phone opens, built as one string so it needs no assets and loads nothing external. |
 | `windows/src/main/schedule-store.ts` | ~237 | Reminders and routines, their next-run maths, and overdue handling. |
 | `windows/src/main/todo-store.ts` | ~166 | The spoken to-do list. |
 | `windows/src/main/config-store.ts` | ~286 | Validated, atomic persistence of user settings, including what is rejected when the panel sends nonsense. |

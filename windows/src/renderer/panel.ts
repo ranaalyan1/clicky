@@ -121,6 +121,12 @@ const element = {
   memoryAddButton: requireElement<HTMLButtonElement>("memory-add-button"),
   memoryClearButton: requireElement<HTMLButtonElement>("memory-clear-button"),
   memoryList: requireElement<HTMLElement>("memory-list"),
+  phoneBridgeToggle: requireElement<HTMLInputElement>("phone-bridge-toggle"),
+  phoneBridgeRow: requireElement<HTMLElement>("phone-bridge-row"),
+  phoneBridgeAddress: requireElement<HTMLInputElement>("phone-bridge-address"),
+  phoneBridgeActions: requireElement<HTMLElement>("phone-bridge-actions"),
+  phoneBridgeRotateButton: requireElement<HTMLButtonElement>("phone-bridge-rotate-button"),
+  phoneBridgeNote: requireElement<HTMLElement>("phone-bridge-note"),
   historySearchInput: requireElement<HTMLInputElement>("history-search-input"),
   historyList: requireElement<HTMLElement>("history-list"),
   historyClearButton: requireElement<HTMLButtonElement>("history-clear-button"),
@@ -183,6 +189,7 @@ const element = {
 
 function renderState(state: UstaadPublicState): void {
   latestState = state;
+  renderPhoneBridge(state);
   void window.ustaad.getIslandState().then((islandState) => renderQuickStart(state, islandState)).catch(() => undefined);
   const config = state.config;
 
@@ -466,6 +473,36 @@ function renderQuickStart(state: UstaadPublicState, islandState: IslandState): v
   element.quickStartCard.hidden = completedStepCount === steps.length;
 }
 
+/**
+ * The phone window card. The address carries the pairing token, so it is the
+ * one link that opens the window — which is also why rotating it unpairs every
+ * phone at once, and why the button says so.
+ */
+function renderPhoneBridge(state: UstaadPublicState): void {
+  const { phoneBridge } = state;
+  const isEnabled = state.config.abilities.phoneWindow;
+
+  element.phoneBridgeToggle.checked = isEnabled;
+
+  const hasAddress = Boolean(phoneBridge.address);
+  element.phoneBridgeRow.hidden = !hasAddress;
+  element.phoneBridgeActions.hidden = !phoneBridge.isRunning;
+  if (hasAddress) {
+    element.phoneBridgeAddress.value = phoneBridge.address;
+  }
+
+  if (phoneBridge.lastErrorMessage) {
+    element.phoneBridgeNote.textContent = phoneBridge.lastErrorMessage;
+    return;
+  }
+  if (phoneBridge.isRunning) {
+    element.phoneBridgeNote.textContent =
+      "open that address on a phone that is on the same wi-fi. it asks this pc, and the pc answers out loud here too.";
+    return;
+  }
+  element.phoneBridgeNote.textContent = isEnabled ? "starting the window…" : "";
+}
+
 function renderPresence(config: UstaadUserConfig): void {
   element.morningBriefToggle.checked = config.presence.morningBriefEnabled;
   element.morningBriefTime.value = config.presence.morningBriefTime;
@@ -633,7 +670,20 @@ function showTransientError(error: unknown): void {
 /* -------------------------------------------------------------------------- */
 
 function setActivePage(pageName: string): void {
-  // Searching the history is instant and local, so it runs on every keystroke.
+  element.phoneBridgeToggle.addEventListener("change", () => {
+  if (!latestState) {
+    return;
+  }
+  void saveSettings({
+    abilities: { ...latestState.config.abilities, phoneWindow: element.phoneBridgeToggle.checked },
+  });
+});
+
+element.phoneBridgeRotateButton.addEventListener("click", () => {
+  window.ustaad.rotatePhoneBridgeToken();
+});
+
+// Searching the history is instant and local, so it runs on every keystroke.
 element.historySearchInput.addEventListener("input", () => void refreshRunHistory());
 element.historyClearButton.addEventListener("click", () => {
   window.ustaad.clearRunHistory();

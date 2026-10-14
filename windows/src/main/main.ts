@@ -292,6 +292,12 @@ function registerIpcHandlers(): void {
     }
   });
 
+  ipcMain.on("panel:rotate-phone-token", (event) => {
+    if (panelSentEvent(event.sender.id)) {
+      ustaadController?.rotatePhoneBridgeToken();
+    }
+  });
+
   ipcMain.handle("panel:search-run-history", (event, query: string) => {
     if (!panelSentEvent(event.sender.id)) {
       throw new Error("IPC request rejected: sender is not the Ustaad panel.");

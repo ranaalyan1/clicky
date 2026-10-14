@@ -48,6 +48,7 @@ declare global {
       clearAuditLog(): void;
       searchRunHistory(query: string): Promise<RunHistorySearchResult[]>;
       clearRunHistory(): void;
+      rotatePhoneBridgeToken(): void;
 
       /* Cursor overlay */
       sendPointingAnimationCompleted(interactionId: number): void;

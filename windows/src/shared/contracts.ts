@@ -79,6 +79,7 @@ export const abilityIds = [
   "systemAccessTier1",
   "systemAccessTier2",
   "presence",
+  "phoneWindow",
 ] as const;
 export type AbilityId = (typeof abilityIds)[number];
 export type AbilitySettings = Record<AbilityId, boolean>;
@@ -660,9 +661,38 @@ export interface UstaadPublicState {
   wakeWordMessage: string;
   wakeWordMuted: boolean;
   config: UstaadUserConfig;
+  /** How to reach Ustaad from a phone on the same wi-fi, when that is switched on. */
+  phoneBridge: PhoneBridgeInfo;
   /** The last few system-access entries, newest first, for the panel's log. */
   auditLog: AuditLogEntry[];
   auditLogCounts: { allowed: number; refused: number; blocked: number; failed: number; total: number };
+}
+
+/**
+ * The phone window: what the panel needs to show so the user can open it on
+ * their phone. The token is the whole of the security, which is why the address
+ * is only ever reachable on the local network and never proxied anywhere.
+ */
+export interface PhoneBridgeInfo {
+  isRunning: boolean;
+  /** The address to open on the phone, including the pairing token. */
+  address: string;
+  port: number;
+  /** Whether a request from the phone may only be answered, never acted on. */
+  isReadOnly: boolean;
+  lastErrorMessage: string | null;
+}
+
+/** What the phone page itself is told about the pc it is a window onto. */
+export interface PhoneBridgeStatus {
+  assistantName: string;
+  isConfigured: boolean;
+  voiceState: CompanionVoiceState;
+  lastTranscript: string;
+  responseText: string;
+  openTodos: string[];
+  nextScheduledTasks: string[];
+  pendingConfirmationCount: number;
 }
 
 /** One line of the record Ustaad keeps of everything it did on this pc. */
