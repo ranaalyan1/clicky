@@ -92,6 +92,7 @@ Worker vars: `ELEVENLABS_VOICE_ID`
 | `windows/src/main/snippet-store.ts` | ~174 | Saved phrases that can be typed into any window. |
 | `windows/src/main/clipboard-history-store.ts` | ~95 | Recent clipboard text, on this PC only. |
 | `windows/src/main/memory-store.ts` | ~170 | Remembered facts and the island's activity feed. |
+| `windows/src/main/run-history-store.ts` | ~190 | What Ustaad was asked and what it did about it: a plain `run-history.json`, newest first, capped at 300 runs, searched in memory with `scoreTextMatch` rather than a database. Follows the memory ability — off means nothing is written. |
 | `windows/src/main/schedule-store.ts` | ~237 | Reminders and routines, their next-run maths, and overdue handling. |
 | `windows/src/main/todo-store.ts` | ~166 | The spoken to-do list. |
 | `windows/src/main/config-store.ts` | ~286 | Validated, atomic persistence of user settings, including what is rejected when the panel sends nonsense. |
