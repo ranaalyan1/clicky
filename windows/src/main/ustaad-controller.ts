@@ -18,6 +18,7 @@ import {
   RegionSelectorSelection,
   PhoneBridgeInfo,
   PhoneBridgeStatus,
+  QueuedTask,
   RunHistoryEntry,
   RunHistorySearchResult,
   RunOutcome,
@@ -75,6 +76,7 @@ import { buildBriefingDigest } from "./briefing";
 import { AuditLogStore } from "./audit-log-store";
 import { JsonFileStore } from "./json-file-store";
 import { SkillStore } from "./skill-store";
+import { TaskQueueStore } from "./task-queue-store";
 import {
   buildSkillRepairPrompt,
   isSkillFailure,
@@ -148,6 +150,9 @@ export class UstaadController {
   private readonly snippetStore: SnippetStore;
   private readonly auditLogStore: AuditLogStore;
   private readonly skillStore: SkillStore;
+  private readonly taskQueueStore: TaskQueueStore;
+  /** The queue entry the running task came from, so its outcome can be filed. */
+  private currentQueuedTaskId: string | null = null;
   private readonly systemAccessRunner: SystemAccessRunner;
   private readonly clipboardHistoryStore: ClipboardHistoryStore;
   private readonly activityFeed = new ActivityFeed();
@@ -221,6 +226,7 @@ export class UstaadController {
     this.snippetStore = new SnippetStore(`${userDataDirectory}/snippets.json`);
     this.auditLogStore = new AuditLogStore(`${userDataDirectory}/audit-log.json`);
     this.skillStore = new SkillStore(`${userDataDirectory}/skills.json`);
+    this.taskQueueStore = new TaskQueueStore(`${userDataDirectory}/task-queue.json`);
     this.skillSuggestionHistoryStore = new JsonFileStore<SkillSuggestionMemory>(
       `${userDataDirectory}/skill-suggestions.json`,
       (storedValue) => {
@@ -346,6 +352,21 @@ export class UstaadController {
     void this.refreshAppIndex();
     this.synchronizeWakeWordListener();
     this.loadSkillSuggestionMemory();
+
+    // Work left waiting when Ustaad last closed is never started on its own: it
+    // is shown, and the user decides whether it still matters.
+    const waitingFromLastTime = this.taskQueueStore.waiting();
+    if (waitingFromLastTime.length > 0) {
+      this.activityFeed.record(
+        "system",
+        waitingFromLastTime.length === 1
+          ? "1 task is still on the list from last time"
+          : `${waitingFromLastTime.length} tasks are still on the list from last time`,
+        "press run in the island, or ask me for something else",
+        false,
+      );
+      this.publishIslandState();
+    }
   }
 
   stop(): void {
@@ -443,6 +464,7 @@ export class UstaadController {
     this.cancelAgentTask();
     this.pendingTaskGoals.clear();
     this.confirmationQueue.clear();
+    this.taskQueueStore.cancelWaiting();
     this.isSnipInFlight = false;
     this.cancelActiveWork();
     this.desktopWindows.hideRegionSelector();
@@ -2014,6 +2036,84 @@ export class UstaadController {
   }
 
   /* ---------------------------------------------------------------------- */
+  /* Task queue: one screen and one pointer, so one task at a time          */
+  /* ---------------------------------------------------------------------- */
+
+  /**
+   * Adds a task to the end of the list instead of refusing it. Nothing here
+   * approves anything: when the queued task starts it walks the same ability
+   * filter and the same confirmation as if it had been asked for out loud.
+   */
+  private enqueueTask(goal: string, seedActions: UstaadAction[]): void {
+    let queuedTask: QueuedTask;
+    try {
+      queuedTask = this.taskQueueStore.enqueue({ goal, seedActions });
+    } catch {
+      return;
+    }
+
+    const waitingCount = this.taskQueueStore.waiting().length;
+    this.activityFeed.record(
+      "system",
+      `added to the list: ${queuedTask.goal}`,
+      waitingCount > 1
+        ? `${waitingCount} waiting their turn`
+        : "it runs as soon as the one before it ends",
+      false,
+    );
+    this.desktopWindows.openIsland();
+    this.publishIslandState();
+  }
+
+  /** Starts the oldest waiting task. Also the island's "run the list" button. */
+  async runTaskQueue(): Promise<string> {
+    if (this.isAgentTaskRunning) {
+      return "I am still working on something.";
+    }
+
+    const nextTask = this.taskQueueStore.takeNext();
+    if (!nextTask) {
+      return "there is nothing waiting.";
+    }
+
+    void this.runAgentTask(nextTask.goal, nextTask.seedActions, null, nextTask.id);
+    return `starting: ${nextTask.goal}`;
+  }
+
+  /** Takes one task off the list. The task being worked on is stopped, not dropped. */
+  cancelQueuedTask(taskId: string): string {
+    const cancelledTask = this.taskQueueStore.cancel(taskId);
+    if (!cancelledTask) {
+      return "that one is already running.";
+    }
+
+    this.activityFeed.record(
+      "system",
+      `off the list: ${cancelledTask.goal}`,
+      "everything behind it moves up",
+      false,
+    );
+    this.publishIslandState();
+    return "taken off the list.";
+  }
+
+  clearTaskQueue(): string {
+    const clearedCount = this.taskQueueStore.cancelWaiting();
+    if (clearedCount === 0) {
+      return "there is nothing waiting.";
+    }
+
+    this.activityFeed.record(
+      "system",
+      clearedCount === 1 ? "cleared 1 waiting task" : `cleared ${clearedCount} waiting tasks`,
+      "",
+      false,
+    );
+    this.publishIslandState();
+    return clearedCount === 1 ? "cleared 1 waiting task." : `cleared ${clearedCount} waiting tasks.`;
+  }
+
+  /* ---------------------------------------------------------------------- */
   /* Skills: tasks the user saved by name                                   */
   /* ---------------------------------------------------------------------- */
 
@@ -2335,12 +2435,29 @@ export class UstaadController {
     goal: string,
     initialActions: UstaadAction[],
     skillId: string | null = null,
+    queuedTaskId: string | null = null,
   ): Promise<void> {
     if (this.isAgentTaskRunning) {
+      // One desktop, one pointer: the second request waits its turn rather
+      // than being lost. A skill is the exception — its health is filed
+      // against the run, so it is better to hear "say it again" than to lose
+      // the outcome of the run.
+      if (skillId) {
+        this.activityFeed.record(
+          "system",
+          "still working on the last one",
+          `say "${goal}" again when I am free`,
+          false,
+        );
+        this.publishIslandState();
+        return;
+      }
+      this.enqueueTask(goal, initialActions);
       return;
     }
 
     this.isAgentTaskRunning = true;
+    this.currentQueuedTaskId = queuedTaskId;
     this.agentTaskCancelled = false;
     this.activityFeed.record("system", `working on: ${goal}`, "step by step, checking the screen as it goes", false);
     this.desktopWindows.openIsland();
@@ -2363,6 +2480,16 @@ export class UstaadController {
         stepsTaken: taskResult.stepsTaken,
         response: this.publicState.responseText,
       });
+      if (this.currentQueuedTaskId) {
+        this.taskQueueStore.finish(
+          this.currentQueuedTaskId,
+          taskResult.outcome === "completed"
+            ? "done"
+            : (taskResult.outcome === "stopped" ? "cancelled" : "failed"),
+          taskResult.note,
+        );
+        this.currentQueuedTaskId = null;
+      }
       if (skillId) {
         this.noteSavedSkillOutcome(skillId, taskResult.outcome, taskResult.note);
       }
@@ -2382,14 +2509,24 @@ export class UstaadController {
         stepsTaken: 0,
         response: "",
       });
+      if (this.currentQueuedTaskId) {
+        this.taskQueueStore.finish(this.currentQueuedTaskId, "failed", errorMessage);
+        this.currentQueuedTaskId = null;
+      }
       if (skillId) {
         this.noteSavedSkillOutcome(skillId, "failed", errorMessage);
       }
     } finally {
       this.isAgentTaskRunning = false;
+      this.currentQueuedTaskId = null;
       this.agentTaskCancelled = true;
       this.publishState();
       this.publishIslandState();
+
+      // The list moves on by itself: whatever was waiting starts now.
+      if (this.taskQueueStore.waiting().length > 0 && !this.configStore.getConfig().automationPaused) {
+        void this.runTaskQueue();
+      }
     }
   }
 
@@ -3111,6 +3248,7 @@ export class UstaadController {
       skills: this.skillStore.list(),
       skillSuggestion: this.currentSkillSuggestion,
       skillRepair: this.currentSkillRepair,
+      taskQueue: this.taskQueueStore.waiting(),
       cursorEnabled: config.cursorEnabled,
       automationPaused: config.automationPaused,
       status: {

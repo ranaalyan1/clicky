@@ -511,6 +511,22 @@ export interface Skill {
   repairedAtIso: string | null;
 }
 
+export type QueuedTaskStatus = "waiting" | "running" | "done" | "failed" | "cancelled";
+
+/**
+ * A task waiting its turn. Ustaad has one screen and one pointer, so tasks run
+ * one at a time; the queue is what stops the second request from being lost.
+ */
+export interface QueuedTask {
+  id: string;
+  goal: string;
+  seedActions: UstaadAction[];
+  status: QueuedTaskStatus;
+  createdAtIso: string;
+  finishedAtIso: string | null;
+  note: string;
+}
+
 /**
  * A saved skill that keeps failing, and the alternative Ustaad worked out for
  * it. Offered and saved, never applied on its own: the only thing that changes
@@ -788,6 +804,8 @@ export interface IslandState {
   skills: Skill[];
   skillSuggestion: SkillSuggestionPrompt | null;
   skillRepair: SkillRepairSurface | null;
+  /** Tasks waiting to run, oldest first. */
+  taskQueue: QueuedTask[];
   /** Why the wake word is in that state, shown as the indicator's tooltip. */
   wakeWordMessage: string;
   todos: TodoItem[];

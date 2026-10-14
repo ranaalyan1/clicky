@@ -606,6 +606,79 @@ function renderControlToggles(islandState: IslandState): void {
 /* -------------------------------------------------------------------------- */
 /* Rendering                                                                  */
 /**
+ * The work waiting its turn. One desktop means one task at a time, so this is
+ * the queue made visible: what is waiting, in the order it will run, with the
+ * two things a waiting person wants — start it, or drop it.
+ */
+function renderTaskQueue(islandState: IslandState): void {
+  const waitingTasks = islandState.taskQueue;
+  if (!waitingTasks.length) {
+    return;
+  }
+
+  const card = document.createElement("div");
+  card.className = "confirmation-card task-queue-card";
+
+  const title = document.createElement("p");
+  title.className = "confirmation-title";
+  title.textContent = waitingTasks.length === 1
+    ? "1 task waiting to run"
+    : `${waitingTasks.length} tasks waiting to run`;
+
+  const list = document.createElement("div");
+  list.className = "island-list";
+  for (const waitingTask of waitingTasks.slice(0, 3)) {
+    const row = document.createElement("div");
+    row.className = "island-list-row";
+
+    const goalText = document.createElement("span");
+    goalText.className = "task-queue-goal";
+    goalText.textContent = waitingTask.goal;
+
+    const dropButton = document.createElement("button");
+    dropButton.type = "button";
+    dropButton.className = "text-button";
+    dropButton.textContent = "drop";
+    dropButton.addEventListener("click", () => {
+      void window.ustaad.cancelQueuedTask(waitingTask.id);
+    });
+
+    row.append(goalText, dropButton);
+    list.append(row);
+  }
+  if (waitingTasks.length > 3) {
+    const moreText = document.createElement("p");
+    moreText.className = "confirmation-reason";
+    moreText.textContent = `and ${waitingTasks.length - 3} more in the panel.`;
+    list.append(moreText);
+  }
+
+  const buttonRow = document.createElement("div");
+  buttonRow.className = "confirmation-buttons";
+
+  const runButton = document.createElement("button");
+  runButton.type = "button";
+  runButton.className = "confirmation-button approve";
+  runButton.textContent = "run the list";
+  runButton.addEventListener("click", () => {
+    runButton.disabled = true;
+    void window.ustaad.runTaskQueue();
+  });
+
+  const clearButton = document.createElement("button");
+  clearButton.type = "button";
+  clearButton.className = "confirmation-button";
+  clearButton.textContent = "clear it";
+  clearButton.addEventListener("click", () => {
+    void window.ustaad.clearTaskQueue();
+  });
+
+  buttonRow.append(runButton, clearButton);
+  card.append(title, list, buttonRow);
+  element.confirmationStack.append(card);
+}
+
+/**
  * The repair card for a saved skill that keeps failing. It has three faces:
  * the offer, the wait while the model thinks, and the proposed new way. Only
  * "save the fix" changes the skill, and even then every run is confirmed.
@@ -713,6 +786,7 @@ function renderIsland(islandState: IslandState): void {
   renderConfirmations(islandState);
   renderSkillSuggestion(islandState);
   renderSkillRepair(islandState);
+  renderTaskQueue(islandState);
   renderTimers(islandState);
   renderSnippets(islandState);
   renderActivityFeed(islandState.activityFeed);

@@ -222,6 +222,42 @@ function registerIpcHandlers(): void {
     }
     ustaadController?.dismissSkillRepair();
   });
+  ipcMain.handle("island:run-task-queue", (event) => {
+    if (!islandSentEvent(event.sender.id)) {
+      throw new Error("IPC request rejected: sender is not the Ustaad island.");
+    }
+    return ustaadController?.runTaskQueue() ?? "there is nothing waiting.";
+  });
+  ipcMain.handle("island:cancel-queued-task", (event, taskId: string) => {
+    if (!islandSentEvent(event.sender.id)) {
+      throw new Error("IPC request rejected: sender is not the Ustaad island.");
+    }
+    return ustaadController?.cancelQueuedTask(taskId) ?? "that one is already running.";
+  });
+  ipcMain.handle("island:clear-task-queue", (event) => {
+    if (!islandSentEvent(event.sender.id)) {
+      throw new Error("IPC request rejected: sender is not the Ustaad island.");
+    }
+    return ustaadController?.clearTaskQueue() ?? "there is nothing waiting.";
+  });
+  ipcMain.handle("panel:run-task-queue", (event) => {
+    if (!panelSentEvent(event.sender.id)) {
+      throw new Error("IPC request rejected: sender is not the Ustaad panel.");
+    }
+    return ustaadController?.runTaskQueue() ?? "there is nothing waiting.";
+  });
+  ipcMain.handle("panel:cancel-queued-task", (event, taskId: string) => {
+    if (!panelSentEvent(event.sender.id)) {
+      throw new Error("IPC request rejected: sender is not the Ustaad panel.");
+    }
+    return ustaadController?.cancelQueuedTask(taskId) ?? "that one is already running.";
+  });
+  ipcMain.handle("panel:clear-task-queue", (event) => {
+    if (!panelSentEvent(event.sender.id)) {
+      throw new Error("IPC request rejected: sender is not the Ustaad panel.");
+    }
+    return ustaadController?.clearTaskQueue() ?? "there is nothing waiting.";
+  });
   ipcMain.handle("panel:rename-skill", (event, skillId: string, nextName: string) => {
     if (!panelSentEvent(event.sender.id)) {
       throw new Error("IPC request rejected: sender is not the Ustaad panel.");

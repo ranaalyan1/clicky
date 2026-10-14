@@ -160,6 +160,10 @@ const element = {
   auditList: requireElement<HTMLElement>("audit-list"),
   auditClearButton: requireElement<HTMLButtonElement>("audit-clear-button"),
   skillsCard: requireElement<HTMLElement>("skills-card"),
+  taskQueueCard: requireElement<HTMLElement>("task-queue-card"),
+  taskQueueList: requireElement<HTMLElement>("task-queue-list"),
+  taskQueueRunButton: requireElement<HTMLButtonElement>("task-queue-run-button"),
+  taskQueueClearButton: requireElement<HTMLButtonElement>("task-queue-clear-button"),
   presenceStatus: requireElement<HTMLElement>("presence-status"),
   morningBriefToggle: requireElement<HTMLInputElement>("morning-brief-toggle"),
   morningBriefTime: requireElement<HTMLInputElement>("morning-brief-time"),
@@ -399,7 +403,10 @@ function renderSetup(state: UstaadPublicState): void {
   element.wakeWordStateChip.textContent = describeWakeWordState(state, config);
   element.wakeWordStatus.textContent = describeWakeWordStatus(state, config);
   renderAuditLog(state);
-  void window.ustaad.getIslandState().then(renderSkills).catch(() => undefined);
+  void window.ustaad.getIslandState().then((islandState) => {
+    renderSkills(islandState);
+    renderTaskQueue(islandState);
+  }).catch(() => undefined);
   element.islandMusicToggle.checked = config.islandShowNowPlaying;
   element.islandClipboardToggle.checked = config.islandShowClipboard;
 
@@ -544,6 +551,43 @@ function describeSkillHealth(skill: Skill): string {
   return skill.failureStreak > 1
     ? `has not worked ${skill.failureStreak} times in a row`
     : "the last run did not finish";
+}
+
+/**
+ * The waiting list, in the panel: the same order the island shows, but with
+ * room for all of it and a button that starts it now.
+ */
+function renderTaskQueue(islandState: IslandState): void {
+  const waitingTasks = islandState.taskQueue;
+  element.taskQueueCard.hidden = waitingTasks.length === 0;
+  if (!waitingTasks.length) {
+    element.taskQueueList.replaceChildren();
+    return;
+  }
+
+  element.taskQueueList.replaceChildren(...waitingTasks.map((waitingTask) => {
+    const row = document.createElement("div");
+    row.className = "list-row";
+
+    const copy = document.createElement("div");
+    copy.className = "list-row-copy";
+    const goalText = document.createElement("strong");
+    goalText.textContent = waitingTask.goal;
+    const meta = document.createElement("span");
+    meta.textContent = "waiting its turn";
+    copy.append(goalText, meta);
+
+    const dropButton = document.createElement("button");
+    dropButton.type = "button";
+    dropButton.className = "ghost-button";
+    dropButton.textContent = "drop";
+    dropButton.addEventListener("click", () => {
+      void window.ustaad.panelCancelQueuedTask(waitingTask.id);
+    });
+
+    row.append(copy, dropButton);
+    return row;
+  }));
 }
 
 function renderSkills(islandState: IslandState): void {
@@ -730,6 +774,13 @@ element.phoneBridgeRotateButton.addEventListener("click", () => {
 });
 
 // Searching the history is instant and local, so it runs on every keystroke.
+element.taskQueueRunButton.addEventListener("click", () => {
+  void window.ustaad.panelRunTaskQueue();
+});
+element.taskQueueClearButton.addEventListener("click", () => {
+  void window.ustaad.panelClearTaskQueue();
+});
+
 element.historySearchInput.addEventListener("input", () => void refreshRunHistory());
 element.historyClearButton.addEventListener("click", () => {
   window.ustaad.clearRunHistory();

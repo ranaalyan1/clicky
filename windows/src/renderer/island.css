@@ -389,6 +389,10 @@ body[data-media-playing="false"] .music-art span { animation-play-state: paused;
   padding: 8px 0;
 }
 .island-list-row + .island-list-row { box-shadow: inset 0 1px 0 var(--island-line); }
+/* A waiting task is a sentence, not a label: it gets the room, and the drop
+   button keeps its own width instead of being pushed off the edge. */
+.task-queue-goal { flex: 1 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.task-queue-card .text-button { flex: 0 0 auto; }
 .island-row-main { flex: 1; min-width: 0; }
 .island-row-title { font-size: 10.5px; line-height: 1.5; word-break: break-word; }
 .island-row-meta { color: var(--island-faint); font-size: 9px; margin-top: 3px; }

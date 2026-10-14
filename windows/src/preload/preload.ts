@@ -96,6 +96,9 @@ contextBridge.exposeInMainWorld("ustaad", {
   },
   clearRunHistory: (): void => ipcRenderer.send("panel:clear-run-history"),
   rotatePhoneBridgeToken: (): void => ipcRenderer.send("panel:rotate-phone-token"),
+  panelRunTaskQueue: (): Promise<string> => ipcRenderer.invoke("panel:run-task-queue"),
+  panelCancelQueuedTask: (taskId: string): Promise<string> => ipcRenderer.invoke("panel:cancel-queued-task", taskId),
+  panelClearTaskQueue: (): Promise<string> => ipcRenderer.invoke("panel:clear-task-queue"),
 
   /* Cursor overlay ------------------------------------------------------- */
   sendPointingAnimationCompleted: (interactionId: number): void => {
@@ -144,6 +147,9 @@ contextBridge.exposeInMainWorld("ustaad", {
   workOutSkillRepair: (): Promise<string> => ipcRenderer.invoke("island:work-out-skill-repair"),
   saveSkillRepair: (): Promise<string> => ipcRenderer.invoke("island:save-skill-repair"),
   dismissSkillRepair: (): Promise<void> => ipcRenderer.invoke("island:dismiss-skill-repair"),
+  runTaskQueue: (): Promise<string> => ipcRenderer.invoke("island:run-task-queue"),
+  cancelQueuedTask: (taskId: string): Promise<string> => ipcRenderer.invoke("island:cancel-queued-task", taskId),
+  clearTaskQueue: (): Promise<string> => ipcRenderer.invoke("island:clear-task-queue"),
   renameSkill: (skillId: string, nextName: string): Promise<void> => {
     return ipcRenderer.invoke("panel:rename-skill", skillId, nextName);
   },

@@ -49,6 +49,9 @@ declare global {
       searchRunHistory(query: string): Promise<RunHistorySearchResult[]>;
       clearRunHistory(): void;
       rotatePhoneBridgeToken(): void;
+      panelRunTaskQueue(): Promise<string>;
+      panelCancelQueuedTask(taskId: string): Promise<string>;
+      panelClearTaskQueue(): Promise<string>;
 
       /* Cursor overlay */
       sendPointingAnimationCompleted(interactionId: number): void;
@@ -75,6 +78,9 @@ declare global {
       workOutSkillRepair(): Promise<string>;
       saveSkillRepair(): Promise<string>;
       dismissSkillRepair(): Promise<void>;
+      runTaskQueue(): Promise<string>;
+      cancelQueuedTask(taskId: string): Promise<string>;
+      clearTaskQueue(): Promise<string>;
       renameSkill(skillId: string, nextName: string): Promise<void>;
       removeSkill(skillId: string): Promise<void>;
       runCheckInNow(): Promise<void>;
