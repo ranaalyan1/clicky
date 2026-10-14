@@ -60,7 +60,10 @@
           ]
         }
       ],
-      "artifactName": "Clickaa-Setup-${version}-${arch}.${ext}"
+      "artifactName": "Clickaa-Setup-${version}-${arch}.${ext}",
+      "signExts": [
+        ".node"
+      ]
     },
     "nsis": {
       "buildUniversalInstaller": false,

@@ -128,6 +128,8 @@ The Windows client needs **either** a user-supplied Gemini API key (paste it in 
 
 The Windows client requires Node.js 22.12+ for the pinned build toolchain. Run packaging on Windows; CI uses `windows-latest`.
 
+Installers are unsigned unless the `WINDOWS_CODE_SIGNING_CERTIFICATE` and `WINDOWS_CODE_SIGNING_CERTIFICATE_PASSWORD` repository secrets are set; `.github/workflows/windows.yml` passes them to electron-builder and verifies every signature when they are. An empty `CSC_LINK` is treated as "no certificate configured", so unsigned builds keep working unchanged. Windows refuses unsigned installers in two different ways — SmartScreen's "Run anyway" and Smart App Control's outright block — and `windows/README.md` documents both.
+
 Use `./node_modules/.bin/tsc` (or the npm scripts) rather than a bare `npx tsc`, which can install an unrelated package named `tsc`.
 
 ### Cloudflare Worker

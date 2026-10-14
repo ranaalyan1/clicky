@@ -25,7 +25,13 @@ Download the latest installer from [Releases](https://github.com/ranaalyan1/clic
 - `Clickaa-Setup-<version>-x64.exe` for almost every PC
 - `Clickaa-Setup-<version>-arm64.exe` for Windows on ARM
 
-The installers are unsigned, so Windows SmartScreen may show "Windows protected your PC" — choose **More info → Run anyway**. Then paste a [Google AI Studio](https://aistudio.google.com/api-keys) Gemini API key into the setup tab. The key is stored on that PC only.
+The installers are unsigned, and Windows treats that two ways. **SmartScreen** shows "Windows protected your PC" and **More info → Run anyway** clears it. **Smart App Control**, on by default on clean Windows 11 installs, blocks unsigned apps outright and offers no way to allow a single one — if you see "Smart App Control blocked an app that may be unsafe", read [windows/README.md](windows/README.md#troubleshooting) before switching anything off, because on older Windows 11 builds that switch is a one-way trip. Either way, check the download is the file CI built:
+
+```powershell
+Get-FileHash .\Clickaa-Setup-1.1.0-x64.exe -Algorithm SHA256
+```
+
+The digest published on the release page must match. Then paste a [Google AI Studio](https://aistudio.google.com/api-keys) Gemini API key into the setup tab; the key is stored on that PC only.
 
 ## Two ways to give Clickaa a brain
 
