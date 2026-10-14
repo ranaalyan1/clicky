@@ -181,6 +181,7 @@ IMPORTANT: Follow these naming rules strictly. Clarity is the top priority.
 
 ### Do NOT
 
+- Do not add features that were not asked for. Feature work is in scope only when the user asks for it — and then it is fully in scope: build all of what was asked, not a convenient subset
 - Do not make unrelated refactors or "improvements" while fixing something else
 - Do not add docstrings, comments, or type annotations to code you did not change
 - Do not enable Electron Node integration, disable renderer sandboxing, or send provider API keys to a renderer
