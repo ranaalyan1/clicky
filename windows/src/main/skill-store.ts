@@ -1,10 +1,33 @@
 import { randomUUID } from "node:crypto";
-import { ClickaaAction, Skill } from "../shared/contracts";
+import { UstaadAction, RunOutcome, Skill } from "../shared/contracts";
 import { JsonFileStore } from "./json-file-store";
 import { normalizeForMatch } from "./text-matching";
 
 const maximumStoredSkills = 60;
 const maximumSeedActionsPerSkill = 12;
+const maximumOutcomeNoteLength = 160;
+const maximumTrackedStreak = 100;
+
+/** A whole number that is present, sane and never negative. */
+function sanitizeCount(storedValue: unknown, fallback: number): number {
+  return typeof storedValue === "number" && Number.isFinite(storedValue)
+    ? Math.min(maximumTrackedStreak, Math.max(0, Math.round(storedValue)))
+    : fallback;
+}
+
+function sanitizeOutcome(storedValue: unknown): RunOutcome | null {
+  const knownOutcomes: RunOutcome[] = [
+    "completed",
+    "gave_up",
+    "ran_out_of_steps",
+    "ran_out_of_time",
+    "stopped",
+    "failed",
+  ];
+  return typeof storedValue === "string" && (knownOutcomes as string[]).includes(storedValue)
+    ? storedValue as RunOutcome
+    : null;
+}
 
 function sanitizeSkills(storedSkills: unknown): Skill[] {
   if (!Array.isArray(storedSkills)) {
@@ -31,7 +54,7 @@ function sanitizeSkills(storedSkills: unknown): Skill[] {
       // Seed actions are a memory aid, never a permission: every run is filtered
       // and confirmed again, exactly like a freshly spoken task.
       seedActions: Array.isArray(skillRecord.seedActions)
-        ? (skillRecord.seedActions as ClickaaAction[]).slice(0, maximumSeedActionsPerSkill)
+        ? (skillRecord.seedActions as UstaadAction[]).slice(0, maximumSeedActionsPerSkill)
         : [],
       createdAtIso: typeof skillRecord.createdAtIso === "string"
         ? skillRecord.createdAtIso
@@ -40,6 +63,16 @@ function sanitizeSkills(storedSkills: unknown): Skill[] {
         ? Math.max(0, Math.round(skillRecord.runCount))
         : 0,
       lastRunAtIso: typeof skillRecord.lastRunAtIso === "string" ? skillRecord.lastRunAtIso : null,
+      // Health is how the skill is doing, not what it may do: it never widens
+      // what a run is allowed to touch.
+      lastOutcome: sanitizeOutcome(skillRecord.lastOutcome),
+      lastOutcomeNote: typeof skillRecord.lastOutcomeNote === "string"
+        ? skillRecord.lastOutcomeNote.trim().slice(0, maximumOutcomeNoteLength)
+        : "",
+      failureStreak: sanitizeCount(skillRecord.failureStreak, 0),
+      repairOfferedStreak: sanitizeCount(skillRecord.repairOfferedStreak, 0),
+      repairCount: sanitizeCount(skillRecord.repairCount, 0),
+      repairedAtIso: typeof skillRecord.repairedAtIso === "string" ? skillRecord.repairedAtIso : null,
     });
   }
 
@@ -85,7 +118,7 @@ export class SkillStore {
     return this.skills.some((skill) => normalizeForMatch(skill.goal) === normalizedGoal);
   }
 
-  save(skillDraft: { name: string; goal: string; seedActions: ClickaaAction[] }): Skill {
+  save(skillDraft: { name: string; goal: string; seedActions: UstaadAction[] }): Skill {
     const skillName = skillDraft.name.trim().slice(0, 60);
     const skillGoal = skillDraft.goal.trim().slice(0, 300);
     if (!skillName) {
@@ -104,6 +137,12 @@ export class SkillStore {
       createdAtIso: existingSkill?.createdAtIso ?? new Date().toISOString(),
       runCount: existingSkill?.runCount ?? 0,
       lastRunAtIso: existingSkill?.lastRunAtIso ?? null,
+      lastOutcome: existingSkill?.lastOutcome ?? null,
+      lastOutcomeNote: existingSkill?.lastOutcomeNote ?? "",
+      failureStreak: existingSkill?.failureStreak ?? 0,
+      repairOfferedStreak: existingSkill?.repairOfferedStreak ?? 0,
+      repairCount: existingSkill?.repairCount ?? 0,
+      repairedAtIso: existingSkill?.repairedAtIso ?? null,
     };
 
     this.skills = existingSkill
@@ -142,14 +181,77 @@ export class SkillStore {
     return true;
   }
 
-  /** Called after a skill runs, so the list can lead with what the user uses. */
-  noteRun(skillId: string): void {
+  /**
+   * Called after a skill runs, so the list can lead with what the user uses and
+   * the health of each skill is known. A run the user stopped themselves is
+   * recorded but never counted against the skill — they stopped it, it did not
+   * fail.
+   */
+  noteRun(skillId: string, run: { outcome: RunOutcome; note: string; countsAsFailure: boolean }): Skill | null {
+    let updatedSkill: Skill | null = null;
+    this.skills = this.skills.map((skill) => {
+      if (skill.id !== skillId) {
+        return skill;
+      }
+      updatedSkill = {
+        ...skill,
+        runCount: skill.runCount + 1,
+        lastRunAtIso: new Date().toISOString(),
+        lastOutcome: run.outcome,
+        lastOutcomeNote: run.note.trim().slice(0, maximumOutcomeNoteLength),
+        failureStreak: run.outcome === "completed"
+          ? 0
+          : (run.countsAsFailure ? sanitizeCount(skill.failureStreak + 1, 1) : skill.failureStreak),
+      };
+      return updatedSkill;
+    });
+    if (updatedSkill) {
+      this.persist();
+    }
+    return updatedSkill;
+  }
+
+  /** Remembers that a repair was offered at this streak, so "not now" sticks. */
+  noteRepairOffered(skillId: string, failureStreak: number): void {
     this.skills = this.skills.map((skill) => (
       skill.id === skillId
-        ? { ...skill, runCount: skill.runCount + 1, lastRunAtIso: new Date().toISOString() }
+        ? { ...skill, repairOfferedStreak: sanitizeCount(failureStreak, 0) }
         : skill
     ));
     this.persist();
+  }
+
+  /**
+   * Replaces how a saved skill is done with the version the user approved,
+   * keeping its name, its id, how often it has run and how many times it has
+   * been repaired.
+   */
+  applyRepair(skillId: string, repair: { goal: string; seedActions: UstaadAction[] }): Skill | null {
+    const repairedGoal = repair.goal.trim().slice(0, 300);
+    if (!repairedGoal) {
+      return null;
+    }
+
+    let repairedSkill: Skill | null = null;
+    this.skills = this.skills.map((skill) => {
+      if (skill.id !== skillId) {
+        return skill;
+      }
+      repairedSkill = {
+        ...skill,
+        goal: repairedGoal,
+        seedActions: repair.seedActions.slice(0, maximumSeedActionsPerSkill),
+        failureStreak: 0,
+        repairOfferedStreak: 0,
+        repairCount: skill.repairCount + 1,
+        repairedAtIso: new Date().toISOString(),
+      };
+      return repairedSkill;
+    });
+    if (repairedSkill) {
+      this.persist();
+    }
+    return repairedSkill;
   }
 
   /** Compact list for the system prompt. */

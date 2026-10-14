@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data:; media-src 'self' data: blob:; connect-src 'none'; object-src 'none'; base-uri 'none'; form-action 'none'">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Clickaa</title>
+  <title>Ustaad</title>
   <link rel="stylesheet" href="./tokens.css">
   <link rel="stylesheet" href="./brand.css">
   <link rel="stylesheet" href="./panel.css">
@@ -14,10 +14,10 @@
     <header class="titlebar">
       <div class="brand-lockup">
         <span class="mini-cursor" aria-hidden="true"></span>
-        <span class="brand-name">clickaa</span>
+        <span class="brand-name">ustaad</span>
         <span class="platform-pill">windows</span>
       </div>
-      <button id="close-button" class="icon-button no-drag" type="button" aria-label="Hide Clickaa"></button>
+      <button id="close-button" class="icon-button no-drag" type="button" aria-label="Hide Ustaad"></button>
     </header>
 
     <nav class="tab-bar" role="tablist">
@@ -40,6 +40,44 @@
           <div class="status-copy">
             <h1 id="status-title">ready when you are</h1>
             <p id="status-description">hold <kbd>Ctrl</kbd> + <kbd>Alt</kbd> anywhere to talk</p>
+          </div>
+        </section>
+
+        <!-- Three steps, each one measurable, and none of them a lecture. The card
+             removes itself once all three are done so it never becomes clutter. -->
+        <section class="card quick-start" id="quick-start-card">
+          <div class="section-heading-row">
+            <div>
+              <p class="eyebrow">start here</p>
+              <h2>three steps and it is yours</h2>
+            </div>
+            <span id="quick-start-progress" class="count-pill"></span>
+          </div>
+          <div class="step-list">
+            <button class="step-row" id="step-brain" type="button">
+              <span class="step-number">1</span>
+              <span class="step-copy">
+                <strong>give ustaad a brain</strong>
+                <span>paste a free gemini key, or point it at your own worker.</span>
+              </span>
+              <span class="step-state" id="step-brain-state">todo</span>
+            </button>
+            <button class="step-row" id="step-talk" type="button">
+              <span class="step-number">2</span>
+              <span class="step-copy">
+                <strong>hold a key and say something</strong>
+                <span>anywhere in windows: hold <kbd>Ctrl</kbd> + <kbd>Alt</kbd>, speak, let go.</span>
+              </span>
+              <span class="step-state" id="step-talk-state">todo</span>
+            </button>
+            <button class="step-row" id="step-automate" type="button">
+              <span class="step-number">3</span>
+              <span class="step-copy">
+                <strong>let it do the work</strong>
+                <span>ask for a task, set a routine, or switch on the check-ins.</span>
+              </span>
+              <span class="step-state" id="step-automate-state">todo</span>
+            </button>
           </div>
         </section>
 
@@ -104,7 +142,7 @@
           <div class="setting-row">
             <div>
               <strong>pause actions</strong>
-              <span>clickaa describes what it would do instead</span>
+              <span>ustaad describes what it would do instead</span>
             </div>
             <label class="toggle-control">
               <input id="pause-toggle" type="checkbox">
@@ -129,7 +167,7 @@
             </div>
           </div>
           <label class="field-label" for="assistant-name">what it calls itself</label>
-          <input id="assistant-name" class="text-field" type="text" spellcheck="false" autocomplete="off" placeholder="clickaa">
+          <input id="assistant-name" class="text-field" type="text" spellcheck="false" autocomplete="off" placeholder="ustaad">
 
           <div id="personality-chips" class="chip-row"></div>
           <p id="personality-description" class="field-hint"></p>
@@ -171,7 +209,7 @@
           <div class="section-heading-row">
             <div>
               <p class="eyebrow">abilities</p>
-              <h2>what clickaa may do</h2>
+              <h2>what ustaad may do</h2>
             </div>
           </div>
           <div id="ability-list" class="ability-list"></div>
@@ -223,8 +261,52 @@
             <input id="schedule-input" class="text-field" type="text" spellcheck="false" autocomplete="off" placeholder="search amazon for gift wraps tomorrow at 11">
             <button id="schedule-add-button" class="primary-button" type="button">ask</button>
           </div>
-          <p id="schedule-hint" class="field-hint">say it out loud instead and clickaa will set it up: "every morning at nine, open unity and spotify".</p>
+          <p id="schedule-hint" class="field-hint">say it out loud instead and ustaad will set it up: "every morning at nine, open unity and spotify".</p>
           <div id="schedule-list" class="list"></div>
+        </section>
+
+        <section class="card" id="presence-card">
+          <div class="section-heading-row">
+            <div>
+              <p class="eyebrow">presence</p>
+              <h2>check-ins ustaad starts</h2>
+            </div>
+            <button id="check-in-now-button" class="ghost-button" type="button">check in now</button>
+          </div>
+          <p class="field-hint">a brief in the morning and a recap at night, written from your own schedule, to-dos and what ustaad did. check-ins never touch anything on this pc.</p>
+          <div class="setting-row">
+            <div>
+              <strong>morning brief</strong>
+              <span>what today holds, and what ran while you slept</span>
+            </div>
+            <input id="morning-brief-time" class="text-field presence-time-field" type="time" aria-label="morning brief time">
+            <label class="toggle-control">
+              <input id="morning-brief-toggle" type="checkbox">
+              <span></span>
+            </label>
+          </div>
+          <div class="setting-row">
+            <div>
+              <strong>evening recap</strong>
+              <span>what ustaad did today, and what is still open</span>
+            </div>
+            <input id="evening-recap-time" class="text-field presence-time-field" type="time" aria-label="evening recap time">
+            <label class="toggle-control">
+              <input id="evening-recap-toggle" type="checkbox">
+              <span></span>
+            </label>
+          </div>
+          <div class="setting-row">
+            <div>
+              <strong>say them out loud</strong>
+              <span>speak each check-in instead of only showing it</span>
+            </div>
+            <label class="toggle-control">
+              <input id="speak-check-ins-toggle" type="checkbox">
+              <span></span>
+            </label>
+          </div>
+          <p id="presence-status" class="field-hint"></p>
         </section>
       </section>
 
@@ -234,7 +316,7 @@
           <div class="section-heading-row">
             <div>
               <p class="eyebrow">memory</p>
-              <h2>things clickaa remembers</h2>
+              <h2>things ustaad remembers</h2>
             </div>
             <button id="memory-clear-button" class="ghost-button" type="button">clear all</button>
           </div>
@@ -245,14 +327,44 @@
           <div id="memory-list" class="list"></div>
         </section>
 
+        <!-- The run history is the answer to "what did you do yesterday?", so it
+             is searchable in place instead of being another file to open. -->
+        <section class="card">
+          <div class="section-heading-row">
+            <div>
+              <p class="eyebrow">what it did</p>
+              <h2>search the run history</h2>
+            </div>
+            <button id="history-clear-button" class="ghost-button" type="button">clear</button>
+          </div>
+          <div class="inline-form">
+            <input id="history-search-input" class="text-field" type="search" spellcheck="false" autocomplete="off" placeholder="receipts from last week">
+          </div>
+          <p id="history-hint" class="field-hint">every reply and every task is written to run-history.json in your user folder. search it here, or open the file yourself.</p>
+          <div id="history-list" class="list"></div>
+        </section>
+
+        <section class="card" id="task-queue-card" hidden>
+          <div class="section-heading-row">
+            <div>
+              <p class="eyebrow">the list</p>
+              <h2>work waiting to run</h2>
+            </div>
+            <button id="task-queue-clear-button" class="ghost-button" type="button">clear</button>
+          </div>
+          <p class="field-hint">ustaad has one screen and one pointer, so it works through these one at a time — anything you ask for while it is busy lands here instead of being lost, and every task still asks before it clicks or types.</p>
+          <div id="task-queue-list" class="list"></div>
+          <button id="task-queue-run-button" class="wide-button" type="button">run the list</button>
+        </section>
+
         <section class="card" id="skills-card">
           <div class="section-heading-row">
             <div>
               <p class="eyebrow">skills</p>
-              <h2>tasks clickaa saved by name</h2>
+              <h2>tasks ustaad saved by name</h2>
             </div>
           </div>
-          <p class="field-hint">when the same task works a few times, clickaa offers to save it. it only saves when you say yes, and every run still checks the screen and asks before it clicks or types.</p>
+          <p class="field-hint">when the same task works a few times, ustaad offers to save it. it only saves when you say yes, and every run still checks the screen and asks before it clicks or types.</p>
           <div id="skill-list" class="list"></div>
         </section>
 
@@ -264,7 +376,7 @@
             </div>
             <button id="clipboard-clear-button" class="ghost-button" type="button">clear</button>
           </div>
-          <p class="field-hint">clickaa keeps your last copies in the island so you can paste them back in one click. nothing leaves this pc.</p>
+          <p class="field-hint">ustaad keeps your last copies in the island so you can paste them back in one click. nothing leaves this pc.</p>
           <div id="clipboard-list" class="list"></div>
         </section>
 
@@ -272,17 +384,41 @@
           <div class="section-heading-row">
             <div>
               <p class="eyebrow">system access</p>
-              <h2>what clickaa did on this pc</h2>
+              <h2>what ustaad did on this pc</h2>
             </div>
             <button id="audit-clear-button" class="ghost-button" type="button">clear log</button>
           </div>
-          <p id="audit-summary" class="field-hint">nothing yet. every command, file and registry read shows up here, whether you allowed it or clickaa refused it.</p>
+          <p id="audit-summary" class="field-hint">nothing yet. every command, file and registry read shows up here, whether you allowed it or ustaad refused it.</p>
           <div id="audit-list" class="list"></div>
         </section>
       </section>
 
       <!-- ------------------------------------------------------------------ -->
       <section class="page" data-page="setup">
+        <!-- The phone window: a link the user opens on their own wi-fi. The
+             switch itself lives with the other abilities, because opening a
+             socket off this machine is an ability, not a setting. -->
+        <section class="card">
+          <div class="section-heading-row">
+            <div>
+              <p class="eyebrow">phone window</p>
+              <h2>ustaad on your phone</h2>
+            </div>
+            <label class="toggle-control">
+              <input id="phone-bridge-toggle" type="checkbox">
+              <span></span>
+            </label>
+          </div>
+          <p class="field-hint">your own wi-fi, and only with the link below. a question that comes from a phone is answered and nothing more: it never clicks, types, opens, deletes or approves anything.</p>
+          <div id="phone-bridge-row" class="inline-form" hidden>
+            <input id="phone-bridge-address" class="text-field" type="text" readonly spellcheck="false">
+          </div>
+          <div class="button-row" id="phone-bridge-actions" hidden>
+            <button id="phone-bridge-rotate-button" class="ghost-button" type="button">new link (unpairs every phone)</button>
+          </div>
+          <p id="phone-bridge-note" class="field-hint"></p>
+        </section>
+
         <section class="card">
           <div class="section-heading-row">
             <div>
@@ -301,7 +437,17 @@
               <strong>cloudflare worker</strong>
               <span>keeps claude, elevenlabs and assemblyai keys off this pc. paste your deployed worker url below.</span>
             </button>
+            <button class="provider-card" type="button" data-brain-provider="local">
+              <strong>on this pc</strong>
+              <span>run the brain yourself with ollama, lm studio or llama.cpp. nothing you say leaves your own network, and it costs nothing per word.</span>
+            </button>
           </div>
+
+          <label class="toggle-control" for="offline-mode-toggle">
+            <input id="offline-mode-toggle" type="checkbox">
+            <span>offline mode — nothing leaves this pc</span>
+          </label>
+          <p class="field-hint">with this on, ustaad itself never reaches the internet: the brain has to be one on this pc, speaking uses the windows voice, and hearing, pictures, the phone window and the cloud wake word all stop until you switch it back off. your browser is still yours — links you ask for still open.</p>
 
           <div id="gemini-setup" class="setup-block">
             <label class="field-label" for="gemini-key">gemini api key</label>
@@ -318,9 +464,25 @@
             </div>
           </div>
 
+          <div id="local-setup" class="setup-block">
+            <label class="field-label" for="local-brain-url">server address</label>
+            <input id="local-brain-url" class="text-field" type="text" spellcheck="false" autocomplete="off" placeholder="http://127.0.0.1:11434">
+            <label class="field-label" for="local-brain-model">model</label>
+            <input id="local-brain-model" class="text-field" type="text" spellcheck="false" autocomplete="off" placeholder="llama3.2">
+            <label class="toggle-control" for="local-brain-sees-screen-toggle">
+              <input id="local-brain-sees-screen-toggle" type="checkbox">
+              <span>my model can look at screenshots</span>
+            </label>
+            <p class="field-hint">ollama, lm studio, jan and llama.cpp all answer on the same address. this machine or your own network only: a public address is refused. leave the screen switch off unless your model really does have eyes — a model that cannot see gets told so instead of guessing.</p>
+            <div class="button-row">
+              <button id="local-brain-save-button" class="secondary-button" type="button">save</button>
+              <button id="local-brain-test-button" class="primary-button" type="button">save &amp; test</button>
+            </div>
+          </div>
+
           <div id="worker-setup" class="setup-block">
             <label class="field-label" for="worker-url">cloudflare worker url</label>
-            <input id="worker-url" class="text-field" type="url" spellcheck="false" autocomplete="off" placeholder="https://clickaa-proxy.you.workers.dev">
+            <input id="worker-url" class="text-field" type="url" spellcheck="false" autocomplete="off" placeholder="https://ustaad-proxy.you.workers.dev">
             <label class="field-label" for="claude-model">claude model</label>
             <select id="claude-model" class="select-field">
               <option value="claude-sonnet-4-6">sonnet — fast</option>
@@ -464,7 +626,7 @@
           </div>
           <div class="setting-row">
             <div>
-              <strong>listen for "clickaa"</strong>
+              <strong>listen for "ustaad"</strong>
               <span>say the name and the island comes up, ready for what you say next</span>
             </div>
             <label class="toggle-control">

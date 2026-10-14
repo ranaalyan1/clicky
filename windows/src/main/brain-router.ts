@@ -1,12 +1,15 @@
 import {
   BrainConnectionTestResult,
-  ClickaaUserConfig,
+  UstaadUserConfig,
   GeminiChatModel,
 } from "../shared/contracts";
 import { BrainStreamRequest, SynthesizedSpeech } from "./brain-types";
 import { ClaudeClient } from "./claude-client";
 import { buildDictationCleanupUserPrompt, dictationCleanupSystemPrompt } from "./dictation-prompts";
 import { GeminiClient } from "./gemini-client";
+import { GeneratedPicturePayload } from "./image-generation";
+import { LocalBrainClient, normalizeLocalBrainBaseUrl } from "./local-brain-client";
+import { ResearchAnswer } from "./research";
 import { normalizeWorkerBaseUrl } from "./config-store";
 
 export type ResolvedSpeechProvider = "gemini" | "elevenlabs" | "windows";
@@ -21,13 +24,25 @@ export type ResolvedSpeechProvider = "gemini" | "elevenlabs" | "windows";
  *   ElevenLabs) so the user's PC never holds a shared key.
  */
 export class BrainRouter {
-  constructor(private readonly claudeClient = new ClaudeClient()) {}
+  constructor(
+    private readonly claudeClient = new ClaudeClient(),
+    private readonly localBrainClient = new LocalBrainClient(),
+  ) {}
 
   /**
    * The provider that can actually answer right now. A user who picked Gemini
-   * but pasted a Worker URL still gets a working Clickaa instead of an error.
+   * but pasted a Worker URL still gets a working Ustaad instead of an error.
    */
-  resolveActiveProvider(config: ClickaaUserConfig): "gemini" | "worker" | null {
+  resolveActiveProvider(config: UstaadUserConfig): "gemini" | "worker" | "local" | null {
+    // Offline mode is a promise, not a preference: with it on the only brain
+    // that can answer is one on the user's own machine, whatever else is set.
+    if (config.offlineMode) {
+      return config.localBrainBaseUrl ? "local" : null;
+    }
+
+    if (config.brainProvider === "local" && config.localBrainBaseUrl) {
+      return "local";
+    }
     if (config.brainProvider === "gemini" && config.geminiApiKey) {
       return "gemini";
     }
@@ -40,10 +55,20 @@ export class BrainRouter {
     return null;
   }
 
-  getBrainLabel(config: ClickaaUserConfig): string {
+  getBrainLabel(config: UstaadUserConfig): string {
     const activeProvider = this.resolveActiveProvider(config);
     if (!activeProvider) {
+      if (config.offlineMode) {
+        return "offline (no local brain yet)";
+      }
+      if (config.brainProvider === "local") {
+        return "on this pc (nothing answered yet)";
+      }
       return config.brainProvider === "gemini" ? "Gemini (key needed)" : "Worker (url needed)";
+    }
+
+    if (activeProvider === "local") {
+      return `on this pc (${config.localBrainModel})`;
     }
 
     if (activeProvider === "gemini") {
@@ -53,21 +78,31 @@ export class BrainRouter {
     return config.selectedClaudeModel === "claude-opus-4-6" ? "Claude Opus" : "Claude Sonnet";
   }
 
-  isConfigured(config: ClickaaUserConfig): boolean {
+  isConfigured(config: UstaadUserConfig): boolean {
     return this.resolveActiveProvider(config) !== null;
   }
 
-  configurationHint(config: ClickaaUserConfig): string {
+  configurationHint(config: UstaadUserConfig): string {
     if (this.isConfigured(config)) {
       return "";
     }
+    if (config.offlineMode) {
+      return "Offline mode is on, so Ustaad needs a model on this pc: start one in the setup tab, or switch offline mode off.";
+    }
+    if (config.brainProvider === "local") {
+      return "Start your local model server (ollama serve, or LM Studio) and check the address in the setup tab.";
+    }
     return config.brainProvider === "gemini"
-      ? "Paste your Gemini API key from Google AI Studio to switch Clickaa on."
-      : "Paste your Cloudflare Worker URL to switch Clickaa on.";
+      ? "Paste your Gemini API key from Google AI Studio to switch Ustaad on."
+      : "Paste your Cloudflare Worker URL to switch Ustaad on.";
   }
 
   /** Which engine should read this reply aloud. */
-  resolveSpeechProvider(config: ClickaaUserConfig): ResolvedSpeechProvider {
+  resolveSpeechProvider(config: UstaadUserConfig): ResolvedSpeechProvider {
+    if (config.offlineMode) {
+      return "windows";
+    }
+
     const geminiIsAvailable = Boolean(config.geminiApiKey);
     const elevenLabsIsAvailable = Boolean(config.workerBaseUrl);
 
@@ -89,8 +124,17 @@ export class BrainRouter {
     }
   }
 
-  async streamResponse(config: ClickaaUserConfig, request: BrainStreamRequest): Promise<string> {
-    if (this.resolveActiveProvider(config) === "gemini") {
+  async streamResponse(config: UstaadUserConfig, request: BrainStreamRequest): Promise<string> {
+    const activeProvider = this.resolveActiveProvider(config);
+    if (activeProvider === "local") {
+      return this.localBrainClient.streamChat(
+        request,
+        config.localBrainBaseUrl,
+        config.localBrainModel,
+        config.localBrainSeesScreen,
+      );
+    }
+    if (activeProvider === "gemini") {
       return new GeminiClient(config.geminiApiKey).streamChat(request, config.geminiChatModel);
     }
 
@@ -101,8 +145,79 @@ export class BrainRouter {
     );
   }
 
+  /** Confirms the local server is up and says which models it has loaded. */
+  async testLocalConnection(config: UstaadUserConfig): Promise<BrainConnectionTestResult> {
+    let baseUrl: string;
+    try {
+      baseUrl = normalizeLocalBrainBaseUrl(config.localBrainBaseUrl);
+    } catch (error) {
+      return { ok: false, message: error instanceof Error ? error.message : String(error) };
+    }
+    if (!baseUrl) {
+      return { ok: false, message: "paste the address of your local model server first." };
+    }
+
+    try {
+      const listedModels = await this.localBrainClient.listModels(baseUrl);
+      if (!listedModels.length) {
+        return { ok: false, message: `${baseUrl} answered but has no models loaded. pull one first, for example: ollama pull ${config.localBrainModel}` };
+      }
+      const chosenModelIsThere = listedModels.includes(config.localBrainModel);
+      return {
+        ok: true,
+        message: chosenModelIsThere
+          ? `your local brain answered. ${config.localBrainModel} is loaded and ready.`
+          : `${baseUrl} answered with ${listedModels.slice(0, 5).join(", ")}. ${config.localBrainModel} is not among them — set a model name that is.`,
+      };
+    } catch (error) {
+      return { ok: false, message: error instanceof Error ? error.message : String(error) };
+    }
+  }
+
+  /**
+   * Looks a question up with the sources kept.
+   *
+   * Grounding is a Gemini feature — Claude behind the Worker has no equivalent
+   * — and offline mode has no internet to read, so both cases are answered
+   * with a sentence rather than a failure deeper down.
+   */
+  async researchWithSources(config: UstaadUserConfig, question: string): Promise<ResearchAnswer> {
+    if (config.offlineMode) {
+      throw new Error(
+        "offline mode is on, so i cannot look anything up: reading the web is the whole point of it. switch offline mode off when you want sources.",
+      );
+    }
+    if (!config.geminiApiKey) {
+      throw new Error(
+        "looking things up needs your own Gemini key, because the worker brain cannot search. paste one in the setup tab and ask again.",
+      );
+    }
+    return new GeminiClient(config.geminiApiKey).researchWithSources(question, config.geminiChatModel);
+  }
+
+  /**
+   * Draws one picture on the user's own Google key.
+   *
+   * Pictures are Gemini-only: the Worker proxy speaks for Claude, and a local
+   * text model has no brush, so the missing key is reported here rather than
+   * failing somewhere deeper down.
+   */
+  async drawPicture(config: UstaadUserConfig, prompt: string): Promise<GeneratedPicturePayload> {
+    if (config.offlineMode) {
+      throw new Error(
+        "offline mode is on, so there is no way to reach the model that draws. switch offline mode off in the setup tab when you want a picture.",
+      );
+    }
+    if (!config.geminiApiKey) {
+      throw new Error(
+        "drawing pictures needs your own Gemini key, because the worker brain cannot draw. paste one in the setup tab and ask again.",
+      );
+    }
+    return new GeminiClient(config.geminiApiKey).generatePicture(prompt);
+  }
+
   async synthesizeSpeech(
-    config: ClickaaUserConfig,
+    config: UstaadUserConfig,
     text: string,
     signal: AbortSignal,
   ): Promise<SynthesizedSpeech> {
@@ -124,13 +239,20 @@ export class BrainRouter {
 
   /** Used by dictation and circle-to-ask when the brain has no live stream. */
   async transcribeRecordedAudio(
-    config: ClickaaUserConfig,
+    config: UstaadUserConfig,
     wavAudio: Buffer,
     signal: AbortSignal,
   ): Promise<string> {
+    if (config.offlineMode) {
+      throw new Error(
+        "offline mode is on, so Ustaad is not listening: hearing runs on Google's servers. type instead, or switch offline mode off.",
+      );
+    }
     if (!config.geminiApiKey) {
       throw new Error(
-        "One-shot transcription needs a Gemini API key. Add one in setup, or deploy the Worker to stream transcription instead.",
+        this.resolveActiveProvider(config) === "local"
+          ? "the brain on this pc answers in text but cannot hear. listening needs a Google key: paste one in the setup tab, or switch the brain back."
+          : "One-shot transcription needs a Gemini API key. Add one in setup, or deploy the Worker to stream transcription instead.",
       );
     }
     return new GeminiClient(config.geminiApiKey).transcribeAudio(wavAudio, signal);
@@ -142,7 +264,7 @@ export class BrainRouter {
    * pasting a few "ums".
    */
   async cleanDictationTranscript(
-    config: ClickaaUserConfig,
+    config: UstaadUserConfig,
     rawTranscript: string,
     signal: AbortSignal,
   ): Promise<string> {
@@ -152,8 +274,31 @@ export class BrainRouter {
       customInstructions: config.soul.customInstructions,
     });
 
+    const activeProvider = this.resolveActiveProvider(config);
+
     try {
-      if (this.resolveActiveProvider(config) === "gemini") {
+      if (!activeProvider) {
+        // Offline with no local model: dictated words are pasted as spoken
+        // rather than sent anywhere to be tidied.
+        return rawTranscript;
+      }
+
+      if (activeProvider === "local") {
+        return await this.localBrainClient.streamChat(
+          {
+            systemPrompt: dictationCleanupSystemPrompt,
+            userPrompt: cleanupPrompt,
+            images: [],
+            conversationHistory: [],
+            signal,
+          },
+          config.localBrainBaseUrl,
+          config.localBrainModel,
+          false,
+        );
+      }
+
+      if (activeProvider === "gemini") {
         return await new GeminiClient(config.geminiApiKey).completeText(
           dictationCleanupSystemPrompt,
           cleanupPrompt,
@@ -173,13 +318,16 @@ export class BrainRouter {
       if (error instanceof Error && error.name === "AbortError") {
         throw error;
       }
-      console.warn("Clickaa could not clean up dictated text; pasting the raw transcript.", error);
+      console.warn("Ustaad could not clean up dictated text; pasting the raw transcript.", error);
       return rawTranscript;
     }
   }
 
   /** The panel's connection test, for whichever brain is selected. */
-  async testConnection(config: ClickaaUserConfig): Promise<BrainConnectionTestResult> {
+  async testConnection(config: UstaadUserConfig): Promise<BrainConnectionTestResult> {
+    if (config.offlineMode || config.brainProvider === "local") {
+      return this.testLocalConnection(config);
+    }
     if (config.brainProvider === "gemini" && config.geminiApiKey) {
       return new GeminiClient(config.geminiApiKey).verifyApiKey();
     }

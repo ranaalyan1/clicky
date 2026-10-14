@@ -82,7 +82,7 @@ export async function captureAllWindowsDisplays(): Promise<CapturedDisplayImage[
   }
 
   if (!capturedDisplays.length) {
-    throw new Error("Clickaa could not capture a usable image from any display.");
+    throw new Error("Ustaad could not capture a usable image from any display.");
   }
 
   return capturedDisplays;
@@ -172,7 +172,7 @@ async function cropDisplayRegionToImage(
   ) ?? screen.getDisplayNearestPoint(screen.getCursorScreenPoint());
 
   if (!matchingSource || matchingSource.thumbnail.isEmpty()) {
-    throw new Error("Clickaa could not capture the screen for that region.");
+    throw new Error("Ustaad could not capture the screen for that region.");
   }
 
   const fullImageSize = matchingSource.thumbnail.getSize();

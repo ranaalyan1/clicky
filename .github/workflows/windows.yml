@@ -26,6 +26,25 @@ jobs:
     if: ${{ github.event_name != 'release' || startsWith(github.event.release.tag_name, 'windows-v') }}
     runs-on: windows-latest
     timeout-minutes: 30
+    env:
+      # Code signing is opt-in and driven by repository secrets. When both are
+      # unset, electron-builder receives an empty CSC_LINK, treats it as "no
+      # certificate configured", and produces unsigned installers as before.
+      # Set WINDOWS_CODE_SIGNING_CERTIFICATE to the base64 of a .pfx, and
+      # WINDOWS_CODE_SIGNING_CERTIFICATE_PASSWORD to its password.
+      CSC_LINK: ${{ secrets.WINDOWS_CODE_SIGNING_CERTIFICATE }}
+      CSC_KEY_PASSWORD: ${{ secrets.WINDOWS_CODE_SIGNING_CERTIFICATE_PASSWORD }}
+      # Or sign with Azure Artifact Signing instead. The credentials come from
+      # Azure's EnvironmentCredential; the four option values are read by
+      # windows/electron-builder.signing.js, which fails the build when only
+      # some of them are set rather than shipping a look-alike unsigned release.
+      AZURE_TENANT_ID: ${{ secrets.AZURE_TENANT_ID }}
+      AZURE_CLIENT_ID: ${{ secrets.AZURE_CLIENT_ID }}
+      AZURE_CLIENT_SECRET: ${{ secrets.AZURE_CLIENT_SECRET }}
+      AZURE_CODE_SIGNING_ENDPOINT: ${{ secrets.AZURE_CODE_SIGNING_ENDPOINT }}
+      AZURE_CODE_SIGNING_ACCOUNT_NAME: ${{ secrets.AZURE_CODE_SIGNING_ACCOUNT_NAME }}
+      AZURE_CODE_SIGNING_CERTIFICATE_PROFILE_NAME: ${{ secrets.AZURE_CODE_SIGNING_CERTIFICATE_PROFILE_NAME }}
+      AZURE_CODE_SIGNING_PUBLISHER_NAME: ${{ secrets.AZURE_CODE_SIGNING_PUBLISHER_NAME }}
 
     steps:
       - name: Check out repository
@@ -50,6 +69,24 @@ jobs:
         working-directory: windows
         run: npm run package:win
 
+      - name: Verify the signature when signing is configured
+        if: ${{ env.CSC_LINK != '' || env.AZURE_CODE_SIGNING_ACCOUNT_NAME != '' }}
+        shell: pwsh
+        run: |
+          # A signature that is merely present is not enough: only a valid,
+          # timestamped signature makes Windows trust the file. Check every
+          # binary a user or Windows itself will load.
+          $signableFiles = @(Get-ChildItem "windows/release/Ustaad-Setup-*.exe") +
+            @(Get-ChildItem "windows/release/win-unpacked/Ustaad.exe")
+
+          foreach ($file in $signableFiles) {
+            $signature = Get-AuthenticodeSignature -FilePath $file.FullName
+            if ($signature.Status -ne "Valid") {
+              throw "$($file.Name) is not validly signed: $($signature.Status) - $($signature.StatusMessage)"
+            }
+            Write-Host "$($file.Name) is signed by $($signature.SignerCertificate.Subject) and timestamped."
+          }
+
       - name: Validate Windows installers
         working-directory: windows
         env:
@@ -62,10 +99,10 @@ jobs:
         env:
           ELECTRON_ENABLE_LOGGING: "1"
         run: |
-          $applicationPath = Resolve-Path "release/win-unpacked/Clickaa.exe"
-          $standardOutputPath = Join-Path $env:RUNNER_TEMP "clickaa-smoke-stdout.log"
-          $standardErrorPath = Join-Path $env:RUNNER_TEMP "clickaa-smoke-stderr.log"
-          $clickaaProcess = Start-Process `
+          $applicationPath = Resolve-Path "release/win-unpacked/Ustaad.exe"
+          $standardOutputPath = Join-Path $env:RUNNER_TEMP "ustaad-smoke-stdout.log"
+          $standardErrorPath = Join-Path $env:RUNNER_TEMP "ustaad-smoke-stderr.log"
+          $ustaadProcess = Start-Process `
             -FilePath $applicationPath `
             -PassThru `
             -RedirectStandardOutput $standardOutputPath `
@@ -73,8 +110,8 @@ jobs:
 
           try {
             Start-Sleep -Seconds 10
-            if ($clickaaProcess.HasExited) {
-              Write-Host "Clickaa exited with code $($clickaaProcess.ExitCode)."
+            if ($ustaadProcess.HasExited) {
+              Write-Host "Ustaad exited with code $($ustaadProcess.ExitCode)."
               if (Test-Path $standardOutputPath) { Get-Content $standardOutputPath }
               if (Test-Path $standardErrorPath) { Get-Content $standardErrorPath }
               throw "The packaged x64 application did not stay running."
@@ -82,16 +119,16 @@ jobs:
             Write-Host "Packaged x64 application remained healthy for the smoke-test window."
           }
           finally {
-            if (-not $clickaaProcess.HasExited) {
-              Stop-Process -Id $clickaaProcess.Id -Force
+            if (-not $ustaadProcess.HasExited) {
+              Stop-Process -Id $ustaadProcess.Id -Force
             }
           }
 
       - name: Upload Windows installers
         uses: actions/upload-artifact@v7
         with:
-          name: clickaa-windows-installers
-          path: windows/release/Clickaa-Setup-*.exe
+          name: ustaad-windows-installers
+          path: windows/release/Ustaad-Setup-*.exe
           if-no-files-found: error
 
       - name: Publish Windows GitHub release
@@ -111,24 +148,34 @@ jobs:
             throw "Release tag must match package version: $expectedReleaseTag"
           }
 
-          $installerPaths = Get-ChildItem "windows/release/Clickaa-Setup-*.exe"
+          $installerPaths = Get-ChildItem "windows/release/Ustaad-Setup-*.exe"
           if ($installerPaths.Count -ne 2) {
             throw "Expected exactly two Windows installers, found $($installerPaths.Count)."
           }
 
-          $releaseNotesPath = Join-Path $env:RUNNER_TEMP "clickaa-windows-release-notes.md"
+          $releaseNotesPath = Join-Path $env:RUNNER_TEMP "ustaad-windows-release-notes.md"
+
+          # Say what is actually true of this build rather than assuming it is
+          # unsigned, so the notes never promise a warning that will not appear
+          # or stay silent about one that will.
+          $signingNote = if ($env:CSC_LINK -or $env:AZURE_CODE_SIGNING_ACCOUNT_NAME) {
+            "The installers are code-signed and timestamped, so Windows should accept them without an unknown-publisher warning. Smart App Control may still withhold judgement until the signature has built up reputation in Microsoft's app intelligence service."
+          } else {
+            "The installers are currently unsigned, and Windows treats unknown publishers two different ways. SmartScreen shows an unrecognized-app warning that **More info → Run anyway** clears. Smart App Control, which is on by default on clean Windows 11 installs, blocks unsigned apps outright and offers no way to allow a single one, so those machines cannot install this build. See windows/README.md for the certificate situation."
+          }
+
           @"
-          Clickaa for Windows $($packageManifest.version).
+          Ustaad for Windows $($packageManifest.version).
 
-          This release contains per-user NSIS installers for Windows x64 and ARM64. After installation, open Clickaa from the notification area, then paste either your own Gemini API key or a deployed Cloudflare Worker URL and select **save & test**.
+          This release contains per-user NSIS installers for Windows x64 and ARM64. After installation, open Ustaad from the notification area, then paste either your own Gemini API key or a deployed Cloudflare Worker URL and select **save & test**.
 
-          The installers are currently unsigned, so Windows SmartScreen may display an unrecognized-app warning for this open-source build.
+          $signingNote
           "@ | Set-Content $releaseNotesPath
 
           $releaseArguments = @(
             "release", "create", $env:RELEASE_TAG,
             "--target", $env:GITHUB_SHA,
-            "--title", "Clickaa for Windows $($packageManifest.version)",
+            "--title", "Ustaad for Windows $($packageManifest.version)",
             "--notes-file", $releaseNotesPath
           ) + $installerPaths.FullName
 
@@ -142,5 +189,5 @@ jobs:
         uses: softprops/action-gh-release@v3
         with:
           tag_name: ${{ github.event.release.tag_name }}
-          files: windows/release/Clickaa-Setup-*.exe
+          files: windows/release/Ustaad-Setup-*.exe
           fail_on_unmatched_files: true

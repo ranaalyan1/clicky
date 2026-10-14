@@ -1,13 +1,20 @@
-/* Palette, type and motion live in tokens.css. */
-
-* { box-sizing: border-box; }
+/*
+ * Ustaad panel: neumorphic soft-UI surface language.
+ *
+ * Two rules keep this coherent, and breaking either one flattens the interface:
+ *   1. Shape background == parent surface (so depth is only shadow).
+ *   2. Raised = two shadows outward. Pressed/held = the same two shadows
+ *      inward. Nothing is drawn with borders.
+ *
+ * Palette, depth and motion live in tokens.css.
+ */
 
 html, body {
   width: 100%;
   height: 100%;
   margin: 0;
   overflow: hidden;
-  background: var(--background);
+  background: var(--ustaad-canvas);
   color: var(--text);
   user-select: none;
 }
@@ -19,33 +26,37 @@ button { color: inherit; }
   height: 100vh;
   display: flex;
   flex-direction: column;
-  border: 1px solid rgba(255, 255, 255, 0.09);
-  background:
-    radial-gradient(circle at 50% 1%, rgba(50, 116, 90, 0.16), transparent 34%),
-    var(--background);
+  background: var(--ustaad-canvas);
+  /* A hairline of light along the top edge and shade along the bottom reads as
+     the panel itself being moulded out of one piece. */
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.05),
+    inset 0 -1px 0 rgba(0, 0, 0, 0.35);
 }
 
 .titlebar {
   -webkit-app-region: drag;
-  height: 46px;
-  flex: 0 0 46px;
+  height: 50px;
+  flex: 0 0 50px;
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 0 13px 0 17px;
-  border-bottom: 1px solid var(--line);
+  padding: 0 14px 0 18px;
 }
 
 .no-drag, button, input, label, select, textarea { -webkit-app-region: no-drag; }
 
-.brand-lockup { display: flex; align-items: center; gap: 8px; }
+.brand-lockup { display: flex; align-items: center; gap: 9px; }
 .brand-name { font-size: 15px; font-weight: 680; letter-spacing: -0.2px; }
+
+/* Soft chip: pressed in, so it reads as a label rather than a control. */
 .platform-pill {
-  color: #89a198;
-  background: rgba(255,255,255,.055);
-  border: 1px solid var(--line);
-  border-radius: 100px;
-  padding: 2px 7px 3px;
+  color: var(--ustaad-ink-muted);
+  background: var(--ustaad-canvas);
+  border: 0;
+  border-radius: var(--ustaad-radius-pill);
+  box-shadow: var(--ustaad-neu-inset-sm);
+  padding: 3px 9px 4px;
   font-size: 9px;
   font-weight: 650;
   letter-spacing: .08em;
@@ -54,89 +65,119 @@ button { color: inherit; }
 
 .mini-cursor, .hero-cursor {
   display: block;
-  background-image: var(--clickaa-mark-image);
+  background-image: var(--ustaad-mark-image);
   background-repeat: no-repeat;
   background-position: center;
   background-size: contain;
-  filter: drop-shadow(0 0 7px rgba(69, 150, 255, .35));
+  filter: drop-shadow(0 2px 6px rgba(0, 0, 0, 0.45));
 }
 .mini-cursor { width: 19px; height: 19px; }
 .hero-cursor { width: 30px; height: 30px; }
 
 /* The orb holds the mark, not a second cursor: one identity, one shape. */
 .status-orb[data-state="listening"] .hero-cursor { animation: mark-listen 1.25s ease-in-out infinite; }
-@keyframes mark-listen { 50% { transform: scale(1.1); filter: drop-shadow(0 0 14px rgba(69, 150, 255, .8)); } }
+@keyframes mark-listen { 50% { transform: scale(1.1); filter: drop-shadow(0 0 14px rgba(182, 232, 0, .8)); } }
 
+/* Soft square button: raised at rest, pressed while held. */
 .icon-button {
   display: grid;
   place-items: center;
-  width: 28px;
-  height: 28px;
+  width: 30px;
+  height: 30px;
   border: 0;
-  border-radius: var(--clickaa-radius-sm);
-  background: transparent;
+  border-radius: var(--ustaad-radius-sm);
+  background: var(--ustaad-surface);
   color: var(--muted);
+  box-shadow: var(--ustaad-neu-raised-sm);
   cursor: pointer;
-  transition: background var(--clickaa-duration-fast) var(--clickaa-ease-out),
-    color var(--clickaa-duration-fast) var(--clickaa-ease-out);
+  transition:
+    box-shadow var(--ustaad-duration-fast) var(--ustaad-ease-out),
+    color var(--ustaad-duration-fast) var(--ustaad-ease-out),
+    transform var(--ustaad-duration-fast) var(--ustaad-ease-out);
 }
-.icon-button:hover { background: rgba(255,255,255,.07); color: var(--text); }
+.icon-button:hover { color: var(--text); box-shadow: var(--ustaad-neu-raised); }
+.icon-button:active { box-shadow: var(--ustaad-neu-inset-sm); transform: translateY(0.5px); }
 
 /* ---------------------------------------------------------------- tabs --- */
 
+/* A segmented control: one inset track, and the active tab raised out of it. */
 .tab-bar {
   display: flex;
-  gap: 2px;
-  padding: 8px 10px 0;
-  border-bottom: 1px solid var(--line);
+  gap: 4px;
+  margin: 2px 14px 14px;
+  padding: 4px;
+  border: 0;
+  border-radius: var(--ustaad-radius-md);
+  background: var(--ustaad-canvas);
+  box-shadow: var(--ustaad-neu-inset);
   flex: 0 0 auto;
 }
+
 .tab-button {
   flex: 1;
-  padding: 7px 4px 9px;
+  padding: 8px 4px;
   border: 0;
-  border-bottom: 2px solid transparent;
+  border-radius: var(--ustaad-radius-sm);
   background: transparent;
   color: var(--faint);
   font-size: 11.5px;
   font-weight: 620;
   letter-spacing: .01em;
   cursor: pointer;
+  transition:
+    box-shadow var(--ustaad-duration-base) var(--ustaad-ease-out),
+    color var(--ustaad-duration-base) var(--ustaad-ease-out);
 }
 .tab-button:hover { color: var(--text); }
-.tab-button.active { color: var(--blue-bright); border-bottom-color: var(--blue); }
+.tab-button.active {
+  color: var(--ustaad-accent-bright);
+  background: var(--ustaad-surface);
+  box-shadow: var(--ustaad-neu-raised-sm);
+}
 
-.tab-scroll { flex: 1 1 auto; overflow-y: auto; overflow-x: hidden; padding-bottom: 14px; }
-.tab-scroll::-webkit-scrollbar { width: 9px; }
-.tab-scroll::-webkit-scrollbar-thumb { background: rgba(255,255,255,.09); border-radius: 9px; }
+.tab-scroll { flex: 1 1 auto; overflow-y: auto; overflow-x: hidden; padding-bottom: 16px; }
+.tab-scroll::-webkit-scrollbar { width: 10px; }
+.tab-scroll::-webkit-scrollbar-thumb {
+  background: var(--ustaad-canvas);
+  border-radius: var(--ustaad-radius-pill);
+  box-shadow: var(--ustaad-neu-inset-sm);
+}
 
 .page { display: none; }
-.page.active { display: block; animation: page-in .16s ease; }
-@keyframes page-in { from { opacity: 0; transform: translateY(3px); } to { opacity: 1; transform: none; } }
+.page.active { display: block; animation: page-in var(--ustaad-duration-base) var(--ustaad-ease-out); }
+@keyframes page-in { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: none; } }
 
 /* --------------------------------------------------------------- hero ---- */
 
 .hero-section {
   display: flex;
   align-items: center;
-  gap: 16px;
-  padding: 20px 22px 16px;
+  gap: 18px;
+  padding: 22px 22px 18px;
 }
 
+/* A raised dial with a pressed inner well behind the mark. */
 .status-orb {
   position: relative;
-  width: 58px;
-  height: 58px;
-  flex: 0 0 58px;
+  width: 62px;
+  height: 62px;
+  flex: 0 0 62px;
   display: grid;
   place-items: center;
   border-radius: 50%;
-  background: linear-gradient(145deg, #17251f, #111916);
-  border: 1px solid rgba(114,178,255,.18);
-  box-shadow: inset 0 1px 1px rgba(255,255,255,.06), 0 10px 30px rgba(0,0,0,.24);
+  border: 0;
+  background: var(--ustaad-canvas);
+  box-shadow: var(--ustaad-neu-raised);
+}
+.status-orb::after {
+  content: "";
+  position: absolute;
+  inset: 9px;
+  border-radius: 50%;
+  box-shadow: var(--ustaad-neu-inset-sm);
 }
 .hero-cursor { z-index: 2; }
-.orb-ring { position: absolute; inset: -1px; border: 1px solid rgba(69,150,255,.35); border-radius: 50%; opacity: 0; }
+.orb-ring { position: absolute; inset: -1px; border: 1px solid rgba(182,232,0,.35); border-radius: 50%; opacity: 0; }
 
 .status-orb[data-state="listening"] .orb-ring { animation: pulse-ring 1.25s ease-out infinite; }
 .status-orb[data-state="listening"] .orb-ring-two { animation-delay: .55s; }
@@ -148,153 +189,249 @@ button { color: inherit; }
 }
 
 @keyframes pulse-ring { 0% { transform: scale(.88); opacity: .75; } 100% { transform: scale(1.45); opacity: 0; } }
-@keyframes thinking { 50% { transform: rotate(18deg) scale(.88); filter: drop-shadow(0 0 12px rgba(69,150,255,.9)); } }
+@keyframes thinking { 50% { transform: rotate(18deg) scale(.88); filter: drop-shadow(0 0 12px rgba(182,232,0,.9)); } }
 @keyframes speaking { to { transform: rotate(-5deg) translateY(-2px) scale(1.07); } }
 
 .status-copy { min-width: 0; }
-.status-copy h1 { margin: 0 0 5px; font-size: 17px; font-weight: 680; letter-spacing: -.3px; }
-.status-copy p { margin: 0; color: var(--muted); font-size: 11.5px; line-height: 1.5; }
+.status-copy h1 { margin: 0 0 6px; font-size: 17px; font-weight: 680; letter-spacing: -.3px; }
+.status-copy p { margin: 0; color: var(--muted); font-size: 11.5px; line-height: 1.55; }
+
+/* Keycaps: small raised tiles, so a shortcut looks like something pressable. */
 kbd {
   display: inline-block;
   min-width: 28px;
-  padding: 1px 5px 2px;
-  border: 1px solid rgba(255,255,255,.13);
-  border-bottom-color: rgba(255,255,255,.24);
-  border-radius: 4px;
-  background: rgba(255,255,255,.055);
-  color: #ced8d2;
-  font: 10px "Segoe UI", sans-serif;
+  padding: 2px 6px 3px;
+  border: 0;
+  border-radius: var(--ustaad-radius-xs);
+  background: var(--ustaad-canvas);
+  box-shadow: var(--ustaad-neu-raised-sm);
+  color: var(--ustaad-ink);
+  font: 600 10px var(--ustaad-font-ui);
   text-align: center;
 }
 
 /* -------------------------------------------------------------- cards ---- */
 
+/* Every container is the same soft slab. */
 .card, .settings-section, .activity-card, .shortcut-card, .talk-card {
-  margin: 0 14px 10px;
-  border: 1px solid var(--line);
-  border-radius: 12px;
-  background: rgba(20, 28, 24, .86);
+  margin: 0 16px 12px;
+  border: 0;
+  border-radius: var(--ustaad-radius-lg);
+  background: var(--ustaad-canvas);
+  box-shadow: var(--ustaad-neu-raised-lg);
 }
-.card { padding: 14px; }
+.card { padding: 16px; }
 
-.section-heading-row { display: flex; align-items: start; justify-content: space-between; gap: 8px; margin-bottom: 11px; }
-.eyebrow { margin: 0 0 2px; color: var(--blue-bright); font-size: 8.5px; font-weight: 750; letter-spacing: .12em; text-transform: uppercase; }
+.section-heading-row { display: flex; align-items: start; justify-content: space-between; gap: 8px; margin-bottom: 12px; }
+.eyebrow { margin: 0 0 3px; color: var(--ustaad-accent-bright); font-size: 8.5px; font-weight: 750; letter-spacing: .12em; text-transform: uppercase; }
 h2 { margin: 0; font-size: 13px; font-weight: 650; }
 
 .count-pill {
-  padding: 3px 8px;
-  border-radius: 50px;
+  padding: 4px 9px;
+  border-radius: var(--ustaad-radius-pill);
+  background: var(--ustaad-canvas);
+  box-shadow: var(--ustaad-neu-inset-sm);
   color: var(--muted);
-  background: rgba(255,255,255,.05);
   font-size: 9px;
   white-space: nowrap;
 }
-.count-pill.connected { color: var(--green); background: rgba(101,217,154,.08); }
+.count-pill.connected { color: var(--green); box-shadow: var(--ustaad-neu-inset-sm), inset 0 0 0 1px rgba(105,217,159,.18); }
 
-.field-label { display: block; margin: 10px 0 5px; color: var(--muted); font-size: 9px; }
-.field-hint { margin: 8px 0 0; color: var(--faint); font-size: 10px; line-height: 1.5; }
+.field-label { display: block; margin: 12px 0 6px; color: var(--muted); font-size: 9px; }
+.field-hint { margin: 9px 0 0; color: var(--faint); font-size: 10px; line-height: 1.55; }
 
+/* Inputs are wells: pressed into the surface, then ring-marked when focused. */
 .text-field, .select-field, .text-area {
   width: 100%;
-  min-height: 34px;
-  padding: 7px 10px;
-  border: 1px solid rgba(255,255,255,.09);
-  border-radius: 7px;
+  min-height: 36px;
+  padding: 8px 11px;
+  border: 0;
+  border-radius: var(--ustaad-radius-sm);
   outline: none;
-  background: rgba(0,0,0,.25);
+  background: var(--ustaad-canvas);
+  box-shadow: var(--ustaad-neu-inset);
   color: var(--text);
   font-size: 11.5px;
+  transition: box-shadow var(--ustaad-duration-fast) var(--ustaad-ease-out);
 }
-.text-field:focus, .select-field:focus, .text-area:focus { border-color: rgba(69,150,255,.45); }
-.text-area { resize: none; line-height: 1.5; font-family: inherit; }
+.text-field::placeholder, .text-area::placeholder { color: var(--ustaad-ink-faint); }
+.text-field:focus, .select-field:focus, .text-area:focus {
+  box-shadow: var(--ustaad-neu-inset), 0 0 0 2px rgba(182, 232, 0, 0.5);
+}
+.text-area { resize: none; line-height: 1.55; font-family: inherit; }
 .select-field { cursor: pointer; }
 
 .range-field { width: 100%; accent-color: var(--blue); }
 
-.button-row { display: flex; gap: 7px; margin-top: 10px; }
+.button-row { display: flex; gap: 8px; margin-top: 12px; }
+
+/* Buttons: raised at rest, pressed flat when clicked. The accent lives in the
+   tint and the text, not in a bright fill, which is what keeps the soft look. */
 .primary-button, .secondary-button, .ghost-button {
-  padding: 8px 13px;
-  border-radius: 8px;
-  border: 1px solid transparent;
+  padding: 9px 14px;
+  border: 0;
+  border-radius: var(--ustaad-radius-sm);
   font-size: 11.5px;
   font-weight: 620;
   cursor: pointer;
+  transition:
+    box-shadow var(--ustaad-duration-fast) var(--ustaad-ease-out),
+    color var(--ustaad-duration-fast) var(--ustaad-ease-out),
+    transform var(--ustaad-duration-fast) var(--ustaad-ease-out);
 }
-.primary-button { flex: 1; background: linear-gradient(180deg, #3f8ff0, #2a76dd); color: #fff; }
-.primary-button:hover { filter: brightness(1.07); }
-.secondary-button { background: rgba(255,255,255,.06); border-color: var(--line); color: var(--text); }
-.secondary-button:hover { background: rgba(255,255,255,.1); }
-.ghost-button { background: transparent; color: var(--muted); font-size: 10px; padding: 4px 8px; }
-.ghost-button:hover { color: var(--text); background: rgba(255,255,255,.06); }
-button:disabled { opacity: .5; cursor: default; }
+.primary-button {
+  flex: 1;
+  background: linear-gradient(160deg, rgba(182,232,0,.22), rgba(47,122,224,.12));
+  color: #cfe3ff;
+  box-shadow: var(--ustaad-neu-raised);
+}
+.primary-button:hover { color: #e6f0ff; box-shadow: var(--ustaad-neu-raised-lit); }
+.primary-button:active { box-shadow: var(--ustaad-neu-inset); transform: translateY(0.5px); }
+.secondary-button { background: var(--ustaad-canvas); color: var(--text); box-shadow: var(--ustaad-neu-raised); }
+.secondary-button:hover { box-shadow: var(--ustaad-neu-raised-lit); }
+.secondary-button:active { box-shadow: var(--ustaad-neu-inset); transform: translateY(0.5px); }
+.ghost-button {
+  background: transparent;
+  box-shadow: none;
+  color: var(--muted);
+  font-size: 10px;
+  padding: 5px 9px;
+}
+.ghost-button:hover { color: var(--text); background: var(--ustaad-surface); box-shadow: var(--ustaad-neu-raised-sm); }
+.ghost-button:active { box-shadow: var(--ustaad-neu-inset-sm); }
+button:disabled { opacity: .5; cursor: default; box-shadow: var(--ustaad-neu-inset-sm); }
 
-.connection-result { margin: 10px 0 0; color: var(--muted); font-size: 10.5px; line-height: 1.5; }
+.connection-result { margin: 11px 0 0; color: var(--muted); font-size: 10.5px; line-height: 1.55; }
 .connection-result.success { color: var(--green); }
 .connection-result.failure { color: var(--danger); }
 
-.inline-form { display: flex; gap: 7px; align-items: center; }
+.inline-form { display: flex; gap: 8px; align-items: center; }
 .inline-form .text-field { flex: 1; }
 .inline-form .primary-button { flex: 0 0 auto; }
 
-/* ---------------------------------------------------------- shortcuts ---- */
+/* ------------------------------------------------------- quick start ----- */
 
-.shortcut-card { padding: 4px 14px; }
-.shortcut-list { display: flex; flex-direction: column; }
-.shortcut-row { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 9px 0; border-bottom: 1px solid var(--line); }
-.shortcut-row:last-child { border-bottom: 0; }
-.shortcut-row span { color: var(--muted); font-size: 10.5px; }
-.shortcut-keys { display: flex; gap: 3px; }
-
-.shortcut-key-list {
-  margin: 10px 0 0;
-  padding: 0;
-  list-style: none;
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-  color: var(--muted);
-  font-size: 10.5px;
-  line-height: 1.5;
-}
-
-.shortcut-key-list kbd {
-  display: inline-block;
-  margin-right: 2px;
-  padding: 1px 5px 2px;
-  border: 1px solid var(--clickaa-line-strong);
-  border-radius: 4px;
-  background: var(--clickaa-surface-raised);
-  color: var(--text);
-  font: 600 9.5px var(--clickaa-font-ui);
-}
-
-/* -------------------------------------------------------------- talk ----- */
-
-.talk-card { padding: 10px; }
-.push-to-talk-button {
+/* First-run steps: a raised number tile, the instruction, and a pressed-in
+   "done" mark. The whole point is that setup reads as three small things. */
+.quick-start { padding: 16px; }
+.step-list { display: flex; flex-direction: column; gap: 10px; margin-top: 4px; }
+.step-row {
   display: flex;
   align-items: center;
   gap: 11px;
   width: 100%;
   padding: 11px 13px;
-  border: 1px solid rgba(69,150,255,.2);
-  border-radius: 10px;
-  background: linear-gradient(180deg, rgba(35,63,95,.55), rgba(23,35,50,.55));
+  border: 0;
+  border-radius: var(--ustaad-radius-md);
+  background: var(--ustaad-canvas);
+  box-shadow: var(--ustaad-neu-raised-sm);
+  text-align: left;
+  cursor: pointer;
+  transition: box-shadow var(--ustaad-duration-fast) var(--ustaad-ease-out);
+}
+.step-row:hover { box-shadow: var(--ustaad-neu-raised); }
+.step-row:active { box-shadow: var(--ustaad-neu-inset-sm); }
+.step-row.is-done { box-shadow: var(--ustaad-neu-inset-sm); }
+.step-number {
+  display: grid;
+  place-items: center;
+  width: 24px;
+  height: 24px;
+  flex: 0 0 24px;
+  border-radius: 50%;
+  background: var(--ustaad-canvas);
+  box-shadow: var(--ustaad-neu-raised-sm);
+  color: var(--ustaad-accent-bright);
+  font-size: 11px;
+  font-weight: 700;
+}
+.step-row.is-done .step-number { box-shadow: var(--ustaad-neu-inset-sm); color: var(--green); }
+.step-copy { flex: 1; min-width: 0; }
+.step-copy strong { display: block; font-size: 11.5px; font-weight: 620; }
+.step-copy span { color: var(--muted); font-size: 10px; line-height: 1.5; }
+.step-state { color: var(--faint); font-size: 9px; text-transform: uppercase; letter-spacing: .08em; }
+.step-row.is-done .step-state { color: var(--green); }
+
+/* ---------------------------------------------------------- history ----- */
+
+/* The matched line, quieter than the request it belongs to. */
+.run-snippet {
+  margin-top: 3px;
+  color: var(--ustaad-ink-muted);
+  font-size: 10.5px;
+  line-height: 1.5;
+}
+
+.list-row-meta[data-outcome="failed"],
+.list-row-meta[data-outcome="gave_up"],
+.list-row-meta[data-outcome="ran_out_of_steps"],
+.list-row-meta[data-outcome="ran_out_of_time"] { color: var(--ustaad-caution); }
+
+/* ---------------------------------------------------------- shortcuts ---- */
+
+.shortcut-card { padding: 6px 16px; }
+.shortcut-list { display: flex; flex-direction: column; }
+.shortcut-row { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 10px 0; }
+.shortcut-row + .shortcut-row { box-shadow: inset 0 1px 0 var(--ustaad-line); }
+.shortcut-row span { color: var(--muted); font-size: 10.5px; }
+.shortcut-keys { display: flex; gap: 4px; }
+
+.shortcut-key-list {
+  margin: 11px 0 0;
+  padding: 0;
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+  color: var(--muted);
+  font-size: 10.5px;
+  line-height: 1.55;
+}
+.shortcut-key-list kbd {
+  display: inline-block;
+  margin-right: 3px;
+  min-width: 0;
+  padding: 2px 6px 3px;
+  border: 0;
+  border-radius: var(--ustaad-radius-xs);
+  background: var(--ustaad-canvas);
+  box-shadow: var(--ustaad-neu-raised-sm);
+  color: var(--text);
+  font: 600 9.5px var(--ustaad-font-ui);
+}
+
+/* -------------------------------------------------------------- talk ----- */
+
+.talk-card { padding: 12px; }
+
+/* The one control that should feel like a physical button: raised and accent
+   tinted, and visibly pressed while the microphone is live. */
+.push-to-talk-button {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  padding: 13px 15px;
+  border: 0;
+  border-radius: var(--ustaad-radius-md);
+  background: linear-gradient(160deg, rgba(182,232,0,.16), rgba(47,122,224,.07));
+  box-shadow: var(--ustaad-neu-raised);
   cursor: pointer;
   text-align: left;
+  transition: box-shadow var(--ustaad-duration-fast) var(--ustaad-ease-out);
 }
-.push-to-talk-button:hover { border-color: rgba(69,150,255,.42); }
-.push-to-talk-button.is-pressed { border-color: rgba(69,150,255,.7); box-shadow: 0 0 0 1px rgba(69,150,255,.25) inset; }
-.talk-button-copy { display: flex; flex-direction: column; gap: 2px; flex: 1; }
+.push-to-talk-button:hover { box-shadow: var(--ustaad-neu-raised-lit); }
+.push-to-talk-button.is-pressed { box-shadow: var(--ustaad-neu-inset); }
+.talk-button-copy { display: flex; flex-direction: column; gap: 3px; flex: 1; }
 .talk-button-copy strong { font-size: 12.5px; }
 .talk-button-copy small { color: var(--muted); font-size: 10px; }
 .microphone-icon {
   display: grid;
   place-items: center;
-  width: 19px;
-  height: 19px;
+  width: 20px;
+  height: 20px;
   color: #8fc4ff;
-  filter: drop-shadow(0 0 8px rgba(69, 150, 255, 0.45));
+  filter: drop-shadow(0 0 8px rgba(182, 232, 0, 0.45));
 }
 .live-wave { display: flex; align-items: flex-end; gap: 2px; height: 16px; }
 .live-wave i { width: 2.5px; height: 4px; border-radius: 2px; background: var(--blue-bright); opacity: .5; }
@@ -306,175 +443,215 @@ button:disabled { opacity: .5; cursor: default; }
 
 /* ------------------------------------------------------------ activity --- */
 
-.activity-card { padding: 12px 14px; }
-.activity-label { margin: 0 0 5px; color: var(--blue-bright); font-size: 8.5px; font-weight: 750; letter-spacing: .12em; text-transform: uppercase; }
-.activity-text { margin: 0; color: #d7e2dc; font-size: 11.5px; line-height: 1.55; }
+.activity-card { padding: 14px 16px; }
+.activity-label { margin: 0 0 6px; color: var(--ustaad-accent-bright); font-size: 8.5px; font-weight: 750; letter-spacing: .12em; text-transform: uppercase; }
+.activity-text { margin: 0; color: var(--ustaad-ink); font-size: 11.5px; line-height: 1.6; }
 
 .error-message {
-  margin: 0 14px 10px;
-  padding: 9px 12px;
-  border: 1px solid rgba(255,133,133,.22);
-  border-radius: 9px;
-  background: rgba(255,133,133,.07);
-  color: #ffb4b4;
+  margin: 0 16px 12px;
+  padding: 11px 14px;
+  border: 0;
+  border-radius: var(--ustaad-radius-md);
+  background: linear-gradient(160deg, rgba(255,138,138,.14), rgba(255,138,138,.05));
+  box-shadow: var(--ustaad-neu-raised-sm);
+  color: #ffc2c2;
   font-size: 10.5px;
-  line-height: 1.5;
+  line-height: 1.55;
 }
 
 /* ------------------------------------------------------------ settings --- */
 
-.settings-section { padding: 4px 14px; }
+.settings-section { padding: 6px 16px; }
 
 .setting-row {
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 12px;
-  padding: 11px 0;
-  border-bottom: 1px solid var(--line);
+  padding: 12px 0;
 }
-.setting-row:last-child { border-bottom: 0; }
+.setting-row + .setting-row { box-shadow: inset 0 1px 0 var(--ustaad-line); }
 .setting-row strong { display: block; font-size: 11.5px; font-weight: 620; }
-.setting-row span { color: var(--muted); font-size: 10px; }
+.setting-row span { color: var(--muted); font-size: 10px; line-height: 1.5; }
+/* A time input has to be narrow enough to sit in a settings row. */
+.presence-time-field { flex: 0 0 96px; width: 96px; min-height: 32px; }
 
-.toggle-control { position: relative; width: 36px; height: 20px; flex: 0 0 36px; cursor: pointer; }
+/* The toggle: a pressed track with a raised knob that sinks when switched on. */
+.toggle-control { position: relative; width: 42px; height: 24px; flex: 0 0 42px; cursor: pointer; }
 .toggle-control input { position: absolute; opacity: 0; width: 0; height: 0; }
 .toggle-control span {
-  position: absolute; inset: 0;
-  border-radius: 50px;
-  background: rgba(255,255,255,.11);
-  transition: background .16s ease;
+  position: absolute;
+  inset: 0;
+  border-radius: var(--ustaad-radius-pill);
+  background: var(--ustaad-canvas);
+  box-shadow: var(--ustaad-neu-inset);
+  transition: box-shadow var(--ustaad-duration-base) var(--ustaad-ease-out);
 }
 .toggle-control span::after {
   content: "";
   position: absolute;
-  top: 2px; left: 2px;
-  width: 16px; height: 16px;
+  top: 3px;
+  left: 3px;
+  width: 18px;
+  height: 18px;
   border-radius: 50%;
-  background: #e7efeb;
-  transition: transform .16s ease;
+  background: var(--ustaad-surface-raised);
+  box-shadow: var(--ustaad-neu-raised-sm);
+  transition: transform var(--ustaad-duration-base) var(--ustaad-ease-out);
 }
-.toggle-control input:checked + span { background: rgba(69,150,255,.65); }
-.toggle-control input:checked + span::after { transform: translateX(16px); }
-.toggle-control input:focus-visible + span { outline: 2px solid rgba(69,150,255,.6); outline-offset: 2px; }
+.toggle-control input:checked + span {
+  box-shadow: var(--ustaad-neu-inset), inset 0 0 0 1px rgba(182, 232, 0, 0.35);
+}
+.toggle-control input:checked + span::after {
+  transform: translateX(18px);
+  background: linear-gradient(160deg, #d8ff4d, #8fb800);
+  box-shadow: var(--ustaad-neu-raised-sm), 0 0 12px rgba(182, 232, 0, 0.4);
+}
+.toggle-control input:focus-visible + span { box-shadow: var(--ustaad-neu-inset), var(--ustaad-focus-ring); }
 
+/* Segmented control: same pattern as the tab bar, at control size. */
 .segmented-control {
   display: flex;
-  gap: 3px;
-  padding: 3px;
-  border: 1px solid var(--line);
-  border-radius: 9px;
-  background: rgba(0,0,0,.22);
+  gap: 4px;
+  padding: 4px;
+  border: 0;
+  border-radius: var(--ustaad-radius-md);
+  background: var(--ustaad-canvas);
+  box-shadow: var(--ustaad-neu-inset);
 }
 .segmented-control button {
   flex: 1;
-  padding: 6px 4px;
+  padding: 7px 5px;
   border: 0;
-  border-radius: 6px;
+  border-radius: var(--ustaad-radius-sm);
   background: transparent;
   color: var(--muted);
   font-size: 10.5px;
   font-weight: 600;
   cursor: pointer;
+  transition: box-shadow var(--ustaad-duration-base) var(--ustaad-ease-out);
 }
 .segmented-control button:hover { color: var(--text); }
-.segmented-control button.active { background: rgba(69,150,255,.2); color: #d6e8ff; }
+.segmented-control button.active {
+  background: var(--ustaad-surface);
+  box-shadow: var(--ustaad-neu-raised-sm);
+  color: var(--ustaad-accent-bright);
+}
 
-.chip-row { display: flex; flex-wrap: wrap; gap: 5px; margin-top: 9px; }
+.chip-row { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 10px; }
 .chip {
-  padding: 5px 9px;
-  border: 1px solid var(--line);
-  border-radius: 50px;
-  background: rgba(255,255,255,.04);
+  padding: 6px 11px;
+  border: 0;
+  border-radius: var(--ustaad-radius-pill);
+  background: var(--ustaad-canvas);
+  box-shadow: var(--ustaad-neu-raised-sm);
   color: var(--muted);
   font-size: 10px;
   cursor: pointer;
+  transition: box-shadow var(--ustaad-duration-fast) var(--ustaad-ease-out);
 }
-.chip:hover { color: var(--text); }
-.chip.active { border-color: rgba(69,150,255,.5); background: rgba(69,150,255,.16); color: #d6e8ff; }
+.chip:hover { color: var(--text); box-shadow: var(--ustaad-neu-raised); }
+.chip.active {
+  box-shadow: var(--ustaad-neu-inset-sm), inset 0 0 0 1px rgba(182,232,0,.3);
+  color: var(--ustaad-accent-bright);
+}
 
 .ability-list { display: flex; flex-direction: column; }
-.ability-row { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 9px 0; border-bottom: 1px solid var(--line); }
-.ability-row:last-child { border-bottom: 0; }
+.ability-row { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 10px 0; }
+.ability-row + .ability-row { box-shadow: inset 0 1px 0 var(--ustaad-line); }
 .ability-row strong { display: block; font-size: 11.5px; font-weight: 600; }
-.ability-row span { color: var(--muted); font-size: 9.5px; line-height: 1.45; }
+.ability-row span { color: var(--muted); font-size: 9.5px; line-height: 1.5; }
 
-.provider-list { display: flex; flex-direction: column; gap: 7px; }
+.provider-list { display: flex; flex-direction: column; gap: 8px; }
 .provider-card {
   display: flex;
   flex-direction: column;
   gap: 4px;
-  padding: 11px 12px;
-  border: 1px solid var(--line);
-  border-radius: 10px;
-  background: rgba(255,255,255,.035);
+  padding: 12px 13px;
+  border: 0;
+  border-radius: var(--ustaad-radius-md);
+  background: var(--ustaad-canvas);
+  box-shadow: var(--ustaad-neu-raised-sm);
   text-align: left;
   cursor: pointer;
 }
 .provider-card strong { font-size: 12px; }
 .provider-card span { color: var(--muted); font-size: 10px; line-height: 1.5; }
-.provider-card.active { border-color: rgba(69,150,255,.5); background: rgba(69,150,255,.12); }
+.provider-card.active {
+  box-shadow: var(--ustaad-neu-inset-sm), inset 0 0 0 1px rgba(182,232,0,.3);
+}
+.provider-card.active strong { color: var(--ustaad-accent-bright); }
 
-.setup-block { display: none; margin-top: 12px; }
+.setup-block { display: none; margin-top: 14px; }
 .setup-block.active { display: block; }
 
 /* ------------------------------------------------------------- lists ----- */
 
-.list { display: flex; flex-direction: column; margin-top: 10px; }
+.list { display: flex; flex-direction: column; margin-top: 11px; }
 .list-row {
   display: flex;
   align-items: center;
-  gap: 9px;
-  padding: 8px 0;
-  border-bottom: 1px solid var(--line);
+  gap: 10px;
+  padding: 9px 0;
 }
-.list-row:last-child { border-bottom: 0; }
+.list-row + .list-row { box-shadow: inset 0 1px 0 var(--ustaad-line); }
 .list-row-main { flex: 1; min-width: 0; }
-.list-row-title { font-size: 11.5px; line-height: 1.45; word-break: break-word; }
-.list-row-meta { color: var(--faint); font-size: 9.5px; margin-top: 2px; }
+.list-row-title { font-size: 11.5px; line-height: 1.5; word-break: break-word; }
+.list-row-meta { color: var(--faint); font-size: 9.5px; margin-top: 3px; }
 .list-row.done .list-row-title { color: var(--faint); text-decoration: line-through; }
 .list-empty { padding: 10px 0; color: var(--faint); font-size: 10.5px; }
 
 .check-button {
-  width: 16px; height: 16px;
-  flex: 0 0 16px;
-  border: 1px solid rgba(255,255,255,.22);
-  border-radius: 5px;
-  background: transparent;
-  cursor: pointer;
   position: relative;
+  width: 20px;
+  height: 20px;
+  flex: 0 0 20px;
+  border: 0;
+  border-radius: var(--ustaad-radius-xs);
+  background: var(--ustaad-canvas);
+  box-shadow: var(--ustaad-neu-inset-sm);
+  cursor: pointer;
+  transition: box-shadow var(--ustaad-duration-fast) var(--ustaad-ease-out);
 }
-.check-button.checked { background: rgba(101,217,154,.8); border-color: transparent; }
+.check-button.checked {
+  box-shadow: var(--ustaad-neu-inset-sm), inset 0 0 0 1px rgba(105,217,159,.35);
+}
 .check-button.checked::after {
   content: "";
-  position: absolute; left: 4.5px; top: 1.5px;
-  width: 4px; height: 8px;
-  border: solid #0d1a13;
+  position: absolute;
+  left: 6.5px;
+  top: 3px;
+  width: 4px;
+  height: 9px;
+  border: solid var(--green);
   border-width: 0 2px 2px 0;
   transform: rotate(42deg);
 }
+
 .row-action {
   border: 0;
   background: transparent;
   color: var(--faint);
   font-size: 13px;
   cursor: pointer;
-  padding: 2px 4px;
-  border-radius: 5px;
+  padding: 3px 6px;
+  border-radius: var(--ustaad-radius-xs);
+  transition: color var(--ustaad-duration-fast) var(--ustaad-ease-out);
 }
-.row-action:hover { color: var(--danger); background: rgba(255,255,255,.06); }
+.row-action:hover { color: var(--danger); }
 .row-action.neutral:hover { color: var(--text); }
 
 .switch-pill {
-  padding: 3px 8px;
-  border: 1px solid var(--line);
-  border-radius: 50px;
-  background: transparent;
+  padding: 4px 10px;
+  border: 0;
+  border-radius: var(--ustaad-radius-pill);
+  background: var(--ustaad-canvas);
+  box-shadow: var(--ustaad-neu-inset-sm);
   color: var(--muted);
   font-size: 9px;
   cursor: pointer;
 }
-.switch-pill.on { color: var(--green); border-color: rgba(101,217,154,.4); }
+.switch-pill.on { color: var(--green); box-shadow: var(--ustaad-neu-inset-sm), inset 0 0 0 1px rgba(105,217,159,.3); }
 
 /* ------------------------------------------------------------ footer ----- */
 
@@ -483,13 +660,19 @@ footer {
   align-items: center;
   justify-content: space-between;
   gap: 8px;
-  padding: 4px 20px 14px;
+  padding: 6px 22px 16px;
   color: var(--faint);
   font-size: 9.5px;
 }
-.footer-dot-label { display: flex; align-items: center; gap: 6px; }
-.footer-dot-label i { width: 6px; height: 6px; border-radius: 50%; background: var(--green); }
-.footer-dot-label.unavailable i { background: var(--danger); }
+.footer-dot-label { display: flex; align-items: center; gap: 7px; }
+.footer-dot-label i {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--green);
+  box-shadow: 0 0 8px rgba(105, 217, 159, 0.55);
+}
+.footer-dot-label.unavailable i { background: var(--danger); box-shadow: 0 0 8px rgba(255,138,138,.5); }
 
 .provider-warning { color: #ffca9b; }
 
@@ -497,14 +680,15 @@ footer {
    "what did it actually run?" is the whole point of keeping a log. */
 .audit-detail {
   display: block;
-  margin-top: 4px;
-  padding: 6px 8px;
-  border: 1px solid var(--clickaa-line);
-  border-radius: 6px;
-  background: var(--clickaa-canvas);
-  color: var(--clickaa-ink-muted);
-  font: var(--clickaa-text-xs) var(--clickaa-font-mono);
-  line-height: 1.5;
+  margin-top: 5px;
+  padding: 8px 10px;
+  border: 0;
+  border-radius: var(--ustaad-radius-sm);
+  background: var(--ustaad-canvas);
+  box-shadow: var(--ustaad-neu-inset-sm);
+  color: var(--ustaad-ink-muted);
+  font: var(--ustaad-text-xs) var(--ustaad-font-mono);
+  line-height: 1.55;
   white-space: pre-wrap;
   word-break: break-word;
   max-height: 96px;
@@ -515,8 +699,8 @@ footer {
 .skill-name-field {
   width: 100%;
   max-width: 240px;
-  min-height: 26px;
-  padding: 3px 8px;
+  min-height: 28px;
+  padding: 4px 9px;
   font-size: 11px;
   font-weight: 600;
 }

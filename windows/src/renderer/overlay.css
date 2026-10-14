@@ -1,3 +1,10 @@
+/*
+ * The buddy: Ustaad's pointer, floating on top of whatever the desktop is
+ * showing. Layers that sit over arbitrary content keep a real drop shadow —
+ * soft twin shadows only read as depth on a surface of their own — but every
+ * control inside the pointer is moulded the same way the panel is.
+ */
+
 * { box-sizing: border-box; }
 html, body { width: 100%; height: 100%; margin: 0; overflow: hidden; background: transparent; pointer-events: none; }
 
@@ -14,6 +21,9 @@ html, body { width: 100%; height: 100%; margin: 0; overflow: hidden; background:
 }
 .buddy.visible { opacity: 1; }
 .visual-wrap { position: relative; width: 38px; height: 44px; }
+
+/* The pointer itself: graphite, lit from the top-left, with the blade's lime
+   held in the glow rather than painted on the shape. */
 .cursor-triangle {
   position: absolute;
   left: 4px;
@@ -23,8 +33,8 @@ html, body { width: 100%; height: 100%; margin: 0; overflow: hidden; background:
   clip-path: polygon(7% 5%, 94% 46%, 55% 61%, 38% 98%);
   transform: rotate(-8deg);
   transform-origin: center;
-  background: linear-gradient(145deg, #7fc0ff 0%, #4398ff 44%, #1777eb 100%);
-  filter: drop-shadow(0 3px 3px rgba(0,0,0,.35)) drop-shadow(0 0 8px rgba(58,151,255,.72));
+  background: linear-gradient(150deg, #f2f5f8 0%, #9aa3ae 42%, #4a525c 100%);
+  filter: drop-shadow(0 3px 4px rgba(0,0,0,.45)) drop-shadow(0 0 9px rgba(182,232,0,.55));
   z-index: 3;
 }
 .glow {
@@ -34,7 +44,7 @@ html, body { width: 100%; height: 100%; margin: 0; overflow: hidden; background:
   width: 36px;
   height: 36px;
   border-radius: 50%;
-  background: rgba(58,151,255,.22);
+  background: rgba(182,232,0,.2);
   filter: blur(9px);
   opacity: .55;
 }
@@ -42,7 +52,8 @@ html, body { width: 100%; height: 100%; margin: 0; overflow: hidden; background:
 .listening-ring {
   position: absolute;
   inset: -5px -3px 3px -5px;
-  border: 2px solid rgba(85,168,255,.55);
+  border: 2px solid var(--ustaad-accent-soft);
+  border-color: rgba(182,232,0,.55);
   border-radius: 50%;
   opacity: 0;
 }
@@ -51,14 +62,15 @@ html, body { width: 100%; height: 100%; margin: 0; overflow: hidden; background:
 @keyframes listening-ring { from { transform: scale(.7); opacity: .9; } to { transform: scale(1.45); opacity: 0; } }
 @keyframes listen-float { to { transform: rotate(-4deg) translateY(-2px) scale(1.05); } }
 
+/* Working: a ring turned out of the surface, spinning its lit edge. */
 .processing-spinner {
   position: absolute;
   left: 2px;
   top: 2px;
   width: 34px;
   height: 34px;
-  border: 2px solid rgba(75,157,255,.18);
-  border-top-color: #68afff;
+  border: 2px solid rgba(255,255,255,.1);
+  border-top-color: var(--ustaad-accent-bright);
   border-radius: 50%;
   opacity: 0;
   z-index: 4;
@@ -67,6 +79,7 @@ html, body { width: 100%; height: 100%; margin: 0; overflow: hidden; background:
 .buddy[data-state="processing"] .cursor-triangle { opacity: .42; transform: rotate(-8deg) scale(.75); }
 @keyframes spin { to { transform: rotate(360deg); } }
 
+/* The level meter: a small slab beside the pointer, raised off its own surface. */
 .waveform {
   position: absolute;
   left: 34px;
@@ -76,14 +89,14 @@ html, body { width: 100%; height: 100%; margin: 0; overflow: hidden; background:
   align-items: center;
   gap: 2px;
   padding: 3px 5px;
-  border: 1px solid rgba(255,255,255,.12);
-  border-radius: 8px;
-  background: rgba(10,17,14,.86);
+  border-radius: var(--ustaad-radius-sm);
+  background: var(--ustaad-canvas);
+  box-shadow: var(--ustaad-neu-raised-sm), var(--ustaad-shadow-soft);
   opacity: 0;
   transform: translateX(-3px) scale(.9);
   transition: opacity .15s, transform .15s;
 }
-.waveform i { width: 2px; height: 4px; border-radius: 3px; background: #75b8ff; animation: wave .48s ease-in-out infinite alternate; }
+.waveform i { width: 2px; height: 4px; border-radius: 3px; background: var(--ustaad-accent); animation: wave .48s ease-in-out infinite alternate; }
 .waveform i:nth-child(2) { animation-delay: -.28s; }
 .waveform i:nth-child(3) { animation-delay: -.12s; }
 .waveform i:nth-child(4) { animation-delay: -.36s; }
@@ -106,29 +119,33 @@ html, body { width: 100%; height: 100%; margin: 0; overflow: hidden; background:
   gap: 5px;
   z-index: 7;
 }
+
+/* A bubble answers out of the pointer, so it is a raised slab with the corner
+   nearest the pointer pressed flat — the moulding says where it came from. */
 .response-bubble {
   max-width: 330px;
-  padding: 10px 13px 11px;
-  border: 1px solid rgba(255,255,255,.13);
-  border-radius: 13px 13px 13px 4px;
-  background: rgba(13,20,17,.93);
-  box-shadow: 0 10px 30px rgba(0,0,0,.3), inset 0 1px rgba(255,255,255,.04);
-  color: #eef6f1;
-  font: 12px/1.42 "Segoe UI Variable", "Segoe UI", sans-serif;
+  padding: 11px 14px 12px;
+  border-radius: var(--ustaad-radius-md) var(--ustaad-radius-md) var(--ustaad-radius-md) var(--ustaad-radius-xs);
+  background: var(--ustaad-canvas);
+  box-shadow: var(--ustaad-neu-raised-lg), var(--ustaad-shadow-floating);
+  color: var(--ustaad-ink);
+  font: var(--ustaad-text-sm)/1.45 var(--ustaad-font-ui);
   letter-spacing: -.05px;
   opacity: 0;
   transform: translateY(5px) scale(.97);
   transition: opacity .2s ease, transform .2s ease;
 }
 .response-bubble:not(:empty) { opacity: 1; transform: translateY(0) scale(1); }
+
+/* The label saying what Ustaad is pointing at: a chip pressed into the bubble. */
 .point-label {
   margin-left: 4px;
-  padding: 3px 7px 4px;
-  border: 1px solid rgba(85,168,255,.25);
-  border-radius: 50px;
-  background: rgba(28,79,132,.78);
-  color: #cce5ff;
-  font: 600 8.5px/1 "Segoe UI", sans-serif;
+  padding: 4px 9px 5px;
+  border-radius: var(--ustaad-radius-pill);
+  background: var(--ustaad-canvas);
+  box-shadow: var(--ustaad-neu-inset-sm);
+  color: var(--ustaad-accent-bright);
+  font: var(--ustaad-weight-strong) 8.5px/1 var(--ustaad-font-ui);
   letter-spacing: .02em;
   opacity: 0;
   transform: translateY(3px);
@@ -136,7 +153,13 @@ html, body { width: 100%; height: 100%; margin: 0; overflow: hidden; background:
 }
 .point-label:not(:empty) { opacity: 1; transform: translateY(0); }
 
-/* Keep bubbles readable when Clickaa is near the right edge. */
+/* Keep bubbles readable when Ustaad is near the right edge. */
 .buddy.flip-bubble .response-stack { left: auto; right: 31px; align-items: flex-end; }
-.buddy.flip-bubble .response-bubble { border-radius: 13px 13px 4px 13px; }
+.buddy.flip-bubble .response-bubble {
+  border-radius: var(--ustaad-radius-md) var(--ustaad-radius-md) var(--ustaad-radius-xs) var(--ustaad-radius-md);
+}
 .buddy.flip-bubble .point-label { margin-left: 0; margin-right: 4px; }
+
+@media (prefers-reduced-motion: reduce) {
+  .listening-ring, .cursor-triangle, .processing-spinner, .waveform i { animation: none !important; }
+}

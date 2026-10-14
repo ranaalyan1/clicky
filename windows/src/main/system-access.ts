@@ -7,7 +7,7 @@ import { homedir } from "node:os";
  *            confirmed per action. Read-only or plainly user-scoped work.
  * - `tier2`  needs the separate arbitrary-commands switch, and its own louder
  *            confirmation text. Anything that changes software or the system.
- * - `blocked` never runs, whatever is switched on. Clickaa says why instead.
+ * - `blocked` never runs, whatever is switched on. Ustaad says why instead.
  */
 export type SystemAccessTier = "tier1" | "tier2" | "blocked";
 
@@ -28,7 +28,7 @@ export const userScopedFolderNames = [
 ] as const;
 
 /**
- * Paths Clickaa refuses to touch at all, whatever tier is switched on: credential
+ * Paths Ustaad refuses to touch at all, whatever tier is switched on: credential
  * stores, security configuration and the places browsers keep saved passwords.
  */
 const blockedPathFragments = [
@@ -104,7 +104,7 @@ const tier1CommandNames = [
 
 /**
  * Shapes that mean "this is not a diagnostic any more". Each one is a reason a
- * careful person would stop and ask, so Clickaa stops and asks too.
+ * careful person would stop and ask, so Ustaad stops and asks too.
  */
 const tier2Patterns: Array<{ pattern: RegExp; reason: string }> = [
   { pattern: /\b(start-process|start|invoke-item)\b/iu, reason: "starts a program" },
@@ -127,22 +127,22 @@ const tier2Patterns: Array<{ pattern: RegExp; reason: string }> = [
   { pattern: /\b(set-mppreference|defender|windefend)\b/iu, reason: "touches windows security" },
 ];
 
-/** Requests Clickaa refuses outright, whatever the user has switched on. */
+/** Requests Ustaad refuses outright, whatever the user has switched on. */
 const blockedPatterns: Array<{ pattern: RegExp; reason: string }> = [
-  { pattern: /\b(disable-|stop-service\s+windefend|stop-service\s+sense)/iu, reason: "turning windows security off is not something Clickaa will do" },
-  { pattern: /\bset-mppreference\b[^|;]*\bdisable\w*/iu, reason: "turning windows security off is not something Clickaa will do" },
-  { pattern: /\b(netsh\s+advfirewall\s+set\s+\w+\s+(state\s+)?off|netsh\s+advfirewall\s+set\s+firewallpolicy)/iu, reason: "Clickaa will not switch the windows firewall off" },
-  { pattern: /\b(net\s+user\s+\S+\s+\/add|net\s+localgroup\s+administrators|add-localgroupmember\s+-group\s+administrators)/iu, reason: "Clickaa will not grant administrator rights" },
-  { pattern: /\b(runas|verb\s+runas|-verb\s+runas)/iu, reason: "Clickaa never runs anything elevated on its own" },
+  { pattern: /\b(disable-|stop-service\s+windefend|stop-service\s+sense)/iu, reason: "turning windows security off is not something Ustaad will do" },
+  { pattern: /\bset-mppreference\b[^|;]*\bdisable\w*/iu, reason: "turning windows security off is not something Ustaad will do" },
+  { pattern: /\b(netsh\s+advfirewall\s+set\s+\w+\s+(state\s+)?off|netsh\s+advfirewall\s+set\s+firewallpolicy)/iu, reason: "Ustaad will not switch the windows firewall off" },
+  { pattern: /\b(net\s+user\s+\S+\s+\/add|net\s+localgroup\s+administrators|add-localgroupmember\s+-group\s+administrators)/iu, reason: "Ustaad will not grant administrator rights" },
+  { pattern: /\b(runas|verb\s+runas|-verb\s+runas)/iu, reason: "Ustaad never runs anything elevated on its own" },
   { pattern: /\b(format|diskpart|cleanmgr\s+\/d|chkdsk\s+\w:\s+\/f)\b/iu, reason: "that could destroy the disk" },
   { pattern: /\b(shadowcopy|wbadmin|cipher\s+\/w|vssadmin\s+delete)\b/iu, reason: "that could destroy backups" },
   { pattern: /\b(sam|security)\s+(hive|file)|reg\s+(save|export)\b[^|;]*(sam|security)/iu, reason: "that is a windows credential store" },
   { pattern: /\b(vaultcmd|credentialmanager|credential\s+manager|dpapi|sekurlsa|mimikatz)\b/iu, reason: "that is a credential store" },
   { pattern: /\b(login\s+data|key3\.db|key4\.db|logins\.json|cookies\.sqlite|signons\.sqlite)\b/iu, reason: "that is where browsers keep saved passwords" },
-  { pattern: /\biwr\s|invoke-expression|\biex\b|\|\s*(iex|invoke-expression)/iu, reason: "Clickaa will not run code it cannot read first" },
-  { pattern: /\b(downloadstring|downloadfile|invoke-webrequest[^|;]*\|\s*(iex|invoke-expression))/iu, reason: "downloading something and running it blindly is not something Clickaa will do" },
+  { pattern: /\biwr\s|invoke-expression|\biex\b|\|\s*(iex|invoke-expression)/iu, reason: "Ustaad will not run code it cannot read first" },
+  { pattern: /\b(downloadstring|downloadfile|invoke-webrequest[^|;]*\|\s*(iex|invoke-expression))/iu, reason: "downloading something and running it blindly is not something Ustaad will do" },
   // `\b` cannot sit before a dash, so the switch is matched on the space before it.
-  { pattern: /(^|\s)-e(nc|ncodedcommand)?\b|\bfrombase64string\b/iu, reason: "Clickaa will not run an encoded command" },
+  { pattern: /(^|\s)-e(nc|ncodedcommand)?\b|\bfrombase64string\b/iu, reason: "Ustaad will not run an encoded command" },
   { pattern: /\b(bcdedit|bootrec|bootsect|fdisk)\b/iu, reason: "that changes how the pc starts" },
   { pattern: /(rm\s+-rf\s+\/|del\s+\/f\s+\/s\s+\/q\s+c:\\|remove-item[^|;]*-recurse[^|;]*-force\s+c:\\)/iu, reason: "that would delete the system drive" },
 ];
@@ -150,7 +150,7 @@ const blockedPatterns: Array<{ pattern: RegExp; reason: string }> = [
 /**
  * Splits a Windows path into comparable parts.
  *
- * Clickaa runs on Windows but is tested everywhere, so it does its own path
+ * Ustaad runs on Windows but is tested everywhere, so it does its own path
  * normalisation instead of leaning on Node's platform-dependent helpers: both
  * separators collapse to one, `.` and `..` resolve, and case stops mattering.
  */
@@ -191,7 +191,7 @@ export function isPathInsideUserFolders(rawPath: string, homeDirectory = homedir
   ));
 }
 
-/** True when a path is one Clickaa must never read or write. */
+/** True when a path is one Ustaad must never read or write. */
 export function isBlockedPath(rawPath: string): boolean {
   const normalizedTarget = `\\${splitWindowsPath(rawPath).join("\\")}\\`;
   return blockedPathFragments.some((fragment) => normalizedTarget.includes(fragment));
@@ -200,7 +200,7 @@ export function isBlockedPath(rawPath: string): boolean {
 /**
  * Classifies a raw PowerShell command or script.
  *
- * Blocked wins over everything, Tier 2 wins over Tier 1, and anything Clickaa
+ * Blocked wins over everything, Tier 2 wins over Tier 1, and anything Ustaad
  * does not positively recognise as a diagnostic is Tier 2 rather than being
  * waved through: the default is "ask the user properly".
  */
@@ -242,7 +242,7 @@ export function classifySystemCommand(rawCommand: string): SystemAccessClassific
       .replace(/\.exe$/iu, "")
       .toLowerCase() ?? "";
     if (!tier1CommandNames.includes(firstWord)) {
-      return { tier: "tier2", reason: "a command Clickaa does not recognise as read-only" };
+      return { tier: "tier2", reason: "a command Ustaad does not recognise as read-only" };
     }
   }
 

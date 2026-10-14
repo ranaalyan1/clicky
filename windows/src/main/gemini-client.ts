@@ -1,10 +1,22 @@
 import { GeminiChatModel, GeminiVoiceName } from "../shared/contracts";
+import {
+  describePictureFailure,
+  GeneratedPicturePayload,
+  readPictureFromGeminiResponse,
+} from "./image-generation";
+import { describeResearchFailure, readResearchAnswer, ResearchAnswer } from "./research";
 import { BrainStreamRequest, SynthesizedSpeech } from "./brain-types";
 import { extractGeminiInlineAudioBase64, extractGeminiTextDelta } from "./gemini-sse";
 import { ServerSentEventTextParser } from "./sse-parser";
 import { wrapGeminiSpeechAudio } from "./wav-encoder";
 
 const geminiApiBaseUrl = "https://generativelanguage.googleapis.com/v1beta";
+
+/** Pictures take longer than words, so they get their own, longer allowance. */
+const pictureRequestTimeoutMilliseconds = 120_000;
+
+/** A grounded lookup reads the web before it answers, so it gets longer too. */
+const researchRequestTimeoutMilliseconds = 90_000;
 
 /** Transcription always uses flash: it is the fastest model that hears well. */
 const geminiTranscriptionModel: GeminiChatModel = "gemini-2.5-flash";
@@ -206,6 +218,85 @@ export class GeminiClient {
       .map((responsePart) => responsePart.text ?? "")
       .join("")
       .trim();
+  }
+
+  /**
+   * Draws one picture from a description, on the user's own key.
+   *
+   * Two families of model can do this and a key rarely reaches both, so the
+   * image model goes first and Imagen second. The second attempt only happens
+   * when the first one did not draw, so the usual case costs one call.
+   */
+  async generatePicture(prompt: string): Promise<GeneratedPicturePayload> {
+    const pictureAttempts: Array<{ path: string; requestBody: Record<string, unknown> }> = [
+      {
+        path: "models/gemini-2.5-flash-image:generateContent",
+        requestBody: {
+          contents: [{ role: "user", parts: [{ text: prompt }] }],
+          generationConfig: { responseModalities: ["TEXT", "IMAGE"] },
+        },
+      },
+      {
+        path: "models/imagen-4.0-generate-001:predict",
+        requestBody: { instances: [{ prompt }], parameters: { sampleCount: 1 } },
+      },
+    ];
+
+    let lastFailure = "";
+    for (const attempt of pictureAttempts) {
+      const callResult = await this.callGemini(
+        attempt.path,
+        attempt.requestBody,
+        AbortSignal.timeout(pictureRequestTimeoutMilliseconds),
+        pictureRequestTimeoutMilliseconds,
+      );
+
+      if (!callResult.response.ok) {
+        lastFailure = describePictureFailure(callResult.response.status, callResult.errorBodyText);
+        continue;
+      }
+
+      const drawnPicture = readPictureFromGeminiResponse(await callResult.response.json());
+      if (drawnPicture) {
+        return drawnPicture;
+      }
+      lastFailure = "google answered without a picture. describe it differently and ask again.";
+    }
+
+    throw new Error(lastFailure || "google would not draw that.");
+  }
+
+  /**
+   * Looks a question up and keeps the pages the answer came from.
+   *
+   * Search grounding is what makes a citation possible: without it the model
+   * answers from memory and there is nothing to check. It needs Gemini 2.5,
+   * which is why the chat model is reused rather than hard-coded here.
+   */
+  async researchWithSources(
+    question: string,
+    chatModel: GeminiChatModel,
+  ): Promise<ResearchAnswer> {
+    const callResult = await this.callGemini(
+      `models/${chatModel}:generateContent`,
+      {
+        contents: [{ role: "user", parts: [{ text: question }] }],
+        tools: [{ google_search: {} }],
+        generationConfig: { temperature: 0.4, maxOutputTokens: 1_024 },
+      },
+      AbortSignal.timeout(researchRequestTimeoutMilliseconds),
+      researchRequestTimeoutMilliseconds,
+    );
+
+    if (!callResult.response.ok) {
+      throw new Error(describeResearchFailure(callResult.response.status, callResult.errorBodyText));
+    }
+
+    const researchAnswer = readResearchAnswer(await callResult.response.json());
+    if (!researchAnswer) {
+      throw new Error("google answered without anything to read. try asking it a different way.");
+    }
+    return researchAnswer;
   }
 
   /** Cheap round trip used by the panel's "check my key" button. */

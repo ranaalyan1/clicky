@@ -1,5 +1,5 @@
 import { randomUUID } from "node:crypto";
-import { ClickaaAction, ScheduleRepeat, ScheduledTask } from "../shared/contracts";
+import { UstaadAction, ScheduleRepeat, ScheduledTask } from "../shared/contracts";
 import { JsonFileStore } from "./json-file-store";
 import { formatLocalIso, parseLocalIsoDateTime } from "./local-time";
 import {
@@ -31,7 +31,7 @@ function sanitizeScheduledTasks(storedValue: unknown): ScheduledTask[] {
       name: possibleTask.name.trim(),
       kind: possibleTask.kind === "routine" ? "routine" : "reminder",
       prompt: typeof possibleTask.prompt === "string" ? possibleTask.prompt : "",
-      actions: Array.isArray(possibleTask.actions) ? possibleTask.actions as ClickaaAction[] : [],
+      actions: Array.isArray(possibleTask.actions) ? possibleTask.actions as UstaadAction[] : [],
       timeOfDay: typeof possibleTask.timeOfDay === "string" ? possibleTask.timeOfDay : null,
       startAtIso: typeof possibleTask.startAtIso === "string" ? possibleTask.startAtIso : null,
       repeat: normalizeScheduleRepeat(possibleTask.repeat),
@@ -48,7 +48,7 @@ export interface NewScheduledTask {
   name: string;
   kind: "reminder" | "routine";
   prompt: string;
-  actions: ClickaaAction[];
+  actions: UstaadAction[];
   timeOfDay: string | null;
   startAtIso: string | null;
   repeat: ScheduleRepeat;
@@ -150,7 +150,7 @@ export class ScheduleStore {
     return this.scheduledTasks.filter((scheduledTask) => isScheduledTaskDue(scheduledTask, now));
   }
 
-  /** Rolls forward everything missed while Clickaa was not running. */
+  /** Rolls forward everything missed while Ustaad was not running. */
   rollForwardOverdueTasks(now: Date): ScheduledTask[] {
     const rolledForwardTasks: ScheduledTask[] = [];
     for (const scheduledTask of this.scheduledTasks) {

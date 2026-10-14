@@ -1,8 +1,8 @@
 import type {
   AudioPlaybackPayload,
   BrainConnectionTestResult,
-  ClickaaPublicState,
-  ClickaaUserConfig,
+  UstaadPublicState,
+  UstaadUserConfig,
   FallbackSpeechPayload,
   IslandPresentation,
   IslandState,
@@ -10,20 +10,21 @@ import type {
   OverlayCursorPayload,
   OverlayModePayload,
   OverlayPointPayload,
+  RunHistorySearchResult,
   SelectionBoundsPayload,
 } from "../shared/contracts";
 
 declare global {
   interface Window {
-    clickaa: {
+    ustaad: {
       /* Panel */
-      getState(): Promise<ClickaaPublicState>;
-      updateSettings(settingsUpdates: Partial<ClickaaUserConfig>): Promise<ClickaaPublicState>;
-      testBrain(settingsUpdates: Partial<ClickaaUserConfig>): Promise<BrainConnectionTestResult>;
+      getState(): Promise<UstaadPublicState>;
+      updateSettings(settingsUpdates: Partial<UstaadUserConfig>): Promise<UstaadPublicState>;
+      testBrain(settingsUpdates: Partial<UstaadUserConfig>): Promise<BrainConnectionTestResult>;
       refreshAppIndex(): Promise<number>;
       hidePanel(): void;
       openSetupVideo(): void;
-      onState(listener: (state: ClickaaPublicState) => void): () => void;
+      onState(listener: (state: UstaadPublicState) => void): () => void;
       onOpenPanelPage(listener: (page: string) => void): () => void;
 
       pushToTalkPressed(): void;
@@ -45,11 +46,17 @@ declare global {
       addMemory(factText: string): void;
       clearMemory(): void;
       clearAuditLog(): void;
+      searchRunHistory(query: string): Promise<RunHistorySearchResult[]>;
+      clearRunHistory(): void;
+      rotatePhoneBridgeToken(): void;
+      panelRunTaskQueue(): Promise<string>;
+      panelCancelQueuedTask(taskId: string): Promise<string>;
+      panelClearTaskQueue(): Promise<string>;
 
       /* Cursor overlay */
       sendPointingAnimationCompleted(interactionId: number): void;
       onOverlayState(
-        listener: (payload: Pick<ClickaaPublicState, "voiceState" | "audioPowerLevel">) => void,
+        listener: (payload: Pick<UstaadPublicState, "voiceState" | "audioPowerLevel">) => void,
       ): () => void;
       onOverlayCursor(listener: (payload: OverlayCursorPayload) => void): () => void;
       onOverlayResponse(listener: (responseText: string) => void): () => void;
@@ -68,8 +75,20 @@ declare global {
       resolveConfirmation(confirmationId: string, decision: "approve" | "reject"): Promise<string>;
       saveSkillSuggestion(): Promise<string>;
       dismissSkillSuggestion(): Promise<void>;
+      workOutSkillRepair(): Promise<string>;
+      saveSkillRepair(): Promise<string>;
+      dismissSkillRepair(): Promise<void>;
+      openDrawnPicture(): Promise<string>;
+      revealDrawnPicture(): Promise<string>;
+      dismissDrawnPicture(): Promise<void>;
+      openResearchSource(sourceUrl: string): Promise<string>;
+      dismissResearch(): Promise<void>;
+      runTaskQueue(): Promise<string>;
+      cancelQueuedTask(taskId: string): Promise<string>;
+      clearTaskQueue(): Promise<string>;
       renameSkill(skillId: string, nextName: string): Promise<void>;
       removeSkill(skillId: string): Promise<void>;
+      runCheckInNow(): Promise<void>;
       undoActivity(activityEntryId: string): Promise<boolean>;
       launchApp(appName: string): Promise<void>;
       mediaControl(operation: "play_pause" | "next" | "previous"): Promise<void>;

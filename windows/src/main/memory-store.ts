@@ -33,7 +33,7 @@ function sanitizeMemoryFacts(storedValue: unknown): MemoryFact[] {
 }
 
 /**
- * Long-lived facts the user asked Clickaa to keep ("my brother's birthday is in
+ * Long-lived facts the user asked Ustaad to keep ("my brother's birthday is in
  * March"). Facts are injected into every system prompt, so the list is capped.
  */
 export class MemoryStore {

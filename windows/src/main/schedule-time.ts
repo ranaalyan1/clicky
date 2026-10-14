@@ -98,7 +98,7 @@ export function isScheduledTaskDue(
 }
 
 /**
- * A task missed while Clickaa was closed should not fire hours later, so
+ * A task missed while Ustaad was closed should not fire hours later, so
  * overdue tasks older than the grace window are rolled forward instead.
  */
 export function isScheduledTaskOverdueBeyondGrace(

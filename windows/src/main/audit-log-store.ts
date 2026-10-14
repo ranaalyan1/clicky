@@ -3,8 +3,8 @@ import { AuditLogEntry } from "../shared/contracts";
 import { JsonFileStore } from "./json-file-store";
 
 /**
- * Every command, file operation and registry read Clickaa attempts is recorded
- * here — whether the user approved it, refused it, or Clickaa itself blocked it.
+ * Every command, file operation and registry read Ustaad attempts is recorded
+ * here — whether the user approved it, refused it, or Ustaad itself blocked it.
  * The log is the answer to "what did that thing actually do on my pc?", so it is
  * written to disk and the panel shows it in full.
  */

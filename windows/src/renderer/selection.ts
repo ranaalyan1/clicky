@@ -78,12 +78,12 @@ window.addEventListener("pointerup", (pointerEvent) => {
   if (selectionBounds.width < minimumSelectionSizePixels || selectionBounds.height < minimumSelectionSizePixels) {
     // A bare click inside the dimmed layer means "never mind".
     hasCompletedSelection = true;
-    window.clickaa.sendSelectionCancelled();
+    window.ustaad.sendSelectionCancelled();
     return;
   }
 
   hasCompletedSelection = true;
-  window.clickaa.sendSelectionCompleted(selectionBounds);
+  window.ustaad.sendSelectionCompleted(selectionBounds);
 });
 
 window.addEventListener("keydown", (keyboardEvent) => {
@@ -105,7 +105,7 @@ function cancelSelection(): void {
   }
   hasCompletedSelection = true;
   clearSelection();
-  window.clickaa.sendSelectionCancelled();
+  window.ustaad.sendSelectionCancelled();
 }
 
 document.addEventListener("contextmenu", (contextMenuEvent) => contextMenuEvent.preventDefault());

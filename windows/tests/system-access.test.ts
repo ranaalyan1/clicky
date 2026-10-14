@@ -46,7 +46,7 @@ test("anything that changes the pc is tier 2, never waved through", () => {
     // The specific danger is named rather than the generic "it chains
     // commands": the reason is what the user reads on the card.
     ["Get-Date; Remove-Item x", "deletes files"],
-    ["Get-These-Things", "a command Clickaa does not recognise as read-only"],
+    ["Get-These-Things", "a command Ustaad does not recognise as read-only"],
   ];
 
   for (const [command, expectedReason] of tier2Examples) {
@@ -152,7 +152,7 @@ test("a file write outside the user folders is refused even when everything is o
   assert.equal(decision.message.includes("only work with files inside your own"), true);
 });
 
-test("the registry reads clickaa allows never include credential hives", () => {
+test("the registry reads ustaad allows never include credential hives", () => {
   const allowedRead = decideSystemAccess({
     request: { kind: "registry", path: "HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Run" },
     abilities: allSwitchedOn,

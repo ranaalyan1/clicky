@@ -6,7 +6,7 @@ import test from "node:test";
 import { AuditLogStore } from "../src/main/audit-log-store";
 
 function createAuditLogStore(): AuditLogStore {
-  return new AuditLogStore(join(mkdtempSync(join(tmpdir(), "clickaa-audit-")), "audit-log.json"));
+  return new AuditLogStore(join(mkdtempSync(join(tmpdir(), "ustaad-audit-")), "audit-log.json"));
 }
 
 test("entries are newest first and carry what actually ran", () => {
@@ -49,8 +49,8 @@ test("refusals are logged too, so the log is the whole story", () => {
   });
 });
 
-test("the log survives a restart, and a corrupt file never takes clickaa down", () => {
-  const logPath = join(mkdtempSync(join(tmpdir(), "clickaa-audit-")), "audit-log.json");
+test("the log survives a restart, and a corrupt file never takes ustaad down", () => {
+  const logPath = join(mkdtempSync(join(tmpdir(), "ustaad-audit-")), "audit-log.json");
   const firstStore = new AuditLogStore(logPath);
   firstStore.record({ summary: "read a file", detail: "C:\\Users\\aly\\Documents\\a.txt", tier: "tier1", outcome: "allowed", resultPreview: "hello" });
 
@@ -58,7 +58,7 @@ test("the log survives a restart, and a corrupt file never takes clickaa down", 
   assert.equal(reloadedStore.list()[0]?.summary, "read a file");
 
   // A file full of nonsense reads as "no entries", and stays writable.
-  const brokenPath = join(mkdtempSync(join(tmpdir(), "clickaa-audit-")), "audit-log.json");
+  const brokenPath = join(mkdtempSync(join(tmpdir(), "ustaad-audit-")), "audit-log.json");
   require("node:fs").writeFileSync(brokenPath, "{ this is not json", "utf8");
   const brokenStore = new AuditLogStore(brokenPath);
   assert.deepEqual(brokenStore.list(), []);

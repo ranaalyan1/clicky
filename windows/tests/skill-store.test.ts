@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { mkdtempSync } from "node:fs";
+import { mkdtempSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import test from "node:test";
@@ -13,7 +13,7 @@ import {
 } from "../src/main/skill-suggestions";
 
 function createSkillStore(): SkillStore {
-  return new SkillStore(join(mkdtempSync(join(tmpdir(), "clickaa-skill-")), "skills.json"));
+  return new SkillStore(join(mkdtempSync(join(tmpdir(), "ustaad-skill-")), "skills.json"));
 }
 
 function historyEntry(goal: string, succeededAtIso = new Date().toISOString()): TaskHistoryEntry {
@@ -60,8 +60,8 @@ test("running a skill counts, so the list can lead with what gets used", () => {
   const quietSkill = skillStore.save({ name: "quiet", goal: "do the quiet thing", seedActions: [] });
   const usedSkill = skillStore.save({ name: "used", goal: "do the used thing", seedActions: [] });
 
-  skillStore.noteRun(usedSkill.id);
-  skillStore.noteRun(usedSkill.id);
+  skillStore.noteRun(usedSkill.id, { outcome: "completed", note: "finished", countsAsFailure: false });
+  skillStore.noteRun(usedSkill.id, { outcome: "completed", note: "finished", countsAsFailure: false });
 
   const [firstSkill] = skillStore.list();
   assert.equal(firstSkill?.id, usedSkill.id);
@@ -73,8 +73,81 @@ test("running a skill counts, so the list can lead with what gets used", () => {
   assert.equal(skillStore.list().length, 1);
 });
 
+test("a failing skill builds a streak, and the run that works clears it", () => {
+  const skillStore = createSkillStore();
+  const skill = skillStore.save({ name: "orders", goal: "check the last order", seedActions: [] });
+
+  skillStore.noteRun(skill.id, { outcome: "gave_up", note: "the page never loaded", countsAsFailure: true });
+  skillStore.noteRun(skill.id, { outcome: "ran_out_of_steps", note: "8 steps used", countsAsFailure: true });
+  const strugglingSkill = skillStore.findById(skill.id);
+  assert.equal(strugglingSkill?.failureStreak, 2);
+  assert.equal(strugglingSkill?.lastOutcome, "ran_out_of_steps");
+  assert.equal(strugglingSkill?.lastOutcomeNote, "8 steps used");
+
+  // A run the user stopped is recorded, but it is not the skill's fault.
+  skillStore.noteRun(skill.id, { outcome: "stopped", note: "you stopped it", countsAsFailure: false });
+  assert.equal(skillStore.findById(skill.id)?.failureStreak, 2);
+
+  skillStore.noteRun(skill.id, { outcome: "completed", note: "found the order", countsAsFailure: false });
+  assert.equal(skillStore.findById(skill.id)?.failureStreak, 0);
+  assert.equal(skillStore.findById(skill.id)?.runCount, 4);
+});
+
+test("a saved repair replaces the aim and the steps but keeps the skill", () => {
+  const skillStore = createSkillStore();
+  const skill = skillStore.save({ name: "videos", goal: "play a video on youtube", seedActions: [] });
+  skillStore.noteRun(skill.id, { outcome: "gave_up", note: "no video found", countsAsFailure: true });
+  skillStore.noteRepairOffered(skill.id, 2);
+
+  const repairedSkill = skillStore.applyRepair(skill.id, {
+    goal: "search youtube for tonight's playlist and play the first result",
+    seedActions: [{ type: "search_web", query: "tonight playlist", target: "youtube" }],
+  });
+
+  assert.equal(repairedSkill?.id, skill.id);
+  assert.equal(repairedSkill?.name, "videos");
+  assert.equal(repairedSkill?.failureStreak, 0);
+  assert.equal(repairedSkill?.repairOfferedStreak, 0);
+  assert.equal(repairedSkill?.repairCount, 1);
+  assert.equal(repairedSkill?.seedActions.length, 1);
+  assert.ok(repairedSkill?.repairedAtIso);
+  assert.equal(skillStore.findById(skill.id)?.goal, "search youtube for tonight's playlist and play the first result");
+
+  // Nonsense repairs are refused rather than half-applied.
+  assert.equal(skillStore.applyRepair(skill.id, { goal: "   ", seedActions: [] }), null);
+  assert.equal(skillStore.findById(skill.id)?.repairCount, 1);
+});
+
+test("stored health is sanitized rather than trusted", () => {
+  const skillPath = join(mkdtempSync(join(tmpdir(), "ustaad-skill-")), "skills.json");
+  writeFileSync(skillPath, JSON.stringify([{
+    id: "kept",
+    name: "kept skill",
+    goal: "do the kept thing",
+    seedActions: [],
+    createdAtIso: "2026-01-01T00:00:00.000Z",
+    runCount: 3,
+    lastRunAtIso: "2026-01-02T00:00:00.000Z",
+    lastOutcome: "exploded",
+    lastOutcomeNote: 42,
+    failureStreak: -7,
+    repairOfferedStreak: 2.6,
+    repairCount: "lots",
+    repairedAtIso: 5,
+  }]));
+
+  const skillStore = new SkillStore(skillPath);
+  const storedSkill = skillStore.findById("kept");
+  assert.equal(storedSkill?.lastOutcome, null);
+  assert.equal(storedSkill?.lastOutcomeNote, "");
+  assert.equal(storedSkill?.failureStreak, 0);
+  assert.equal(storedSkill?.repairOfferedStreak, 3);
+  assert.equal(storedSkill?.repairCount, 0);
+  assert.equal(storedSkill?.repairedAtIso, null);
+});
+
 test("skills persist across a restart", () => {
-  const skillPath = join(mkdtempSync(join(tmpdir(), "clickaa-skill-")), "skills.json");
+  const skillPath = join(mkdtempSync(join(tmpdir(), "ustaad-skill-")), "skills.json");
   const firstStore = new SkillStore(skillPath);
   firstStore.save({
     name: "my videos",
@@ -127,7 +200,7 @@ test("a task that is already a skill is never offered again", () => {
   assert.equal(suggestSkill({ history, savedSignatures: new Set([taskSignature("play a video on youtube")]) }), null);
 });
 
-test("a no thanks is respected for a while, then clickaa may ask once more", () => {
+test("a no thanks is respected for a while, then ustaad may ask once more", () => {
   const threeRuns = [
     historyEntry("play a video on youtube"),
     historyEntry("play a video on youtube"),

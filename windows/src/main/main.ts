@@ -1,15 +1,15 @@
 import { app, ipcMain, screen, session } from "electron";
 import { join } from "node:path";
-import { ClickaaConfigStore } from "./config-store";
-import { ClickaaController } from "./clickaa-controller";
-import { ClickaaDesktopWindows } from "./desktop-windows";
+import { UstaadConfigStore } from "./config-store";
+import { UstaadController } from "./ustaad-controller";
+import { UstaadDesktopWindows } from "./desktop-windows";
 import { GlobalShortcutMonitor } from "./global-shortcut-monitor";
-import { migrateLegacyClickyUserData } from "./legacy-migration";
-import { ClickaaUserConfig, IslandToggleKey } from "../shared/contracts";
+import { migrateLegacyUserData } from "./legacy-migration";
+import { UstaadUserConfig, IslandToggleKey } from "../shared/contracts";
 
 app.commandLine.appendSwitch("autoplay-policy", "no-user-gesture-required");
 
-/** The walkthrough Clickaa points people at from the setup tab. */
+/** The walkthrough Ustaad points people at from the setup tab. */
 const setupVideoUrl = "https://youtu.be/bei_Cc8-CBw";
 
 const hasSingleInstanceLock = app.requestSingleInstanceLock();
@@ -17,8 +17,8 @@ if (!hasSingleInstanceLock) {
   app.quit();
 }
 
-let desktopWindows: ClickaaDesktopWindows | null = null;
-let clickaaController: ClickaaController | null = null;
+let desktopWindows: UstaadDesktopWindows | null = null;
+let ustaadController: UstaadController | null = null;
 let globalShortcutMonitor: GlobalShortcutMonitor | null = null;
 let isQuitting = false;
 
@@ -42,7 +42,7 @@ function registerSecureMediaPermissions(): void {
 function registerIpcHandlers(): void {
   const requirePanelSender = (webContentsId: number): void => {
     if (desktopWindows?.isPanelWebContents(webContentsId) !== true) {
-      throw new Error("IPC request rejected: sender is not the Clickaa panel.");
+      throw new Error("IPC request rejected: sender is not the Ustaad panel.");
     }
   };
   const panelSentEvent = (webContentsId: number): boolean => {
@@ -54,48 +54,48 @@ function registerIpcHandlers(): void {
 
   /* Panel: state and settings -------------------------------------------- */
 
-  ipcMain.handle("clickaa:get-state", (event) => {
+  ipcMain.handle("ustaad:get-state", (event) => {
     requirePanelSender(event.sender.id);
-    return clickaaController?.getPublicState();
+    return ustaadController?.getPublicState();
   });
-  ipcMain.handle("clickaa:update-settings", (event, settingsUpdates: Partial<ClickaaUserConfig>) => {
+  ipcMain.handle("ustaad:update-settings", (event, settingsUpdates: Partial<UstaadUserConfig>) => {
     requirePanelSender(event.sender.id);
-    const updatedState = clickaaController?.updateSettings(settingsUpdates);
+    const updatedState = ustaadController?.updateSettings(settingsUpdates);
     // Changing the dictation shortcut rebuilds the global key state machine.
     if (settingsUpdates && typeof settingsUpdates === "object" && "dictationShortcut" in settingsUpdates) {
       globalShortcutMonitor?.setDictationShortcut(updatedState?.config.dictationShortcut ?? "ctrl+windows");
     }
     return updatedState;
   });
-  ipcMain.handle("clickaa:test-brain", (event, settingsUpdates: Partial<ClickaaUserConfig>) => {
+  ipcMain.handle("ustaad:test-brain", (event, settingsUpdates: Partial<UstaadUserConfig>) => {
     requirePanelSender(event.sender.id);
-    return clickaaController?.testBrainConnection(settingsUpdates);
+    return ustaadController?.testBrainConnection(settingsUpdates);
   });
-  ipcMain.on("clickaa:open-setup-video", (event) => {
+  ipcMain.on("ustaad:open-setup-video", (event) => {
     if (panelSentEvent(event.sender.id)) {
       void import("electron").then(({ shell }) => shell.openExternal(setupVideoUrl));
     }
   });
-  ipcMain.handle("clickaa:refresh-app-index", (event) => {
+  ipcMain.handle("ustaad:refresh-app-index", (event) => {
     requirePanelSender(event.sender.id);
-    return clickaaController?.refreshAppIndex();
+    return ustaadController?.refreshAppIndex();
   });
 
   /* Panel: push-to-talk --------------------------------------------------- */
 
-  ipcMain.on("clickaa:panel-hide", (event) => {
+  ipcMain.on("ustaad:panel-hide", (event) => {
     if (panelSentEvent(event.sender.id)) {
       desktopWindows?.hidePanel();
     }
   });
   ipcMain.on("push-to-talk:pressed", (event) => {
     if (panelSentEvent(event.sender.id)) {
-      clickaaController?.handlePanelPushToTalkPressed();
+      ustaadController?.handlePanelPushToTalkPressed();
     }
   });
   ipcMain.on("push-to-talk:released", (event) => {
     if (panelSentEvent(event.sender.id)) {
-      clickaaController?.handlePanelPushToTalkReleased();
+      ustaadController?.handlePanelPushToTalkReleased();
     }
   });
 
@@ -103,7 +103,7 @@ function registerIpcHandlers(): void {
 
   ipcMain.on("audio-capture:started", (event, interactionId: number) => {
     if (panelSentEvent(event.sender.id)) {
-      clickaaController?.handleMicrophoneCaptureStarted(interactionId);
+      ustaadController?.handleMicrophoneCaptureStarted(interactionId);
     }
   });
   ipcMain.on(
@@ -124,33 +124,33 @@ function registerIpcHandlers(): void {
         );
       }
       if (audioBytes) {
-        clickaaController?.appendMicrophoneAudio(interactionId, audioBytes);
+        ustaadController?.appendMicrophoneAudio(interactionId, audioBytes);
       }
     },
   );
   ipcMain.on("audio-capture:level", (event, interactionId: number, audioPowerLevel: number) => {
     if (panelSentEvent(event.sender.id) && Number.isFinite(audioPowerLevel)) {
-      clickaaController?.handleAudioPowerLevel(interactionId, audioPowerLevel);
+      ustaadController?.handleAudioPowerLevel(interactionId, audioPowerLevel);
     }
   });
   ipcMain.on("audio-capture:error", (event, interactionId: number, errorMessage: string) => {
     if (panelSentEvent(event.sender.id)) {
-      clickaaController?.handleMicrophoneCaptureError(interactionId, String(errorMessage));
+      ustaadController?.handleMicrophoneCaptureError(interactionId, String(errorMessage));
     }
   });
   ipcMain.on("audio-playback:started", (event, interactionId: number) => {
     if (panelSentEvent(event.sender.id)) {
-      clickaaController?.handleAudioPlaybackStarted(interactionId);
+      ustaadController?.handleAudioPlaybackStarted(interactionId);
     }
   });
   ipcMain.on("audio-playback:ended", (event, interactionId: number) => {
     if (panelSentEvent(event.sender.id)) {
-      clickaaController?.handleAudioPlaybackEnded(interactionId);
+      ustaadController?.handleAudioPlaybackEnded(interactionId);
     }
   });
   ipcMain.on("audio-playback:error", (event, interactionId: number, errorMessage: string) => {
     if (panelSentEvent(event.sender.id)) {
-      clickaaController?.handleAudioPlaybackError(interactionId, String(errorMessage));
+      ustaadController?.handleAudioPlaybackError(interactionId, String(errorMessage));
     }
   });
 
@@ -158,7 +158,7 @@ function registerIpcHandlers(): void {
 
   ipcMain.on("overlay:point-complete", (event, interactionId: number) => {
     if (desktopWindows?.isOverlayWebContents(event.sender.id)) {
-      clickaaController?.handlePointingAnimationCompleted(interactionId);
+      ustaadController?.handlePointingAnimationCompleted(interactionId);
     }
   });
 
@@ -166,9 +166,9 @@ function registerIpcHandlers(): void {
 
   ipcMain.handle("island:get-state", (event) => {
     if (!islandSentEvent(event.sender.id)) {
-      throw new Error("IPC request rejected: sender is not the Clickaa island.");
+      throw new Error("IPC request rejected: sender is not the Ustaad island.");
     }
-    return clickaaController?.getIslandState();
+    return ustaadController?.getIslandState();
   });
   ipcMain.on("island:pointer-over", (event, isPointerOverIsland: boolean) => {
     if (islandSentEvent(event.sender.id)) {
@@ -177,136 +177,245 @@ function registerIpcHandlers(): void {
   });
   ipcMain.on("island:close", (event) => {
     if (islandSentEvent(event.sender.id)) {
-      clickaaController?.handleIslandClosedByUser();
+      ustaadController?.handleIslandClosedByUser();
     }
   });
   ipcMain.on("island:set-expanded", (event, isExpanded: boolean) => {
     if (islandSentEvent(event.sender.id)) {
-      clickaaController?.handleIslandExpandedChanged(Boolean(isExpanded));
+      ustaadController?.handleIslandExpandedChanged(Boolean(isExpanded));
     }
   });
   ipcMain.handle("island:resolve-confirmation", (event, confirmationId: string, decision: "approve" | "reject") => {
     if (!islandSentEvent(event.sender.id)) {
-      throw new Error("IPC request rejected: sender is not the Clickaa island.");
+      throw new Error("IPC request rejected: sender is not the Ustaad island.");
     }
-    return clickaaController?.runConfirmationDecision(confirmationId, decision);
+    return ustaadController?.runConfirmationDecision(confirmationId, decision);
   });
   ipcMain.handle("island:save-skill-suggestion", (event) => {
     if (!islandSentEvent(event.sender.id)) {
-      throw new Error("IPC request rejected: sender is not the Clickaa island.");
+      throw new Error("IPC request rejected: sender is not the Ustaad island.");
     }
-    const savedSkill = clickaaController?.saveSuggestedSkill();
+    const savedSkill = ustaadController?.saveSuggestedSkill();
     return savedSkill ? `saved the ${savedSkill.name} skill.` : "there was nothing to save.";
   });
   ipcMain.handle("island:dismiss-skill-suggestion", (event) => {
     if (!islandSentEvent(event.sender.id)) {
-      throw new Error("IPC request rejected: sender is not the Clickaa island.");
+      throw new Error("IPC request rejected: sender is not the Ustaad island.");
     }
-    clickaaController?.dismissSuggestedSkill();
+    ustaadController?.dismissSuggestedSkill();
+  });
+  ipcMain.handle("island:work-out-skill-repair", (event) => {
+    if (!islandSentEvent(event.sender.id)) {
+      throw new Error("IPC request rejected: sender is not the Ustaad island.");
+    }
+    return ustaadController?.workOutSkillRepair() ?? "there is nothing to fix right now.";
+  });
+  ipcMain.handle("island:save-skill-repair", (event) => {
+    if (!islandSentEvent(event.sender.id)) {
+      throw new Error("IPC request rejected: sender is not the Ustaad island.");
+    }
+    return ustaadController?.saveSkillRepair() ?? "there is no fix to save.";
+  });
+  ipcMain.handle("island:dismiss-skill-repair", (event) => {
+    if (!islandSentEvent(event.sender.id)) {
+      throw new Error("IPC request rejected: sender is not the Ustaad island.");
+    }
+    ustaadController?.dismissSkillRepair();
+  });
+  ipcMain.handle("island:open-drawn-picture", (event) => {
+    if (!islandSentEvent(event.sender.id)) {
+      throw new Error("IPC request rejected: sender is not the Ustaad island.");
+    }
+    return ustaadController?.openDrawnPicture() ?? "there is no picture to open.";
+  });
+  ipcMain.handle("island:reveal-drawn-picture", (event) => {
+    if (!islandSentEvent(event.sender.id)) {
+      throw new Error("IPC request rejected: sender is not the Ustaad island.");
+    }
+    return ustaadController?.revealDrawnPicture() ?? "there is no picture to show.";
+  });
+  ipcMain.handle("island:dismiss-drawn-picture", (event) => {
+    if (!islandSentEvent(event.sender.id)) {
+      throw new Error("IPC request rejected: sender is not the Ustaad island.");
+    }
+    ustaadController?.dismissDrawnPicture();
+  });
+  ipcMain.handle("island:open-research-source", (event, sourceUrl: string) => {
+    if (!islandSentEvent(event.sender.id)) {
+      throw new Error("IPC request rejected: sender is not the Ustaad island.");
+    }
+    return ustaadController?.openResearchSource(String(sourceUrl)) ?? "that source is not on the card any more.";
+  });
+  ipcMain.handle("island:dismiss-research", (event) => {
+    if (!islandSentEvent(event.sender.id)) {
+      throw new Error("IPC request rejected: sender is not the Ustaad island.");
+    }
+    ustaadController?.dismissResearch();
+  });
+  ipcMain.handle("island:run-task-queue", (event) => {
+    if (!islandSentEvent(event.sender.id)) {
+      throw new Error("IPC request rejected: sender is not the Ustaad island.");
+    }
+    return ustaadController?.runTaskQueue() ?? "there is nothing waiting.";
+  });
+  ipcMain.handle("island:cancel-queued-task", (event, taskId: string) => {
+    if (!islandSentEvent(event.sender.id)) {
+      throw new Error("IPC request rejected: sender is not the Ustaad island.");
+    }
+    return ustaadController?.cancelQueuedTask(taskId) ?? "that one is already running.";
+  });
+  ipcMain.handle("island:clear-task-queue", (event) => {
+    if (!islandSentEvent(event.sender.id)) {
+      throw new Error("IPC request rejected: sender is not the Ustaad island.");
+    }
+    return ustaadController?.clearTaskQueue() ?? "there is nothing waiting.";
+  });
+  ipcMain.handle("panel:run-task-queue", (event) => {
+    if (!panelSentEvent(event.sender.id)) {
+      throw new Error("IPC request rejected: sender is not the Ustaad panel.");
+    }
+    return ustaadController?.runTaskQueue() ?? "there is nothing waiting.";
+  });
+  ipcMain.handle("panel:cancel-queued-task", (event, taskId: string) => {
+    if (!panelSentEvent(event.sender.id)) {
+      throw new Error("IPC request rejected: sender is not the Ustaad panel.");
+    }
+    return ustaadController?.cancelQueuedTask(taskId) ?? "that one is already running.";
+  });
+  ipcMain.handle("panel:clear-task-queue", (event) => {
+    if (!panelSentEvent(event.sender.id)) {
+      throw new Error("IPC request rejected: sender is not the Ustaad panel.");
+    }
+    return ustaadController?.clearTaskQueue() ?? "there is nothing waiting.";
   });
   ipcMain.handle("panel:rename-skill", (event, skillId: string, nextName: string) => {
     if (!panelSentEvent(event.sender.id)) {
-      throw new Error("IPC request rejected: sender is not the Clickaa panel.");
+      throw new Error("IPC request rejected: sender is not the Ustaad panel.");
     }
-    clickaaController?.renameSkill(String(skillId), String(nextName));
+    ustaadController?.renameSkill(String(skillId), String(nextName));
   });
   ipcMain.handle("panel:remove-skill", (event, skillId: string) => {
     if (!panelSentEvent(event.sender.id)) {
-      throw new Error("IPC request rejected: sender is not the Clickaa panel.");
+      throw new Error("IPC request rejected: sender is not the Ustaad panel.");
     }
-    clickaaController?.removeSkill(String(skillId));
+    ustaadController?.removeSkill(String(skillId));
+  });
+  ipcMain.handle("panel:run-check-in-now", (event) => {
+    if (!panelSentEvent(event.sender.id)) {
+      throw new Error("IPC request rejected: sender is not the Ustaad panel.");
+    }
+    return ustaadController?.runCheckInNow();
   });
   ipcMain.handle("island:undo-activity", (event, activityEntryId: string) => {
     if (!islandSentEvent(event.sender.id)) {
-      throw new Error("IPC request rejected: sender is not the Clickaa island.");
+      throw new Error("IPC request rejected: sender is not the Ustaad island.");
     }
-    return clickaaController?.undoActivity(activityEntryId);
+    return ustaadController?.undoActivity(activityEntryId);
   });
   ipcMain.handle("island:launch-app", (event, appName: string) => {
     if (!islandSentEvent(event.sender.id)) {
-      throw new Error("IPC request rejected: sender is not the Clickaa island.");
+      throw new Error("IPC request rejected: sender is not the Ustaad island.");
     }
-    return clickaaController?.handleIslandLaunchApp(appName);
+    return ustaadController?.handleIslandLaunchApp(appName);
   });
   ipcMain.handle("island:media-control", (event, operation: "play_pause" | "next" | "previous") => {
     if (!islandSentEvent(event.sender.id)) {
-      throw new Error("IPC request rejected: sender is not the Clickaa island.");
+      throw new Error("IPC request rejected: sender is not the Ustaad island.");
     }
-    return clickaaController?.handleIslandMediaControl(operation);
+    return ustaadController?.handleIslandMediaControl(operation);
   });
   ipcMain.handle("island:copy-clip", (event, clipId: string) => {
     if (!islandSentEvent(event.sender.id)) {
-      throw new Error("IPC request rejected: sender is not the Clickaa island.");
+      throw new Error("IPC request rejected: sender is not the Ustaad island.");
     }
-    return clickaaController?.handleIslandClipboardCopy(clipId);
+    return ustaadController?.handleIslandClipboardCopy(clipId);
   });
   ipcMain.on("island:clear-clips", (event) => {
     if (islandSentEvent(event.sender.id)) {
-      clickaaController?.handleIslandClipboardClear();
+      ustaadController?.handleIslandClipboardClear();
     }
   });
   ipcMain.on("island:toggle-todo", (event, todoId: string, isDone: boolean) => {
     if (islandSentEvent(event.sender.id)) {
-      clickaaController?.handleIslandTodoToggle(todoId, Boolean(isDone));
+      ustaadController?.handleIslandTodoToggle(todoId, Boolean(isDone));
     }
   });
   ipcMain.on("island:remove-todo", (event, todoId: string) => {
     if (islandSentEvent(event.sender.id)) {
-      clickaaController?.handleIslandTodoRemove(todoId);
+      ustaadController?.handleIslandTodoRemove(todoId);
     }
   });
   ipcMain.on("island:toggle-schedule", (event, scheduleId: string, isEnabled: boolean) => {
     if (islandSentEvent(event.sender.id)) {
-      clickaaController?.handleIslandScheduleToggle(scheduleId, Boolean(isEnabled));
+      ustaadController?.handleIslandScheduleToggle(scheduleId, Boolean(isEnabled));
     }
   });
   ipcMain.on("island:remove-schedule", (event, scheduleId: string) => {
     if (islandSentEvent(event.sender.id)) {
-      clickaaController?.handleIslandScheduleRemove(scheduleId);
+      ustaadController?.handleIslandScheduleRemove(scheduleId);
     }
   });
   ipcMain.on("island:remove-memory", (event, memoryFactId: string) => {
     if (islandSentEvent(event.sender.id)) {
-      clickaaController?.handleIslandMemoryRemove(memoryFactId);
+      ustaadController?.handleIslandMemoryRemove(memoryFactId);
     }
   });
   ipcMain.on("panel:add-todo", (event, todoText: string) => {
     if (panelSentEvent(event.sender.id)) {
-      clickaaController?.handlePanelTodoAdd(String(todoText));
+      ustaadController?.handlePanelTodoAdd(String(todoText));
     }
   });
   ipcMain.on("panel:add-memory", (event, factText: string) => {
     if (panelSentEvent(event.sender.id)) {
-      clickaaController?.handlePanelMemoryAdd(String(factText));
+      ustaadController?.handlePanelMemoryAdd(String(factText));
     }
   });
   ipcMain.on("panel:clear-audit-log", (event) => {
     if (panelSentEvent(event.sender.id)) {
-      clickaaController?.clearAuditLog();
+      ustaadController?.clearAuditLog();
+    }
+  });
+
+  ipcMain.on("panel:rotate-phone-token", (event) => {
+    if (panelSentEvent(event.sender.id)) {
+      ustaadController?.rotatePhoneBridgeToken();
+    }
+  });
+
+  ipcMain.handle("panel:search-run-history", (event, query: string) => {
+    if (!panelSentEvent(event.sender.id)) {
+      throw new Error("IPC request rejected: sender is not the Ustaad panel.");
+    }
+    return ustaadController?.searchRunHistory(String(query)) ?? [];
+  });
+
+  ipcMain.on("panel:clear-run-history", (event) => {
+    if (panelSentEvent(event.sender.id)) {
+      ustaadController?.clearRunHistory();
     }
   });
 
   ipcMain.on("panel:clear-memory", (event) => {
     if (panelSentEvent(event.sender.id)) {
-      clickaaController?.handlePanelMemoryClear();
+      ustaadController?.handlePanelMemoryClear();
     }
   });
 
   ipcMain.on("island:open-panel", (event, page: string) => {
     if (islandSentEvent(event.sender.id)) {
-      clickaaController?.handleIslandOpenPanel(String(page));
+      ustaadController?.handleIslandOpenPanel(String(page));
     }
   });
   ipcMain.on("island:set-toggle", (event, toggleKey: string, isEnabled: boolean) => {
     if (islandSentEvent(event.sender.id)) {
-      clickaaController?.handleIslandToggle(toggleKey as IslandToggleKey, Boolean(isEnabled));
+      ustaadController?.handleIslandToggle(toggleKey as IslandToggleKey, Boolean(isEnabled));
     }
   });
   ipcMain.handle("island:set-wallpaper-solid", (event, wallpaperColor: string) => {
     if (!islandSentEvent(event.sender.id)) {
-      throw new Error("IPC request rejected: sender is not the Clickaa island.");
+      throw new Error("IPC request rejected: sender is not the Ustaad island.");
     }
-    return clickaaController?.handleIslandWallpaperSolidColor(String(wallpaperColor));
+    return ustaadController?.handleIslandWallpaperSolidColor(String(wallpaperColor));
   });
 
   /* Panel: page switching asked for by the island or the panel itself ------ */
@@ -337,42 +446,42 @@ function registerIpcHandlers(): void {
 
     desktopWindows?.hideRegionSelector();
     if (selectorRecord.purpose === "snip") {
-      void clickaaController?.handleSnipRegionSelected(desktopRegionSelection);
+      void ustaadController?.handleSnipRegionSelected(desktopRegionSelection);
     } else {
-      clickaaController?.handleCircleRegionSelected(desktopRegionSelection);
+      ustaadController?.handleCircleRegionSelected(desktopRegionSelection);
     }
   });
   ipcMain.on("selection:cancelled", (event) => {
     const selectorRecord = desktopWindows?.getRegionSelectorRecord(event.sender.id) ?? null;
     if (selectorRecord) {
       if (selectorRecord.purpose === "snip") {
-        clickaaController?.handleSnipCancelled();
+        ustaadController?.handleSnipCancelled();
       } else {
-        clickaaController?.handleCircleSelectionCancelled();
+        ustaadController?.handleCircleSelectionCancelled();
       }
       desktopWindows?.hideRegionSelector();
     }
   });
 }
 
-async function startClickaa(): Promise<void> {
+async function startUstaad(): Promise<void> {
   registerSecureMediaPermissions();
 
   const userDataDirectory = app.getPath("userData");
-  migrateLegacyClickyUserData(app.getPath("appData"), userDataDirectory);
+  migrateLegacyUserData(app.getPath("appData"), userDataDirectory);
 
-  const configStore = new ClickaaConfigStore(join(userDataDirectory, "settings.json"));
-  desktopWindows = new ClickaaDesktopWindows({
-    onToggleCursor: () => clickaaController?.toggleCursorEnabled(),
-    onToggleIsland: () => clickaaController?.toggleIslandEnabled(),
-    onToggleAutomationPaused: () => clickaaController?.toggleAutomationPaused(),
-    onToggleWakeWordMuted: () => clickaaController?.toggleWakeWordMuted(),
+  const configStore = new UstaadConfigStore(join(userDataDirectory, "settings.json"));
+  desktopWindows = new UstaadDesktopWindows({
+    onToggleCursor: () => ustaadController?.toggleCursorEnabled(),
+    onToggleIsland: () => ustaadController?.toggleIslandEnabled(),
+    onToggleAutomationPaused: () => ustaadController?.toggleAutomationPaused(),
+    onToggleWakeWordMuted: () => ustaadController?.toggleWakeWordMuted(),
     onQuit: () => {
       isQuitting = true;
       app.quit();
     },
   });
-  clickaaController = new ClickaaController(configStore, desktopWindows, userDataDirectory);
+  ustaadController = new UstaadController(configStore, desktopWindows, userDataDirectory);
 
   registerIpcHandlers();
   await desktopWindows.create();
@@ -381,17 +490,17 @@ async function startClickaa(): Promise<void> {
     configStore.getConfig().dictationShortcut,
     (transition) => {
       if (transition.phase === "pressed") {
-        clickaaController?.handleShortcutPressed(transition.shortcutId);
+        ustaadController?.handleShortcutPressed(transition.shortcutId);
       } else {
-        clickaaController?.handleShortcutReleased(transition.shortcutId);
+        ustaadController?.handleShortcutReleased(transition.shortcutId);
       }
     },
-    () => clickaaController?.handleEscapePressed(),
+    () => ustaadController?.handleEscapePressed(),
   );
   const shortcutAvailable = globalShortcutMonitor.start();
-  await clickaaController.start(shortcutAvailable);
+  await ustaadController.start(shortcutAvailable);
 
-  if (!clickaaController.getPublicState().configured) {
+  if (!ustaadController.getPublicState().configured) {
     desktopWindows.showPanel("setup");
   }
 
@@ -401,20 +510,20 @@ async function startClickaa(): Promise<void> {
 }
 
 if (hasSingleInstanceLock) {
-  void app.whenReady().then(startClickaa);
+  void app.whenReady().then(startUstaad);
 
   app.on("second-instance", () => {
     desktopWindows?.showPanel();
   });
 
   app.on("window-all-closed", () => {
-    // Clickaa is a tray app. Closing its panel must not terminate background work.
+    // Ustaad is a tray app. Closing its panel must not terminate background work.
   });
 
   app.on("before-quit", () => {
     isQuitting = true;
     globalShortcutMonitor?.stop();
-    clickaaController?.stop();
+    ustaadController?.stop();
     desktopWindows?.destroy();
   });
 

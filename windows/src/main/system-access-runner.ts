@@ -56,11 +56,11 @@ export class SystemAccessRunner {
    */
   async runPowerShell(commandText: string, workingDirectory?: string): Promise<CommandRunResult> {
     if (!this.isSupported) {
-      throw new Error("Clickaa runs commands through PowerShell, which only exists on Windows.");
+      throw new Error("Ustaad runs commands through PowerShell, which only exists on Windows.");
     }
 
-    const scriptDirectory = await mkdtemp(join(tmpdir(), "clickaa-command-"));
-    const scriptPath = join(scriptDirectory, "clickaa-command.ps1");
+    const scriptDirectory = await mkdtemp(join(tmpdir(), "ustaad-command-"));
+    const scriptPath = join(scriptDirectory, "ustaad-command.ps1");
 
     try {
       // PowerShell reads files without a byte-order mark as ANSI, so the script

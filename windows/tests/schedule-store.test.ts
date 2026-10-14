@@ -37,7 +37,7 @@ test("weekday routines skip the weekend and one-shot times in the past never run
 
 test("a scheduled search keeps its own name and reports when it next runs", () => {
   const now = new Date(2026, 9, 13, 8, 0, 0);
-  const scheduleStore = new ScheduleStore(join(mkdtempSync(join(tmpdir(), "clickaa-schedule-")), "schedules.json"));
+  const scheduleStore = new ScheduleStore(join(mkdtempSync(join(tmpdir(), "ustaad-schedule-")), "schedules.json"));
 
   const createdTask = scheduleStore.add(
     {
@@ -62,7 +62,7 @@ test("a scheduled search keeps its own name and reports when it next runs", () =
 
 test("recurring tasks roll forward after running and one-shot reminders go quiet", () => {
   const now = new Date(2026, 9, 13, 8, 0, 0);
-  const scheduleStore = new ScheduleStore(join(mkdtempSync(join(tmpdir(), "clickaa-schedule-")), "schedules.json"));
+  const scheduleStore = new ScheduleStore(join(mkdtempSync(join(tmpdir(), "ustaad-schedule-")), "schedules.json"));
 
   const dailyRoutine = scheduleStore.add(
     {
@@ -98,7 +98,7 @@ test("recurring tasks roll forward after running and one-shot reminders go quiet
 
 test("overdue tasks started from a cold boot roll forward instead of firing late", () => {
   const now = new Date(2026, 9, 13, 8, 0, 0);
-  const scheduleStore = new ScheduleStore(join(mkdtempSync(join(tmpdir(), "clickaa-schedule-")), "schedules.json"));
+  const scheduleStore = new ScheduleStore(join(mkdtempSync(join(tmpdir(), "ustaad-schedule-")), "schedules.json"));
 
   const morningRoutine = scheduleStore.add(
     {

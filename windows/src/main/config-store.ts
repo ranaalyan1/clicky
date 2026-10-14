@@ -3,8 +3,10 @@ import { dirname } from "node:path";
 import {
   AbilitySettings,
   brainProviderIds,
+  defaultLocalBrainBaseUrl,
+  defaultLocalBrainModel,
   BrainProviderId,
-  ClickaaUserConfig,
+  UstaadUserConfig,
   dictationShortcutIds,
   DictationShortcutId,
   geminiChatModels,
@@ -24,10 +26,16 @@ import {
   sanitizeConfirmationMode,
   sanitizeSoulSettings,
 } from "./soul-config";
+import { defaultPresenceSettings, sanitizePresenceSettings } from "./presence-schedule";
+import { normalizeLocalBrainBaseUrl } from "./local-brain-client";
 
-export const defaultClickaaUserConfig: ClickaaUserConfig = {
+export const defaultUstaadUserConfig: UstaadUserConfig = {
   workerBaseUrl: "",
   brainProvider: "gemini",
+  localBrainBaseUrl: defaultLocalBrainBaseUrl,
+  localBrainModel: defaultLocalBrainModel,
+  localBrainSeesScreen: false,
+  offlineMode: false,
   geminiApiKey: "",
   geminiChatModel: "gemini-2.5-flash",
   selectedClaudeModel: "claude-sonnet-4-6",
@@ -48,6 +56,7 @@ export const defaultClickaaUserConfig: ClickaaUserConfig = {
   wakeWordProvider: "offline",
   soul: { ...defaultSoulSettings },
   abilities: { ...defaultAbilitySettings },
+  presence: { ...defaultPresenceSettings },
 };
 
 export function normalizeWorkerBaseUrl(rawWorkerBaseUrl: string): string {
@@ -60,7 +69,7 @@ export function normalizeWorkerBaseUrl(rawWorkerBaseUrl: string): string {
   try {
     parsedWorkerUrl = new URL(trimmedWorkerBaseUrl);
   } catch {
-    throw new Error("Enter a valid Worker URL, for example https://clickaa.example.workers.dev");
+    throw new Error("Enter a valid Worker URL, for example https://ustaad.example.workers.dev");
   }
 
   const isLocalDevelopmentHost = ["localhost", "127.0.0.1", "::1"].includes(
@@ -132,12 +141,12 @@ function readBoolean(storedValue: unknown, fallbackValue: boolean): boolean {
   return typeof storedValue === "boolean" ? storedValue : fallbackValue;
 }
 
-export function sanitizeStoredConfig(storedConfig: unknown): ClickaaUserConfig {
+export function sanitizeStoredConfig(storedConfig: unknown): UstaadUserConfig {
   if (!storedConfig || typeof storedConfig !== "object") {
-    return { ...defaultClickaaUserConfig };
+    return { ...defaultUstaadUserConfig };
   }
 
-  const possibleConfig = storedConfig as Partial<ClickaaUserConfig>;
+  const possibleConfig = storedConfig as Partial<UstaadUserConfig>;
 
   let workerBaseUrl = "";
   if (typeof possibleConfig.workerBaseUrl === "string") {
@@ -157,79 +166,104 @@ export function sanitizeStoredConfig(storedConfig: unknown): ClickaaUserConfig {
     }
   }
 
+  let localBrainBaseUrl = defaultUstaadUserConfig.localBrainBaseUrl;
+  if (typeof possibleConfig.localBrainBaseUrl === "string") {
+    try {
+      localBrainBaseUrl = normalizeLocalBrainBaseUrl(possibleConfig.localBrainBaseUrl)
+        || defaultUstaadUserConfig.localBrainBaseUrl;
+    } catch {
+      localBrainBaseUrl = defaultUstaadUserConfig.localBrainBaseUrl;
+    }
+  }
+
   return {
     workerBaseUrl,
     brainProvider: isSupportedBrainProvider(possibleConfig.brainProvider)
       ? possibleConfig.brainProvider
-      : defaultClickaaUserConfig.brainProvider,
+      : defaultUstaadUserConfig.brainProvider,
+    localBrainBaseUrl,
+    localBrainModel: typeof possibleConfig.localBrainModel === "string" && possibleConfig.localBrainModel.trim()
+      ? possibleConfig.localBrainModel.trim().slice(0, 120)
+      : defaultUstaadUserConfig.localBrainModel,
+    localBrainSeesScreen: readBoolean(
+      possibleConfig.localBrainSeesScreen,
+      defaultUstaadUserConfig.localBrainSeesScreen,
+    ),
+    offlineMode: readBoolean(possibleConfig.offlineMode, defaultUstaadUserConfig.offlineMode),
     geminiApiKey,
     geminiChatModel: isSupportedGeminiModel(possibleConfig.geminiChatModel)
       ? possibleConfig.geminiChatModel
-      : defaultClickaaUserConfig.geminiChatModel,
+      : defaultUstaadUserConfig.geminiChatModel,
     selectedClaudeModel: isSupportedModel(possibleConfig.selectedClaudeModel)
       ? possibleConfig.selectedClaudeModel
-      : defaultClickaaUserConfig.selectedClaudeModel,
-    cursorEnabled: readBoolean(possibleConfig.cursorEnabled, defaultClickaaUserConfig.cursorEnabled),
-    launchAtLogin: readBoolean(possibleConfig.launchAtLogin, defaultClickaaUserConfig.launchAtLogin),
-    automationPaused: readBoolean(possibleConfig.automationPaused, defaultClickaaUserConfig.automationPaused),
+      : defaultUstaadUserConfig.selectedClaudeModel,
+    cursorEnabled: readBoolean(possibleConfig.cursorEnabled, defaultUstaadUserConfig.cursorEnabled),
+    launchAtLogin: readBoolean(possibleConfig.launchAtLogin, defaultUstaadUserConfig.launchAtLogin),
+    automationPaused: readBoolean(possibleConfig.automationPaused, defaultUstaadUserConfig.automationPaused),
     confirmationMode: sanitizeConfirmationMode(possibleConfig.confirmationMode),
     autoApprovedActionTypes: sanitizeAutoApprovedActionTypes(possibleConfig.autoApprovedActionTypes),
     wakeWordProvider: isSupportedWakeWordProvider(possibleConfig.wakeWordProvider)
       ? possibleConfig.wakeWordProvider
-      : defaultClickaaUserConfig.wakeWordProvider,
+      : defaultUstaadUserConfig.wakeWordProvider,
     dictationShortcut: isSupportedDictationShortcut(possibleConfig.dictationShortcut)
       ? possibleConfig.dictationShortcut
-      : defaultClickaaUserConfig.dictationShortcut,
+      : defaultUstaadUserConfig.dictationShortcut,
     dictationCleanupEnabled: readBoolean(
       possibleConfig.dictationCleanupEnabled,
-      defaultClickaaUserConfig.dictationCleanupEnabled,
+      defaultUstaadUserConfig.dictationCleanupEnabled,
     ),
     speakScheduledResults: readBoolean(
       possibleConfig.speakScheduledResults,
-      defaultClickaaUserConfig.speakScheduledResults,
+      defaultUstaadUserConfig.speakScheduledResults,
     ),
-    islandEnabled: readBoolean(possibleConfig.islandEnabled, defaultClickaaUserConfig.islandEnabled),
+    islandEnabled: readBoolean(possibleConfig.islandEnabled, defaultUstaadUserConfig.islandEnabled),
     islandSummonEnabled: readBoolean(
       possibleConfig.islandSummonEnabled,
-      defaultClickaaUserConfig.islandSummonEnabled,
+      defaultUstaadUserConfig.islandSummonEnabled,
     ),
     islandAlwaysVisible: readBoolean(
       possibleConfig.islandAlwaysVisible,
-      defaultClickaaUserConfig.islandAlwaysVisible,
+      defaultUstaadUserConfig.islandAlwaysVisible,
     ),
     islandShowNowPlaying: readBoolean(
       possibleConfig.islandShowNowPlaying,
-      defaultClickaaUserConfig.islandShowNowPlaying,
+      defaultUstaadUserConfig.islandShowNowPlaying,
     ),
     islandShowClipboard: readBoolean(
       possibleConfig.islandShowClipboard,
-      defaultClickaaUserConfig.islandShowClipboard,
+      defaultUstaadUserConfig.islandShowClipboard,
     ),
     clipboardHistoryEnabled: readBoolean(
       possibleConfig.clipboardHistoryEnabled,
-      defaultClickaaUserConfig.clipboardHistoryEnabled,
+      defaultUstaadUserConfig.clipboardHistoryEnabled,
     ),
     soul: sanitizeSoulSettings(possibleConfig.soul),
     abilities: sanitizeAbilitySettings(possibleConfig.abilities),
+    presence: sanitizePresenceSettings(possibleConfig.presence),
   };
 }
 
 /** Settings live on this PC only, in the same JSON file the panel edits. */
-export class ClickaaConfigStore {
-  private readonly jsonFileStore: JsonFileStore<ClickaaUserConfig>;
-  private currentConfig: ClickaaUserConfig;
+export class UstaadConfigStore {
+  private readonly jsonFileStore: JsonFileStore<UstaadUserConfig>;
+  private currentConfig: UstaadUserConfig;
 
   constructor(private readonly configFilePath: string) {
     this.jsonFileStore = new JsonFileStore(configFilePath, sanitizeStoredConfig);
     this.currentConfig = this.jsonFileStore.read();
   }
 
-  getConfig(): ClickaaUserConfig {
-    return { ...this.currentConfig, soul: { ...this.currentConfig.soul }, abilities: { ...this.currentConfig.abilities } };
+  getConfig(): UstaadUserConfig {
+    return {
+      ...this.currentConfig,
+      soul: { ...this.currentConfig.soul },
+      abilities: { ...this.currentConfig.abilities },
+      presence: { ...this.currentConfig.presence },
+    };
   }
 
-  updateConfig(configUpdates: Partial<ClickaaUserConfig>): ClickaaUserConfig {
-    const updatedConfig: ClickaaUserConfig = {
+  updateConfig(configUpdates: Partial<UstaadUserConfig>): UstaadUserConfig {
+    const updatedConfig: UstaadUserConfig = {
       ...this.currentConfig,
       ...configUpdates,
       soul: configUpdates.soul
@@ -238,6 +272,11 @@ export class ClickaaConfigStore {
       abilities: configUpdates.abilities
         ? { ...this.currentConfig.abilities, ...configUpdates.abilities }
         : this.currentConfig.abilities,
+      // Merged field by field so the panel can send just "the morning time
+      // changed" without wiping the rest of the check-in settings.
+      presence: configUpdates.presence
+        ? { ...this.currentConfig.presence, ...configUpdates.presence }
+        : this.currentConfig.presence,
     };
 
     // Values that arrive from the panel are validated strictly so the user sees
@@ -248,20 +287,33 @@ export class ClickaaConfigStore {
     if ("geminiApiKey" in configUpdates) {
       updatedConfig.geminiApiKey = normalizeGeminiApiKey(updatedConfig.geminiApiKey);
     }
+    if ("localBrainBaseUrl" in configUpdates) {
+      // Throws with the reason ("that address is on the internet") so the
+      // panel can show it beside the field instead of replacing it silently.
+      updatedConfig.localBrainBaseUrl = normalizeLocalBrainBaseUrl(updatedConfig.localBrainBaseUrl)
+        || defaultUstaadUserConfig.localBrainBaseUrl;
+    }
+    if ("localBrainModel" in configUpdates) {
+      const requestedModel = updatedConfig.localBrainModel.trim();
+      if (!requestedModel) {
+        throw new Error("Name the model your local server has loaded.");
+      }
+      updatedConfig.localBrainModel = requestedModel.slice(0, 120);
+    }
     if ("selectedClaudeModel" in configUpdates && !isSupportedModel(updatedConfig.selectedClaudeModel)) {
-      throw new Error("That Claude model is not supported by this version of Clickaa.");
+      throw new Error("That Claude model is not supported by this version of Ustaad.");
     }
     if ("geminiChatModel" in configUpdates && !isSupportedGeminiModel(updatedConfig.geminiChatModel)) {
-      throw new Error("That Gemini model is not supported by this version of Clickaa.");
+      throw new Error("That Gemini model is not supported by this version of Ustaad.");
     }
     if ("brainProvider" in configUpdates && !isSupportedBrainProvider(updatedConfig.brainProvider)) {
-      throw new Error("That brain is not supported by this version of Clickaa.");
+      throw new Error("That brain is not supported by this version of Ustaad.");
     }
     if ("dictationShortcut" in configUpdates && !isSupportedDictationShortcut(updatedConfig.dictationShortcut)) {
-      throw new Error("That dictation shortcut is not supported by this version of Clickaa.");
+      throw new Error("That dictation shortcut is not supported by this version of Ustaad.");
     }
     if ("wakeWordProvider" in configUpdates && !isSupportedWakeWordProvider(updatedConfig.wakeWordProvider)) {
-      throw new Error("That wake word mode is not supported by this version of Clickaa.");
+      throw new Error("That wake word mode is not supported by this version of Ustaad.");
     }
 
     const sanitizedConfig = sanitizeStoredConfig(updatedConfig);
@@ -270,7 +322,7 @@ export class ClickaaConfigStore {
     return this.getConfig();
   }
 
-  private writeConfigToDisk(config: ClickaaUserConfig): void {
+  private writeConfigToDisk(config: UstaadUserConfig): void {
     mkdirSync(dirname(this.configFilePath), { recursive: true });
     const temporaryConfigPath = `${this.configFilePath}.tmp`;
     writeFileSync(temporaryConfigPath, `${JSON.stringify(config, null, 2)}\n`, "utf8");

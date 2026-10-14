@@ -2,8 +2,6 @@ import { contextBridge, ipcRenderer } from "electron";
 import {
   AudioPlaybackPayload,
   BrainConnectionTestResult,
-  ClickaaPublicState,
-  ClickaaUserConfig,
   FallbackSpeechPayload,
   IslandPresentation,
   IslandState,
@@ -11,7 +9,10 @@ import {
   OverlayCursorPayload,
   OverlayModePayload,
   OverlayPointPayload,
+  RunHistorySearchResult,
   SelectionBoundsPayload,
+  UstaadPublicState,
+  UstaadUserConfig,
 } from "../shared/contracts";
 
 function subscribe<T>(channel: string, listener: (payload: T) => void): () => void {
@@ -31,19 +32,19 @@ function subscribeToSignal(channel: string, listener: () => void): () => void {
  * cursor overlay, and the region selector. Each renderer only gets a view it
  * needs, and the main process re-checks the sender of every message.
  */
-contextBridge.exposeInMainWorld("clickaa", {
+contextBridge.exposeInMainWorld("ustaad", {
   /* Panel: state and settings -------------------------------------------- */
-  getState: (): Promise<ClickaaPublicState> => ipcRenderer.invoke("clickaa:get-state"),
-  updateSettings: (settingsUpdates: Partial<ClickaaUserConfig>): Promise<ClickaaPublicState> => {
-    return ipcRenderer.invoke("clickaa:update-settings", settingsUpdates);
+  getState: (): Promise<UstaadPublicState> => ipcRenderer.invoke("ustaad:get-state"),
+  updateSettings: (settingsUpdates: Partial<UstaadUserConfig>): Promise<UstaadPublicState> => {
+    return ipcRenderer.invoke("ustaad:update-settings", settingsUpdates);
   },
-  testBrain: (settingsUpdates: Partial<ClickaaUserConfig>): Promise<BrainConnectionTestResult> => {
-    return ipcRenderer.invoke("clickaa:test-brain", settingsUpdates);
+  testBrain: (settingsUpdates: Partial<UstaadUserConfig>): Promise<BrainConnectionTestResult> => {
+    return ipcRenderer.invoke("ustaad:test-brain", settingsUpdates);
   },
-  refreshAppIndex: (): Promise<number> => ipcRenderer.invoke("clickaa:refresh-app-index"),
-  hidePanel: (): void => ipcRenderer.send("clickaa:panel-hide"),
-  openSetupVideo: (): void => ipcRenderer.send("clickaa:open-setup-video"),
-  onState: (listener: (state: ClickaaPublicState) => void): (() => void) => subscribe("clickaa:state", listener),
+  refreshAppIndex: (): Promise<number> => ipcRenderer.invoke("ustaad:refresh-app-index"),
+  hidePanel: (): void => ipcRenderer.send("ustaad:panel-hide"),
+  openSetupVideo: (): void => ipcRenderer.send("ustaad:open-setup-video"),
+  onState: (listener: (state: UstaadPublicState) => void): (() => void) => subscribe("ustaad:state", listener),
   onOpenPanelPage: (listener: (page: string) => void): (() => void) => subscribe("panel:open-page", listener),
 
   /* Panel: push-to-talk and audio --------------------------------------- */
@@ -90,13 +91,21 @@ contextBridge.exposeInMainWorld("clickaa", {
   addMemory: (factText: string): void => ipcRenderer.send("panel:add-memory", factText),
   clearMemory: (): void => ipcRenderer.send("panel:clear-memory"),
   clearAuditLog: (): void => ipcRenderer.send("panel:clear-audit-log"),
+  searchRunHistory: (query: string): Promise<RunHistorySearchResult[]> => {
+    return ipcRenderer.invoke("panel:search-run-history", query);
+  },
+  clearRunHistory: (): void => ipcRenderer.send("panel:clear-run-history"),
+  rotatePhoneBridgeToken: (): void => ipcRenderer.send("panel:rotate-phone-token"),
+  panelRunTaskQueue: (): Promise<string> => ipcRenderer.invoke("panel:run-task-queue"),
+  panelCancelQueuedTask: (taskId: string): Promise<string> => ipcRenderer.invoke("panel:cancel-queued-task", taskId),
+  panelClearTaskQueue: (): Promise<string> => ipcRenderer.invoke("panel:clear-task-queue"),
 
   /* Cursor overlay ------------------------------------------------------- */
   sendPointingAnimationCompleted: (interactionId: number): void => {
     ipcRenderer.send("overlay:point-complete", interactionId);
   },
   onOverlayState: (
-    listener: (payload: Pick<ClickaaPublicState, "voiceState" | "audioPowerLevel">) => void,
+    listener: (payload: Pick<UstaadPublicState, "voiceState" | "audioPowerLevel">) => void,
   ): (() => void) => subscribe("overlay:state", listener),
   onOverlayCursor: (listener: (payload: OverlayCursorPayload) => void): (() => void) => {
     return subscribe("overlay:cursor", listener);
@@ -135,10 +144,22 @@ contextBridge.exposeInMainWorld("clickaa", {
   },
   saveSkillSuggestion: (): Promise<string> => ipcRenderer.invoke("island:save-skill-suggestion"),
   dismissSkillSuggestion: (): Promise<void> => ipcRenderer.invoke("island:dismiss-skill-suggestion"),
+  workOutSkillRepair: (): Promise<string> => ipcRenderer.invoke("island:work-out-skill-repair"),
+  saveSkillRepair: (): Promise<string> => ipcRenderer.invoke("island:save-skill-repair"),
+  dismissSkillRepair: (): Promise<void> => ipcRenderer.invoke("island:dismiss-skill-repair"),
+  openDrawnPicture: (): Promise<string> => ipcRenderer.invoke("island:open-drawn-picture"),
+  revealDrawnPicture: (): Promise<string> => ipcRenderer.invoke("island:reveal-drawn-picture"),
+  dismissDrawnPicture: (): Promise<void> => ipcRenderer.invoke("island:dismiss-drawn-picture"),
+  openResearchSource: (sourceUrl: string): Promise<string> => ipcRenderer.invoke("island:open-research-source", sourceUrl),
+  dismissResearch: (): Promise<void> => ipcRenderer.invoke("island:dismiss-research"),
+  runTaskQueue: (): Promise<string> => ipcRenderer.invoke("island:run-task-queue"),
+  cancelQueuedTask: (taskId: string): Promise<string> => ipcRenderer.invoke("island:cancel-queued-task", taskId),
+  clearTaskQueue: (): Promise<string> => ipcRenderer.invoke("island:clear-task-queue"),
   renameSkill: (skillId: string, nextName: string): Promise<void> => {
     return ipcRenderer.invoke("panel:rename-skill", skillId, nextName);
   },
   removeSkill: (skillId: string): Promise<void> => ipcRenderer.invoke("panel:remove-skill", skillId),
+  runCheckInNow: (): Promise<void> => ipcRenderer.invoke("panel:run-check-in-now"),
   undoActivity: (activityEntryId: string): Promise<boolean> => {
     return ipcRenderer.invoke("island:undo-activity", activityEntryId);
   },

@@ -20,7 +20,7 @@ const physicalModifierKeyCodes: ModifierKeyCodes = {
 };
 
 /**
- * System-wide hold-to-act monitor for all three Clickaa shortcuts.
+ * System-wide hold-to-act monitor for all three Ustaad shortcuts.
  *
  * `uiohook-napi` is required rather than Electron's `globalShortcut`, because
  * push-to-talk needs real key-up events (something `globalShortcut` does not
@@ -60,7 +60,7 @@ export class GlobalShortcutMonitor {
       this.isStarted = true;
       return true;
     } catch (error) {
-      console.error("Clickaa could not start the global shortcut monitor:", error);
+      console.error("Ustaad could not start the global shortcut monitor:", error);
       return false;
     }
   }

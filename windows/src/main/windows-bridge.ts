@@ -2,7 +2,7 @@ import { spawn } from "node:child_process";
 import { writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { NowPlayingInfo } from "../shared/contracts";
-import { clickaaWindowsBridgeScript } from "./windows-bridge-script";
+import { ustaadWindowsBridgeScript } from "./windows-bridge-script";
 
 interface BridgeResponse {
   id: number;
@@ -56,16 +56,16 @@ export interface MediaSessionSnapshot {
 }
 
 export const unsupportedBridgePlatformMessage =
-  "Clickaa controls Windows through a small PowerShell helper, which is only available on Windows.";
+  "Ustaad controls Windows through a small PowerShell helper, which is only available on Windows.";
 
 /**
  * Keeps one PowerShell helper alive and speaks its line-delimited JSON protocol.
  *
  * A single long-lived process matters: starting PowerShell takes a few hundred
- * milliseconds, and Clickaa asks it for the now-playing track every few seconds.
+ * milliseconds, and Ustaad asks it for the now-playing track every few seconds.
  * If the helper dies (or Windows kills it), the next request starts a fresh one.
  */
-export class ClickaaWindowsBridge {
+export class UstaadWindowsBridge {
   private bridgeProcess: ReturnType<typeof spawn> | null = null;
   private readonly pendingRequests = new Map<number, PendingBridgeRequest>();
   private nextRequestId = 1;
@@ -94,7 +94,7 @@ export class ClickaaWindowsBridge {
 
   stop(): void {
     this.isStopping = true;
-    this.rejectAllPendingRequests(new Error("Clickaa is shutting down."));
+    this.rejectAllPendingRequests(new Error("Ustaad is shutting down."));
     this.bridgeProcess?.kill();
     this.bridgeProcess = null;
   }
@@ -175,16 +175,16 @@ export class ClickaaWindowsBridge {
   }
 
   private writeScriptToDisk(): void {
-    this.scriptPath = join(this.userDataDirectory, "clickaa-windows-helper.ps1");
+    this.scriptPath = join(this.userDataDirectory, "ustaad-windows-helper.ps1");
     // Windows PowerShell reads files without a byte-order mark as ANSI, so the
     // script is written with a UTF-8 BOM even though it is ASCII-only today.
     writeFileSync(this.scriptPath, Buffer.concat([
       Buffer.from([0xef, 0xbb, 0xbf]),
-      Buffer.from(clickaaWindowsBridgeScript, "utf8"),
+      Buffer.from(ustaadWindowsBridgeScript, "utf8"),
     ]));
   }
 
-  private async ensureBridgeProcess(): Promise<NonNullable<ClickaaWindowsBridge["bridgeProcess"]>> {
+  private async ensureBridgeProcess(): Promise<NonNullable<UstaadWindowsBridge["bridgeProcess"]>> {
     if (this.bridgeProcess) {
       return this.bridgeProcess;
     }
@@ -215,7 +215,7 @@ export class ClickaaWindowsBridge {
     });
 
     bridgeProcess.stderr?.on("data", (rawChunk: Buffer) => {
-      console.warn("[clickaa-helper]", rawChunk.toString("utf8").trim().slice(0, 500));
+      console.warn("[ustaad-helper]", rawChunk.toString("utf8").trim().slice(0, 500));
     });
 
     bridgeProcess.on("exit", (exitCode) => {
@@ -228,7 +228,7 @@ export class ClickaaWindowsBridge {
     });
 
     bridgeProcess.on("error", (error) => {
-      console.error("Clickaa could not start its Windows helper:", error);
+      console.error("Ustaad could not start its Windows helper:", error);
       if (this.bridgeProcess === bridgeProcess) {
         this.bridgeProcess = null;
       }
@@ -254,7 +254,7 @@ export class ClickaaWindowsBridge {
     try {
       parsedResponse = JSON.parse(trimmedLine) as BridgeResponse;
     } catch {
-      console.warn("[clickaa-helper] unreadable output:", trimmedLine.slice(0, 200));
+      console.warn("[ustaad-helper] unreadable output:", trimmedLine.slice(0, 200));
       return;
     }
 

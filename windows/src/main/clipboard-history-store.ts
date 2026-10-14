@@ -29,7 +29,7 @@ function sanitizeClipboardClips(storedValue: unknown): ClipboardClip[] {
 }
 
 /**
- * Clipboard history for the island. Clickaa only records text the user copied
+ * Clipboard history for the island. Ustaad only records text the user copied
  * while the feature is switched on, and it never sends the history anywhere.
  */
 export class ClipboardHistoryStore {

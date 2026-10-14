@@ -1,11 +1,11 @@
 /**
- * Clickaa's icon set.
+ * Ustaad's icon set.
  *
  * Drawn as inline SVG instead of text glyphs so every control looks the same on
  * every Windows build, inherits the surrounding colour, and lands on the pixel
  * grid. Each icon is authored on a 24×24 canvas and scaled by CSS.
  */
-export type ClickaaIconName =
+export type UstaadIconName =
   | "play"
   | "pause"
   | "next"
@@ -23,7 +23,7 @@ interface IconGeometry {
   mode: "fill" | "stroke";
 }
 
-const iconGeometries: Record<ClickaaIconName, IconGeometry> = {
+const iconGeometries: Record<UstaadIconName, IconGeometry> = {
   play: {
     paths: ["M8.2 5.1 19 12 8.2 18.9Z"],
     mode: "fill",
@@ -73,8 +73,8 @@ const iconCanvasSize = 24;
  * Builds one icon. The returned element inherits `currentColor`, so a button
  * only has to change its own colour.
  */
-export function createClickaaIcon(
-  iconName: ClickaaIconName,
+export function createUstaadIcon(
+  iconName: UstaadIconName,
   sizePixels = 16,
   className = "",
 ): SVGSVGElement {
@@ -85,7 +85,7 @@ export function createClickaaIcon(
   iconElement.setAttribute("height", String(sizePixels));
   iconElement.setAttribute("aria-hidden", "true");
   iconElement.setAttribute("focusable", "false");
-  iconElement.classList.add("clickaa-icon");
+  iconElement.classList.add("ustaad-icon");
   if (sizePixels <= 14) {
     iconElement.classList.add("size-sm");
   } else if (sizePixels >= 20) {
@@ -115,15 +115,15 @@ export function createClickaaIcon(
 
 /**
  * Replaces a button's contents with one icon and gives it an accessible name,
- * which is how every icon-only control in Clickaa is built.
+ * which is how every icon-only control in Ustaad is built.
  */
 export function setIconButton(
   button: HTMLButtonElement,
-  iconName: ClickaaIconName,
+  iconName: UstaadIconName,
   accessibleLabel: string,
   sizePixels = 16,
 ): void {
-  button.replaceChildren(createClickaaIcon(iconName, sizePixels));
+  button.replaceChildren(createUstaadIcon(iconName, sizePixels));
   button.setAttribute("aria-label", accessibleLabel);
   button.title = accessibleLabel;
 }
@@ -131,7 +131,7 @@ export function setIconButton(
 /** Swaps only the glyph, for controls whose meaning changes (play ↔ pause). */
 export function updateIconButton(
   button: HTMLButtonElement,
-  iconName: ClickaaIconName,
+  iconName: UstaadIconName,
   accessibleLabel: string,
   sizePixels = 16,
 ): void {

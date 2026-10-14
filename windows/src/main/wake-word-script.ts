@@ -1,19 +1,19 @@
 /**
- * The wake word listener Clickaa keeps running when the wake word is switched on.
+ * The wake word listener Ustaad keeps running when the wake word is switched on.
  *
- * It listens on the default microphone for one word ("clickaa") using the speech
+ * It listens on the default microphone for one word ("ustaad") using the speech
  * recognizer that Windows already ships, so there is no model to download and no
  * audio ever leaves the machine. The script prints one line per event:
  *
  *   READY
- *   WAKE 87 clickaa
+ *   WAKE 87 ustaad
  *   UNAVAILABLE no offline speech recognizer is installed for this windows language
  *   ERROR <message>
  *
  * Windows PowerShell 5.1 reads un-BOM'd files as ANSI and the file is written
  * with a UTF-8 BOM anyway, so the script stays ASCII-only on purpose.
  */
-export const clickaaWakeWordScript = String.raw`
+export const ustaadWakeWordScript = String.raw`
 $ErrorActionPreference = 'Continue'
 [Console]::OutputEncoding = New-Object System.Text.ASCIIEncoding
 
@@ -25,16 +25,16 @@ function Emit([string] $line) {
 # The recognizer only ever hears these phrases; anything else is discarded by
 # the grammar, which is what keeps an always-on microphone cheap and private.
 $wakePhrases = @(
-  'clickaa',
+  'ustaad',
   'click a',
   'click ah',
-  'hey clickaa',
-  'ok clickaa',
-  'hi clickaa'
+  'hey ustaad',
+  'ok ustaad',
+  'hi ustaad'
 )
 
 # Easily confused with ordinary speech ("click a button"), so they have to be
-# said more clearly before Clickaa responds.
+# said more clearly before Ustaad responds.
 $strictPhrases = @('click a', 'click ah')
 $defaultThreshold = 0.62
 $strictThreshold = 0.78
@@ -76,7 +76,7 @@ try {
   $grammarBuilder = New-Object System.Speech.Recognition.GrammarBuilder
   $grammarBuilder.Append($choices)
   $wakeGrammar = New-Object System.Speech.Recognition.Grammar($grammarBuilder)
-  $wakeGrammar.Name = 'clickaa wake word'
+  $wakeGrammar.Name = 'ustaad wake word'
   $recognizer.LoadGrammar($wakeGrammar)
 } catch {
   Emit ('UNAVAILABLE ' + $_.Exception.Message)

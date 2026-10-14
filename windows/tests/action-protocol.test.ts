@@ -107,7 +107,7 @@ test("timers run freely while typing a snippet asks first", () => {
   assert.equal(getActionRisk("timer_start"), "safe");
 });
 
-test("a reply can carry a task goal for Clickaa to finish on its own", () => {
+test("a reply can carry a task goal for Ustaad to finish on its own", () => {
   const parsedResponse = parseModelResponse(
     'opening youtube now. <task>play a video on youtube</task><actions>[{"type":"open_url","url":"https://youtube.com"}]</actions>',
   );
@@ -253,7 +253,7 @@ test("a snip action parses, stays safe, and needs screen vision", () => {
   assert.deepEqual(withExtraField.actions, [{ type: "screenshot_region" }]);
 });
 
-test("clipboard rewrites only accept the four operations clickaa knows", () => {
+test("clipboard rewrites only accept the four operations ustaad knows", () => {
   const parsedResponse = parseModelResponse(
     '<actions>[{"type":"clipboard_transform","operation":"translate","targetLanguage":"urdu"}]</actions>',
   );

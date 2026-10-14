@@ -6,7 +6,7 @@ import test from "node:test";
 import { ActivityFeed, MemoryStore } from "../src/main/memory-store";
 
 function createMemoryStore(): MemoryStore {
-  return new MemoryStore(join(mkdtempSync(join(tmpdir(), "clickaa-memory-")), "memory.json"));
+  return new MemoryStore(join(mkdtempSync(join(tmpdir(), "ustaad-memory-")), "memory.json"));
 }
 
 test("facts are remembered once and duplicate wording is not stored twice", () => {

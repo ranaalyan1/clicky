@@ -8,7 +8,7 @@ import {
 import {
   AudioPlaybackPayload,
   IslandPresentation,
-  ClickaaPublicState,
+  UstaadPublicState,
   FallbackSpeechPayload,
   IslandState,
   OverlayCursorPayload,
@@ -56,7 +56,7 @@ export interface DesktopWindowCallbacks {
   onQuit: () => void;
 }
 
-export class ClickaaDesktopWindows {
+export class UstaadDesktopWindows {
   private panelWindow: BrowserWindow | null = null;
   private islandWindow: BrowserWindow | null = null;
   private tray: Tray | null = null;
@@ -64,7 +64,7 @@ export class ClickaaDesktopWindows {
   private readonly regionSelectorWindows = new Map<number, RegionSelectorWindowRecord>();
   private overlayWindowsShouldBeVisible = false;
   private cursorBroadcastTimer: NodeJS.Timeout | null = null;
-  private latestPublicState: ClickaaPublicState | null = null;
+  private latestPublicState: UstaadPublicState | null = null;
   private islandAnimationFrame: NodeJS.Timeout | null = null;
   private isQuitting = false;
 
@@ -125,7 +125,7 @@ export class ClickaaDesktopWindows {
     return null;
   }
 
-  publishState(publicState: ClickaaPublicState): void {
+  publishState(publicState: UstaadPublicState): void {
     const trayMenuNeedsRefresh = this.latestPublicState === null
       || this.latestPublicState.cursorEnabled !== publicState.cursorEnabled
       || this.latestPublicState.islandEnabled !== publicState.islandEnabled
@@ -134,7 +134,7 @@ export class ClickaaDesktopWindows {
       || this.latestPublicState.wakeWordState !== publicState.wakeWordState;
 
     this.latestPublicState = publicState;
-    this.sendToPanel("clickaa:state", publicState);
+    this.sendToPanel("ustaad:state", publicState);
     this.broadcastToOverlays("overlay:state", {
       voiceState: publicState.voiceState,
       audioPowerLevel: publicState.audioPowerLevel,
@@ -697,7 +697,7 @@ export class ClickaaDesktopWindows {
     const trayIconPath = join(__dirname, "../../assets/tray.png");
     const trayIcon = nativeImage.createFromPath(trayIconPath);
     this.tray = new Tray(trayIcon);
-    this.tray.setToolTip("Clickaa — hold Ctrl + Alt to talk, Ctrl + Windows to dictate");
+    this.tray.setToolTip("Ustaad — hold Ctrl + Alt to talk, Ctrl + Windows to dictate");
     this.tray.on("click", () => this.togglePanel());
     this.rebuildTrayContextMenu();
   }
@@ -715,7 +715,7 @@ export class ClickaaDesktopWindows {
 
     this.tray.setContextMenu(Menu.buildFromTemplate([
       {
-        label: "Open Clickaa",
+        label: "Open Ustaad",
         click: () => this.showPanel(),
       },
       { type: "separator" },
@@ -746,7 +746,7 @@ export class ClickaaDesktopWindows {
       },
       { type: "separator" },
       {
-        label: "Quit Clickaa",
+        label: "Quit Ustaad",
         click: () => this.callbacks.onQuit(),
       },
     ]));

@@ -6,7 +6,7 @@ import test from "node:test";
 import { SnippetStore } from "../src/main/snippet-store";
 
 function createSnippetStore(): SnippetStore {
-  return new SnippetStore(join(mkdtempSync(join(tmpdir(), "clickaa-snippet-")), "snippets.json"));
+  return new SnippetStore(join(mkdtempSync(join(tmpdir(), "ustaad-snippet-")), "snippets.json"));
 }
 
 test("a saved snippet can be looked up by its exact name", () => {
@@ -39,7 +39,7 @@ test("a rough name still finds the snippet, and a missing one explains itself", 
   assert.equal(missingLookup.message.includes("passport number"), true);
 });
 
-test("two equally plausible snippets make Clickaa ask instead of guessing", () => {
+test("two equally plausible snippets make Ustaad ask instead of guessing", () => {
   const snippetStore = createSnippetStore();
   snippetStore.save("work address", "Level 4, Tech Park");
   snippetStore.save("work address formal", "Level 4, Tech Park, Islamabad");
@@ -50,7 +50,7 @@ test("two equally plausible snippets make Clickaa ask instead of guessing", () =
 });
 
 test("snippets persist, and removing one by name works", () => {
-  const snippetPath = join(mkdtempSync(join(tmpdir(), "clickaa-snippet-")), "snippets.json");
+  const snippetPath = join(mkdtempSync(join(tmpdir(), "ustaad-snippet-")), "snippets.json");
   const firstStore = new SnippetStore(snippetPath);
   firstStore.save("bank details", "IBAN PK00 TEST 0000");
 

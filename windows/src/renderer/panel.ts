@@ -1,8 +1,8 @@
 import type {
   AbilityId,
-  ClickaaActionType,
-  ClickaaPublicState,
-  ClickaaUserConfig,
+  UstaadActionType,
+  UstaadPublicState,
+  UstaadUserConfig,
   ConfirmationMode,
   DictationShortcutId,
   GeminiChatModel,
@@ -10,9 +10,12 @@ import type {
   GeminiVoiceName,
   PersonalityPresetId,
   ResponseLengthId,
+  RunHistoryEntry,
+  RunHistorySearchResult,
+  Skill,
   SpeechProviderId,
 } from "../shared/contracts";
-import { createClickaaIcon, setIconButton } from "./icons.js";
+import { createUstaadIcon, setIconButton } from "./icons.js";
 import { MicrophoneCapture } from "./audio-capture.js";
 import { CompanionAudioPlayback } from "./audio-playback.js";
 
@@ -27,15 +30,17 @@ const abilityCopy: Array<{ id: AbilityId; label: string; description: string }> 
   { id: "dictation", label: "dictation", description: "hold the dictation shortcut to talk and have clean text land in the focused app" },
   { id: "circleToAsk", label: "circle to ask", description: "circle anything on screen and ask about it out loud" },
   { id: "webSearch", label: "web search", description: "search google, youtube, amazon and friends in your browser" },
+  { id: "imageGeneration", label: "draw pictures", description: "draw one picture from your description into your Pictures folder — it runs on your google key, so each picture is billed to you" },
   { id: "systemControl", label: "system control", description: "volume, media playback, windows and wallpaper" },
   { id: "scheduling", label: "reminders and routines", description: "run tasks later, by themselves, and tell you what they did" },
   { id: "toDoList", label: "to-do list", description: "keep a spoken to-do list in the island" },
   { id: "memory", label: "memory", description: "remember facts you ask it to keep" },
   { id: "clipboardHistory", label: "clipboard history", description: "keep your recent copies in the island, on this pc only" },
   { id: "island", label: "the island", description: "show the notch at the top of the screen" },
-  { id: "wakeWord", label: "wake word", description: "listen for \"clickaa\" on this pc, and open the island when you say it" },
+  { id: "presence", label: "presence", description: "wake up on its own with a morning brief and an evening recap" },
+  { id: "wakeWord", label: "wake word", description: "listen for \"ustaad\" on this pc, and open the island when you say it" },
   { id: "systemAccessTier1", label: "system access", description: "read-only diagnostics, registry reads, and files in your own folders — each one asks first" },
-  { id: "systemAccessTier2", label: "arbitrary commands", description: "let clickaa run commands that change your pc. leave this off unless you want that, and read every card it shows" },
+  { id: "systemAccessTier2", label: "arbitrary commands", description: "let ustaad run commands that change your pc. leave this off unless you want that, and read every card it shows" },
 ];
 
 const personalityCopy: Array<{ id: PersonalityPresetId; label: string; description: string }> = [
@@ -51,7 +56,7 @@ const geminiVoiceNames: GeminiVoiceName[] = [
 ];
 
 /** Action types the model can ask for that are worth pre-approving. */
-const autoApproveCopy: Array<{ type: ClickaaActionType; label: string }> = [
+const autoApproveCopy: Array<{ type: UstaadActionType; label: string }> = [
   { type: "open_app", label: "open apps" },
   { type: "type_text", label: "type text" },
   { type: "press_keys", label: "press keys" },
@@ -64,10 +69,10 @@ const autoApproveCopy: Array<{ type: ClickaaActionType; label: string }> = [
 const confirmationModeCopy: Record<ConfirmationMode, string> = {
   risky: "reminders and to-dos happen on their own. opening apps, typing and anything destructive wait for your yes in the island.",
   all: "every action waits for your yes, even adding a to-do.",
-  never: "clickaa acts immediately and reports what it did. only pick this if you trust it fully.",
+  never: "ustaad acts immediately and reports what it did. only pick this if you trust it fully.",
 };
 
-let latestState: ClickaaPublicState | null = null;
+let latestState: UstaadPublicState | null = null;
 let panelPushToTalkIsPressed = false;
 let hasInitializedFields = false;
 
@@ -118,6 +123,15 @@ const element = {
   memoryAddButton: requireElement<HTMLButtonElement>("memory-add-button"),
   memoryClearButton: requireElement<HTMLButtonElement>("memory-clear-button"),
   memoryList: requireElement<HTMLElement>("memory-list"),
+  phoneBridgeToggle: requireElement<HTMLInputElement>("phone-bridge-toggle"),
+  phoneBridgeRow: requireElement<HTMLElement>("phone-bridge-row"),
+  phoneBridgeAddress: requireElement<HTMLInputElement>("phone-bridge-address"),
+  phoneBridgeActions: requireElement<HTMLElement>("phone-bridge-actions"),
+  phoneBridgeRotateButton: requireElement<HTMLButtonElement>("phone-bridge-rotate-button"),
+  phoneBridgeNote: requireElement<HTMLElement>("phone-bridge-note"),
+  historySearchInput: requireElement<HTMLInputElement>("history-search-input"),
+  historyList: requireElement<HTMLElement>("history-list"),
+  historyClearButton: requireElement<HTMLButtonElement>("history-clear-button"),
   clipboardList: requireElement<HTMLElement>("clipboard-list"),
   clipboardClearButton: requireElement<HTMLButtonElement>("clipboard-clear-button"),
   brainBadge: requireElement<HTMLElement>("brain-badge"),
@@ -127,6 +141,13 @@ const element = {
   geminiModel: requireElement<HTMLSelectElement>("gemini-model"),
   geminiSaveButton: requireElement<HTMLButtonElement>("gemini-save-button"),
   geminiTestButton: requireElement<HTMLButtonElement>("gemini-test-button"),
+  offlineModeToggle: requireElement<HTMLInputElement>("offline-mode-toggle"),
+  localSetup: requireElement<HTMLElement>("local-setup"),
+  localBrainUrl: requireElement<HTMLInputElement>("local-brain-url"),
+  localBrainModel: requireElement<HTMLInputElement>("local-brain-model"),
+  localBrainSeesScreenToggle: requireElement<HTMLInputElement>("local-brain-sees-screen-toggle"),
+  localBrainSaveButton: requireElement<HTMLButtonElement>("local-brain-save-button"),
+  localBrainTestButton: requireElement<HTMLButtonElement>("local-brain-test-button"),
   workerSetup: requireElement<HTMLElement>("worker-setup"),
   workerUrl: requireElement<HTMLInputElement>("worker-url"),
   claudeModel: requireElement<HTMLSelectElement>("claude-model"),
@@ -147,6 +168,25 @@ const element = {
   auditList: requireElement<HTMLElement>("audit-list"),
   auditClearButton: requireElement<HTMLButtonElement>("audit-clear-button"),
   skillsCard: requireElement<HTMLElement>("skills-card"),
+  taskQueueCard: requireElement<HTMLElement>("task-queue-card"),
+  taskQueueList: requireElement<HTMLElement>("task-queue-list"),
+  taskQueueRunButton: requireElement<HTMLButtonElement>("task-queue-run-button"),
+  taskQueueClearButton: requireElement<HTMLButtonElement>("task-queue-clear-button"),
+  presenceStatus: requireElement<HTMLElement>("presence-status"),
+  morningBriefToggle: requireElement<HTMLInputElement>("morning-brief-toggle"),
+  morningBriefTime: requireElement<HTMLInputElement>("morning-brief-time"),
+  eveningRecapToggle: requireElement<HTMLInputElement>("evening-recap-toggle"),
+  eveningRecapTime: requireElement<HTMLInputElement>("evening-recap-time"),
+  speakCheckInsToggle: requireElement<HTMLInputElement>("speak-check-ins-toggle"),
+  checkInNowButton: requireElement<HTMLButtonElement>("check-in-now-button"),
+  quickStartCard: requireElement<HTMLElement>("quick-start-card"),
+  quickStartProgress: requireElement<HTMLElement>("quick-start-progress"),
+  stepBrain: requireElement<HTMLButtonElement>("step-brain"),
+  stepBrainState: requireElement<HTMLElement>("step-brain-state"),
+  stepTalk: requireElement<HTMLButtonElement>("step-talk"),
+  stepTalkState: requireElement<HTMLElement>("step-talk-state"),
+  stepAutomate: requireElement<HTMLButtonElement>("step-automate"),
+  stepAutomateState: requireElement<HTMLElement>("step-automate-state"),
   skillList: requireElement<HTMLElement>("skill-list"),
   islandMusicToggle: requireElement<HTMLInputElement>("island-music-toggle"),
   islandClipboardToggle: requireElement<HTMLInputElement>("island-clipboard-toggle"),
@@ -160,8 +200,10 @@ const element = {
 /* Rendering                                                                  */
 /* -------------------------------------------------------------------------- */
 
-function renderState(state: ClickaaPublicState): void {
+function renderState(state: UstaadPublicState): void {
   latestState = state;
+  renderPhoneBridge(state);
+  void window.ustaad.getIslandState().then((islandState) => renderQuickStart(state, islandState)).catch(() => undefined);
   const config = state.config;
 
   element.statusOrb.dataset.state = state.voiceState;
@@ -170,7 +212,7 @@ function renderState(state: ClickaaPublicState): void {
   element.clipboardToggle.checked = config.clipboardHistoryEnabled;
   element.pauseToggle.checked = config.automationPaused;
 
-  const statusMessages: Record<ClickaaPublicState["voiceState"], [string, string]> = {
+  const statusMessages: Record<UstaadPublicState["voiceState"], [string, string]> = {
     idle: state.configured
       ? ["ready when you are", `hold ${state.shortcutLabel} anywhere to talk`]
       : ["connect a brain", state.configurationHint || "pick gemini or a worker in the setup tab"],
@@ -190,7 +232,7 @@ function renderState(state: ClickaaPublicState): void {
   element.activityCard.hidden = !displayedActivity;
   if (displayedActivity) {
     element.transcriptLabel.textContent = state.responseText
-      ? "clickaa"
+      ? "ustaad"
       : state.partialTranscript
         ? "hearing"
         : "you said";
@@ -206,11 +248,12 @@ function renderState(state: ClickaaPublicState): void {
   element.brainLabel.textContent = `brain: ${state.brainLabel}`;
 
   renderSoul(config);
+  renderPresence(config);
   renderScheduleHint(state);
   renderSetup(state);
 }
 
-function renderShortcuts(state: ClickaaPublicState): void {
+function renderShortcuts(state: UstaadPublicState): void {
   const shortcutRows = [
     { keys: state.shortcutLabel.split(" + "), description: "hold, ask, release" },
     { keys: state.dictationShortcutLabel.split(" + "), description: "hold, talk badly, get clean text" },
@@ -237,7 +280,7 @@ function renderShortcuts(state: ClickaaPublicState): void {
   }));
 }
 
-function renderSoul(config: ClickaaUserConfig): void {
+function renderSoul(config: UstaadUserConfig): void {
   if (!hasInitializedFields || document.activeElement !== element.assistantName) {
     element.assistantName.value = config.soul.assistantName;
   }
@@ -331,7 +374,7 @@ function renderSoul(config: ClickaaUserConfig): void {
   }));
 }
 
-function renderScheduleHint(state: ClickaaPublicState): void {
+function renderScheduleHint(state: UstaadPublicState): void {
   element.scheduleHint.textContent = state.config.abilities.scheduling
     ? "say it out loud instead: \"every morning at nine, open unity and spotify\"."
     : "reminders and routines are switched off in the soul tab.";
@@ -339,7 +382,7 @@ function renderScheduleHint(state: ClickaaPublicState): void {
   element.scheduleAddButton.disabled = !state.config.abilities.scheduling;
 }
 
-function renderSetup(state: ClickaaPublicState): void {
+function renderSetup(state: UstaadPublicState): void {
   const config = state.config;
 
   for (const providerCard of element.brainProviderList.querySelectorAll<HTMLButtonElement>("[data-brain-provider]")) {
@@ -347,6 +390,16 @@ function renderSetup(state: ClickaaPublicState): void {
   }
   element.geminiSetup.classList.toggle("active", config.brainProvider === "gemini");
   element.workerSetup.classList.toggle("active", config.brainProvider === "worker");
+  element.localSetup.classList.toggle("active", config.brainProvider === "local");
+
+  if (!hasInitializedFields || document.activeElement !== element.localBrainUrl) {
+    element.localBrainUrl.value = config.localBrainBaseUrl;
+  }
+  if (!hasInitializedFields || document.activeElement !== element.localBrainModel) {
+    element.localBrainModel.value = config.localBrainModel;
+  }
+  element.localBrainSeesScreenToggle.checked = config.localBrainSeesScreen;
+  element.offlineModeToggle.checked = config.offlineMode;
 
   if (!hasInitializedFields || document.activeElement !== element.geminiKey) {
     element.geminiKey.value = config.geminiApiKey;
@@ -368,7 +421,10 @@ function renderSetup(state: ClickaaPublicState): void {
   element.wakeWordStateChip.textContent = describeWakeWordState(state, config);
   element.wakeWordStatus.textContent = describeWakeWordStatus(state, config);
   renderAuditLog(state);
-  void window.clickaa.getIslandState().then(renderSkills).catch(() => undefined);
+  void window.ustaad.getIslandState().then((islandState) => {
+    renderSkills(islandState);
+    renderTaskQueue(islandState);
+  }).catch(() => undefined);
   element.islandMusicToggle.checked = config.islandShowNowPlaying;
   element.islandClipboardToggle.checked = config.islandShowClipboard;
 
@@ -381,7 +437,7 @@ function renderSetup(state: ClickaaPublicState): void {
 /* Settings writes                                                            */
 /* -------------------------------------------------------------------------- */
 
-function describeWakeWordState(state: ClickaaPublicState, config: ClickaaUserConfig): string {
+function describeWakeWordState(state: UstaadPublicState, config: UstaadUserConfig): string {
   if (!config.abilities.wakeWord) {
     return "off";
   }
@@ -389,7 +445,7 @@ function describeWakeWordState(state: ClickaaPublicState, config: ClickaaUserCon
     return "muted";
   }
 
-  const stateLabels: Record<ClickaaPublicState["wakeWordState"], string> = {
+  const stateLabels: Record<UstaadPublicState["wakeWordState"], string> = {
     off: "off",
     starting: "starting",
     listening: "listening",
@@ -399,7 +455,7 @@ function describeWakeWordState(state: ClickaaPublicState, config: ClickaaUserCon
   return stateLabels[state.wakeWordState];
 }
 
-function describeWakeWordStatus(state: ClickaaPublicState, config: ClickaaUserConfig): string {
+function describeWakeWordStatus(state: UstaadPublicState, config: UstaadUserConfig): string {
   if (state.wakeWordMuted) {
     return "muted from the tray. right-click the tray icon and unmute it to start listening again.";
   }
@@ -412,8 +468,150 @@ function describeWakeWordStatus(state: ClickaaPublicState, config: ClickaaUserCo
 }
 
 /** Skills are editable here: rename one inline, or delete it for good. */
+/**
+ * The first-run checklist.
+ *
+ * Each step is judged from state Ustaad already publishes rather than from a
+ * separate "has the user done this?" flag, so the card cannot get out of sync
+ * with reality: if the brain is connected, step one is done, whatever route the
+ * user took to connect it.
+ */
+function renderQuickStart(state: UstaadPublicState, islandState: IslandState): void {
+  const hasSpoken = state.lastTranscript.trim().length > 0 || state.responseText.trim().length > 0;
+  const hasPutItToWork = islandState.scheduledTasks.length > 0
+    || islandState.skills.length > 0
+    || islandState.todos.length > 0
+    || islandState.presence.lastCheckIn !== null;
+
+  const steps = [
+    { row: element.stepBrain, stateLabel: element.stepBrainState, isDone: state.configured, doneLabel: "connected", todoLabel: "todo" },
+    { row: element.stepTalk, stateLabel: element.stepTalkState, isDone: hasSpoken, doneLabel: "talked", todoLabel: "todo" },
+    { row: element.stepAutomate, stateLabel: element.stepAutomateState, isDone: hasPutItToWork, doneLabel: "working", todoLabel: "todo" },
+  ];
+
+  for (const step of steps) {
+    step.row.classList.toggle("is-done", step.isDone);
+    step.stateLabel.textContent = step.isDone ? step.doneLabel : step.todoLabel;
+  }
+
+  const completedStepCount = steps.filter((step) => step.isDone).length;
+  element.quickStartProgress.textContent = `${completedStepCount} of 3`;
+  element.quickStartCard.hidden = completedStepCount === steps.length;
+}
+
+/**
+ * The phone window card. The address carries the pairing token, so it is the
+ * one link that opens the window — which is also why rotating it unpairs every
+ * phone at once, and why the button says so.
+ */
+function renderPhoneBridge(state: UstaadPublicState): void {
+  const { phoneBridge } = state;
+  const isEnabled = state.config.abilities.phoneWindow;
+
+  element.phoneBridgeToggle.checked = isEnabled;
+
+  const hasAddress = Boolean(phoneBridge.address);
+  element.phoneBridgeRow.hidden = !hasAddress;
+  element.phoneBridgeActions.hidden = !phoneBridge.isRunning;
+  if (hasAddress) {
+    element.phoneBridgeAddress.value = phoneBridge.address;
+  }
+
+  if (phoneBridge.lastErrorMessage) {
+    element.phoneBridgeNote.textContent = phoneBridge.lastErrorMessage;
+    return;
+  }
+  if (phoneBridge.isRunning) {
+    element.phoneBridgeNote.textContent =
+      "open that address on a phone that is on the same wi-fi. it asks this pc, and the pc answers out loud here too.";
+    return;
+  }
+  element.phoneBridgeNote.textContent = isEnabled ? "starting the window…" : "";
+}
+
+function renderPresence(config: UstaadUserConfig): void {
+  element.morningBriefToggle.checked = config.presence.morningBriefEnabled;
+  element.morningBriefTime.value = config.presence.morningBriefTime;
+  element.eveningRecapToggle.checked = config.presence.eveningRecapEnabled;
+  element.eveningRecapTime.value = config.presence.eveningRecapTime;
+  element.speakCheckInsToggle.checked = config.presence.speakCheckIns;
+
+  void window.ustaad
+    .getIslandState()
+    .then((islandState) => {
+      const { nextCheckInLabel, lastCheckIn } = islandState.presence;
+      const lastCheckInText = lastCheckIn
+        ? `last check-in: ${lastCheckIn.title}, ${lastCheckIn.summary}`
+        : "no check-in yet.";
+      element.presenceStatus.textContent = nextCheckInLabel
+        ? `next: ${nextCheckInLabel}. ${lastCheckInText}`
+        : `${lastCheckInText} both check-ins are off.`;
+    })
+    .catch(() => undefined);
+}
+
+/**
+ * One short line about how a saved skill is doing. The renderer keeps its own
+ * copy rather than importing from the main process: main code is CommonJS and
+ * the renderer is browser-native ES modules, and that boundary is worth more
+ * than saving four lines.
+ */
+function describeSkillHealth(skill: Skill): string {
+  if (!skill.lastOutcome) {
+    return "";
+  }
+  if (skill.lastOutcome === "completed") {
+    return "last run worked";
+  }
+  if (skill.lastOutcome === "stopped") {
+    return "last run was stopped";
+  }
+  return skill.failureStreak > 1
+    ? `has not worked ${skill.failureStreak} times in a row`
+    : "the last run did not finish";
+}
+
+/**
+ * The waiting list, in the panel: the same order the island shows, but with
+ * room for all of it and a button that starts it now.
+ */
+function renderTaskQueue(islandState: IslandState): void {
+  const waitingTasks = islandState.taskQueue;
+  element.taskQueueCard.hidden = waitingTasks.length === 0;
+  if (!waitingTasks.length) {
+    element.taskQueueList.replaceChildren();
+    return;
+  }
+
+  element.taskQueueList.replaceChildren(...waitingTasks.map((waitingTask) => {
+    const row = document.createElement("div");
+    row.className = "list-row";
+
+    const copy = document.createElement("div");
+    copy.className = "list-row-copy";
+    const goalText = document.createElement("strong");
+    goalText.textContent = waitingTask.goal;
+    const meta = document.createElement("span");
+    meta.textContent = "waiting its turn";
+    copy.append(goalText, meta);
+
+    const dropButton = document.createElement("button");
+    dropButton.type = "button";
+    dropButton.className = "ghost-button";
+    dropButton.textContent = "drop";
+    dropButton.addEventListener("click", () => {
+      void window.ustaad.panelCancelQueuedTask(waitingTask.id);
+    });
+
+    row.append(copy, dropButton);
+    return row;
+  }));
+}
+
 function renderSkills(islandState: IslandState): void {
-  element.skillsCard.hidden = !islandState.skills.length && !islandState.skillSuggestion;
+  element.skillsCard.hidden = !islandState.skills.length
+    && !islandState.skillSuggestion
+    && !islandState.skillRepair;
   const skillRows = islandState.skills.map((skill) => {
     const row = document.createElement("div");
     row.className = "list-row";
@@ -427,13 +625,16 @@ function renderSkills(islandState: IslandState): void {
     nameInput.value = skill.name;
     nameInput.setAttribute("aria-label", `name of the ${skill.name} skill`);
     nameInput.addEventListener("change", () => {
-      void window.clickaa.renameSkill(skill.id, nameInput.value);
+      void window.ustaad.renameSkill(skill.id, nameInput.value);
     });
 
     const meta = document.createElement("span");
-    meta.textContent = skill.runCount
-      ? `${skill.goal} · used ${skill.runCount} ${skill.runCount === 1 ? "time" : "times"}`
-      : skill.goal;
+    const health = describeSkillHealth(skill);
+    const usage = skill.runCount
+      ? `used ${skill.runCount} ${skill.runCount === 1 ? "time" : "times"}`
+      : "not used yet";
+    meta.textContent = `${skill.goal} · ${usage}${health ? ` · ${health}` : ""}`
+      + (skill.repairCount ? ` · repaired ${skill.repairCount} time${skill.repairCount === 1 ? "" : "s"}` : "");
 
     copy.append(nameInput, meta);
 
@@ -442,12 +643,31 @@ function renderSkills(islandState: IslandState): void {
     removeButton.className = "ghost-button";
     removeButton.textContent = "remove";
     removeButton.addEventListener("click", () => {
-      void window.clickaa.removeSkill(skill.id);
+      void window.ustaad.removeSkill(skill.id);
     });
 
     row.append(copy, removeButton);
     return row;
   });
+
+  if (islandState.skillRepair) {
+    const repair = islandState.skillRepair;
+    const repairRow = document.createElement("div");
+    repairRow.className = "list-row";
+    const copy = document.createElement("div");
+    copy.className = "list-row-copy";
+    const title = document.createElement("strong");
+    title.textContent = repair.stage === "proposed"
+      ? `ready to fix: "${repair.skillName}"`
+      : `needs a fix: "${repair.skillName}"`;
+    const meta = document.createElement("span");
+    meta.textContent = repair.stage === "proposed"
+      ? `new aim: ${repair.proposedGoal ?? ""} — offered in the island`
+      : `has not worked ${repair.failureStreak} times in a row — offered in the island`;
+    copy.append(title, meta);
+    repairRow.append(copy);
+    skillRows.unshift(repairRow);
+  }
 
   if (islandState.skillSuggestion) {
     const suggestionRow = document.createElement("div");
@@ -471,25 +691,25 @@ function renderSkills(islandState: IslandState): void {
       const emptyCopy = document.createElement("div");
       emptyCopy.className = "list-row-copy";
       const emptyText = document.createElement("span");
-      emptyText.textContent = "nothing saved yet. do something twice and clickaa will offer to save it.";
+      emptyText.textContent = "nothing saved yet. do something twice and ustaad will offer to save it.";
       emptyCopy.append(emptyText);
       emptyRow.append(emptyCopy);
       return emptyRow;
     })()]));
 }
 
-const auditOutcomeLabels: Record<ClickaaPublicState["auditLog"][number]["outcome"], string> = {
+const auditOutcomeLabels: Record<UstaadPublicState["auditLog"][number]["outcome"], string> = {
   allowed: "ran",
   refused: "you said no",
-  blocked: "clickaa blocked it",
+  blocked: "ustaad blocked it",
   failed: "failed",
 };
 
-function renderAuditLog(state: ClickaaPublicState): void {
+function renderAuditLog(state: UstaadPublicState): void {
   const { auditLog, auditLogCounts } = state;
   element.auditSummary.textContent = auditLogCounts.total
-    ? `${auditLogCounts.total} ${auditLogCounts.total === 1 ? "entry" : "entries"}: ${auditLogCounts.allowed} ran, ${auditLogCounts.refused} refused, ${auditLogCounts.blocked} blocked by clickaa, ${auditLogCounts.failed} failed. newest first.`
-    : "nothing yet. every command, file and registry read shows up here, whether you allowed it or clickaa refused it.";
+    ? `${auditLogCounts.total} ${auditLogCounts.total === 1 ? "entry" : "entries"}: ${auditLogCounts.allowed} ran, ${auditLogCounts.refused} refused, ${auditLogCounts.blocked} blocked by ustaad, ${auditLogCounts.failed} failed. newest first.`
+    : "nothing yet. every command, file and registry read shows up here, whether you allowed it or ustaad refused it.";
 
   element.auditList.replaceChildren(...auditLog.slice(0, 25).map((auditEntry) => {
     const row = document.createElement("div");
@@ -519,32 +739,34 @@ function renderAuditLog(state: ClickaaPublicState): void {
   }));
 }
 
-async function saveSettings(settingsUpdates: Partial<ClickaaUserConfig>): Promise<void> {
+async function saveSettings(settingsUpdates: Partial<UstaadUserConfig>): Promise<void> {
   try {
-    const updatedState = await window.clickaa.updateSettings(settingsUpdates);
+    const updatedState = await window.ustaad.updateSettings(settingsUpdates);
     renderState(updatedState);
   } catch (error) {
     showTransientError(error);
   }
 }
 
-async function testBrain(settingsUpdates: Partial<ClickaaUserConfig>): Promise<void> {
+async function testBrain(settingsUpdates: Partial<UstaadUserConfig>): Promise<void> {
   element.geminiTestButton.disabled = true;
   element.workerTestButton.disabled = true;
+  element.localBrainTestButton.disabled = true;
   element.brainResult.className = "connection-result";
   element.brainResult.textContent = "checking…";
 
   try {
-    const testResult = await window.clickaa.testBrain(settingsUpdates);
+    const testResult = await window.ustaad.testBrain(settingsUpdates);
     element.brainResult.classList.add(testResult.ok ? "success" : "failure");
     element.brainResult.textContent = testResult.message;
-    renderState(await window.clickaa.getState());
+    renderState(await window.ustaad.getState());
   } catch (error) {
     element.brainResult.classList.add("failure");
     element.brainResult.textContent = error instanceof Error ? error.message : String(error);
   } finally {
     element.geminiTestButton.disabled = false;
     element.workerTestButton.disabled = false;
+    element.localBrainTestButton.disabled = false;
   }
 }
 
@@ -558,14 +780,49 @@ function showTransientError(error: unknown): void {
 /* -------------------------------------------------------------------------- */
 
 function setActivePage(pageName: string): void {
-  for (const tabButton of document.querySelectorAll<HTMLButtonElement>(".tab-button")) {
+  element.phoneBridgeToggle.addEventListener("change", () => {
+  if (!latestState) {
+    return;
+  }
+  void saveSettings({
+    abilities: { ...latestState.config.abilities, phoneWindow: element.phoneBridgeToggle.checked },
+  });
+});
+
+element.phoneBridgeRotateButton.addEventListener("click", () => {
+  window.ustaad.rotatePhoneBridgeToken();
+});
+
+// Searching the history is instant and local, so it runs on every keystroke.
+element.taskQueueRunButton.addEventListener("click", () => {
+  void window.ustaad.panelRunTaskQueue();
+});
+element.taskQueueClearButton.addEventListener("click", () => {
+  void window.ustaad.panelClearTaskQueue();
+});
+
+element.historySearchInput.addEventListener("input", () => void refreshRunHistory());
+element.historyClearButton.addEventListener("click", () => {
+  window.ustaad.clearRunHistory();
+  void refreshRunHistory();
+});
+
+for (const tabButton of document.querySelectorAll<HTMLButtonElement>(".tab-button")) {
     tabButton.classList.toggle("active", tabButton.dataset.page === pageName);
   }
   for (const page of document.querySelectorAll<HTMLElement>(".page")) {
     page.classList.toggle("active", page.dataset.page === pageName);
   }
+
+  if (pageName === "home" && latestState) {
+    const currentState = latestState;
+    void window.ustaad.getIslandState().then((islandState) => renderQuickStart(currentState, islandState)).catch(() => undefined);
+  }
   if (pageName === "plans" || pageName === "memory") {
     void refreshIslandLists();
+  }
+  if (pageName === "memory") {
+    void refreshRunHistory();
   }
 }
 
@@ -573,8 +830,91 @@ function setActivePage(pageName: string): void {
  * The panel reuses the island's state for the to-do list, schedules, memory and
  * clipboard so there is exactly one source of truth for the user's data.
  */
+const runOutcomeLabels: Record<RunHistoryEntry["outcome"], string> = {
+  completed: "done",
+  gave_up: "gave up",
+  ran_out_of_steps: "ran out of steps",
+  ran_out_of_time: "ran out of time",
+  stopped: "stopped",
+  failed: "failed",
+};
+
+function formatRunMoment(createdAtIso: string): string {
+  const createdAt = new Date(createdAtIso);
+  if (Number.isNaN(createdAt.getTime())) {
+    return "";
+  }
+  return createdAt.toLocaleString(undefined, {
+    month: "short",
+    day: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+  });
+}
+
+/**
+ * Run history rows. The request is the heading and the snippet is the line that
+ * matched, so searching "receipts" shows the run *and* why it is on screen.
+ */
+function renderRunHistory(searchResults: RunHistorySearchResult[], query: string): void {
+  if (!searchResults.length) {
+    element.historyList.replaceChildren(createEmptyRow(query
+      ? "nothing in the history matches that yet."
+      : "no runs recorded yet. ask something and it lands here."));
+    return;
+  }
+
+  element.historyList.replaceChildren(...searchResults.map((searchResult) => {
+    const { entry, snippet } = searchResult;
+
+    const row = document.createElement("div");
+    row.className = "list-row";
+
+    const copy = document.createElement("div");
+    copy.className = "list-row-main";
+
+    const title = document.createElement("div");
+    title.className = "list-row-title";
+    title.textContent = entry.request;
+    copy.append(title);
+
+    if (snippet && snippet !== entry.request) {
+      const snippetLine = document.createElement("div");
+      snippetLine.className = "run-snippet";
+      snippetLine.textContent = snippet;
+      copy.append(snippetLine);
+    }
+
+    const meta = document.createElement("div");
+    meta.className = "list-row-meta";
+    const moment = formatRunMoment(entry.createdAtIso);
+    const stepCount = entry.stepsTaken > 0 ? `${entry.stepsTaken} step${entry.stepsTaken === 1 ? "" : "s"}` : "";
+    meta.textContent = [moment, entry.kind, runOutcomeLabels[entry.outcome], stepCount].filter(Boolean).join(" · ");
+    meta.dataset.outcome = entry.outcome;
+    copy.append(meta);
+
+    row.append(copy);
+    return row;
+  }));
+}
+
+async function refreshRunHistory(): Promise<void> {
+  // With memory switched off the history is not written at all, so say that
+  // rather than showing an empty list that looks like a bug.
+  if (latestState && !latestState.config.abilities.memory) {
+    element.historyList.replaceChildren(createEmptyRow(
+      "the run history follows the memory switch, and memory is off. turn it on in soul and runs start landing here.",
+    ));
+    return;
+  }
+
+  const query = element.historySearchInput.value.trim();
+  const searchResults = await window.ustaad.searchRunHistory(query);
+  renderRunHistory(searchResults, query);
+}
+
 async function refreshIslandLists(): Promise<void> {
-  const islandState = await window.clickaa.getIslandState();
+  const islandState = await window.ustaad.getIslandState();
 
   element.todoCount.textContent = `${islandState.todos.filter((todoItem) => !todoItem.isDone).length} open`;
   element.todoList.replaceChildren(...(islandState.todos.length
@@ -588,7 +928,7 @@ async function refreshIslandLists(): Promise<void> {
       checkButton.className = "check-button";
       checkButton.classList.toggle("checked", todoItem.isDone);
       checkButton.addEventListener("click", () => {
-        window.clickaa.toggleTodo(todoItem.id, !todoItem.isDone);
+        window.ustaad.toggleTodo(todoItem.id, !todoItem.isDone);
         window.setTimeout(() => void refreshIslandLists(), 120);
       });
 
@@ -610,7 +950,7 @@ async function refreshIslandLists(): Promise<void> {
       removeButton.className = "row-action";
       setIconButton(removeButton, "close", "Remove this to-do", 13);
       removeButton.addEventListener("click", () => {
-        window.clickaa.removeTodo(todoItem.id);
+        window.ustaad.removeTodo(todoItem.id);
         window.setTimeout(() => void refreshIslandLists(), 120);
       });
 
@@ -643,7 +983,7 @@ async function refreshIslandLists(): Promise<void> {
       toggleButton.classList.toggle("on", scheduledTask.isEnabled);
       toggleButton.textContent = scheduledTask.isEnabled ? "on" : "off";
       toggleButton.addEventListener("click", () => {
-        window.clickaa.toggleSchedule(scheduledTask.id, !scheduledTask.isEnabled);
+        window.ustaad.toggleSchedule(scheduledTask.id, !scheduledTask.isEnabled);
         window.setTimeout(() => void refreshIslandLists(), 120);
       });
 
@@ -652,7 +992,7 @@ async function refreshIslandLists(): Promise<void> {
       removeButton.className = "row-action";
       setIconButton(removeButton, "close", "Remove this reminder", 13);
       removeButton.addEventListener("click", () => {
-        window.clickaa.removeSchedule(scheduledTask.id);
+        window.ustaad.removeSchedule(scheduledTask.id);
         window.setTimeout(() => void refreshIslandLists(), 120);
       });
 
@@ -678,7 +1018,7 @@ async function refreshIslandLists(): Promise<void> {
       removeButton.className = "row-action";
       setIconButton(removeButton, "close", "Forget this", 13);
       removeButton.addEventListener("click", () => {
-        window.clickaa.removeMemory(memoryFact.id);
+        window.ustaad.removeMemory(memoryFact.id);
         window.setTimeout(() => void refreshIslandLists(), 120);
       });
 
@@ -703,7 +1043,7 @@ async function refreshIslandLists(): Promise<void> {
       copyButton.type = "button";
       copyButton.className = "row-action neutral";
       setIconButton(copyButton, "copy", "Copy this clip back", 13);
-      copyButton.addEventListener("click", () => void window.clickaa.copyClip(clipboardClip.id));
+      copyButton.addEventListener("click", () => void window.ustaad.copyClip(clipboardClip.id));
 
       row.append(copy, copyButton);
       return row;
@@ -746,7 +1086,10 @@ for (const confirmationModeButton of document.querySelectorAll<HTMLButtonElement
 
 for (const providerCard of element.brainProviderList.querySelectorAll<HTMLButtonElement>("[data-brain-provider]")) {
   providerCard.addEventListener("click", () => {
-    void saveSettings({ brainProvider: providerCard.dataset.brainProvider === "worker" ? "worker" : "gemini" });
+    const chosenProvider = providerCard.dataset.brainProvider;
+    void saveSettings({
+      brainProvider: chosenProvider === "worker" || chosenProvider === "local" ? chosenProvider : "gemini",
+    });
   });
 }
 
@@ -793,7 +1136,7 @@ element.geminiModel.addEventListener("change", () => {
   void saveSettings({ geminiChatModel: element.geminiModel.value as GeminiChatModel });
 });
 element.claudeModel.addEventListener("change", () => {
-  void saveSettings({ selectedClaudeModel: element.claudeModel.value as ClickaaPublicState["config"]["selectedClaudeModel"] });
+  void saveSettings({ selectedClaudeModel: element.claudeModel.value as UstaadPublicState["config"]["selectedClaudeModel"] });
 });
 element.dictationShortcut.addEventListener("change", () => {
   void saveSettings({ dictationShortcut: element.dictationShortcut.value as DictationShortcutId });
@@ -803,6 +1146,20 @@ element.geminiSaveButton.addEventListener("click", () => void saveSettings({ gem
 element.geminiTestButton.addEventListener("click", () => void testBrain({ geminiApiKey: element.geminiKey.value }));
 element.workerSaveButton.addEventListener("click", () => void saveSettings({ workerBaseUrl: element.workerUrl.value }));
 element.workerTestButton.addEventListener("click", () => void testBrain({ workerBaseUrl: element.workerUrl.value }));
+element.offlineModeToggle.addEventListener("change", () => {
+  void saveSettings({ offlineMode: element.offlineModeToggle.checked });
+});
+
+element.localBrainSaveButton.addEventListener("click", () => void saveSettings({
+  localBrainBaseUrl: element.localBrainUrl.value,
+  localBrainModel: element.localBrainModel.value,
+  localBrainSeesScreen: element.localBrainSeesScreenToggle.checked,
+}));
+element.localBrainTestButton.addEventListener("click", () => void testBrain({
+  localBrainBaseUrl: element.localBrainUrl.value,
+  localBrainModel: element.localBrainModel.value,
+  localBrainSeesScreen: element.localBrainSeesScreenToggle.checked,
+}));
 
 element.todoAddButton.addEventListener("click", () => {
   const todoText = element.todoInput.value.trim();
@@ -810,7 +1167,7 @@ element.todoAddButton.addEventListener("click", () => {
     return;
   }
   element.todoInput.value = "";
-  window.clickaa.addTodo(todoText);
+  window.ustaad.addTodo(todoText);
   window.setTimeout(() => void refreshIslandLists(), 160);
 });
 
@@ -823,8 +1180,8 @@ element.todoInput.addEventListener("keydown", (keyboardEvent) => {
 // Reminders and routines are set by voice ("search amazon for bags tomorrow at 9"),
 // because the same sentence has to be understood the same way in both places.
 element.scheduleAddButton.addEventListener("click", () => {
-  element.scheduleHint.textContent = "hold the talk shortcut and say it out loud — clickaa will set it up and show it here.";
-  window.clickaa.showPanel("home");
+  element.scheduleHint.textContent = "hold the talk shortcut and say it out loud — ustaad will set it up and show it here.";
+  window.ustaad.showPanel("home");
 });
 
 element.memoryAddButton.addEventListener("click", () => {
@@ -833,7 +1190,7 @@ element.memoryAddButton.addEventListener("click", () => {
     return;
   }
   element.memoryInput.value = "";
-  window.clickaa.addMemory(factText);
+  window.ustaad.addMemory(factText);
   window.setTimeout(() => void refreshIslandLists(), 160);
 });
 
@@ -844,18 +1201,18 @@ element.memoryInput.addEventListener("keydown", (keyboardEvent) => {
 });
 
 element.memoryClearButton.addEventListener("click", () => {
-  window.clickaa.clearMemory();
+  window.ustaad.clearMemory();
   window.setTimeout(() => void refreshIslandLists(), 160);
 });
 
 element.clipboardClearButton.addEventListener("click", () => {
-  window.clickaa.clearClips();
+  window.ustaad.clearClips();
   window.setTimeout(() => void refreshIslandLists(), 120);
 });
 
 element.refreshAppsButton.addEventListener("click", () => {
   element.refreshAppsButton.textContent = "scanning…";
-  void window.clickaa.refreshAppIndex().then((appCount) => {
+  void window.ustaad.refreshAppIndex().then((appCount) => {
     element.refreshAppsButton.textContent = `${appCount} apps`;
     window.setTimeout(() => {
       element.refreshAppsButton.textContent = "rescan apps";
@@ -879,19 +1236,53 @@ element.launchToggle.addEventListener("change", () => void saveSettings({ launch
 element.islandSummonToggle.addEventListener("change", () => {
   void saveSettings({ islandSummonEnabled: element.islandSummonToggle.checked });
 });
+function savePresenceSettings(presenceUpdates: Partial<UstaadUserConfig["presence"]>): void {
+  const currentPresence = latestState?.config.presence;
+  if (!currentPresence) {
+    return;
+  }
+  void saveSettings({ presence: { ...currentPresence, ...presenceUpdates } });
+}
+
+element.morningBriefToggle.addEventListener("change", () => {
+  savePresenceSettings({ morningBriefEnabled: element.morningBriefToggle.checked });
+});
+element.morningBriefTime.addEventListener("change", () => {
+  savePresenceSettings({ morningBriefTime: element.morningBriefTime.value });
+});
+element.eveningRecapToggle.addEventListener("change", () => {
+  savePresenceSettings({ eveningRecapEnabled: element.eveningRecapToggle.checked });
+});
+element.eveningRecapTime.addEventListener("change", () => {
+  savePresenceSettings({ eveningRecapTime: element.eveningRecapTime.value });
+});
+element.speakCheckInsToggle.addEventListener("change", () => {
+  savePresenceSettings({ speakCheckIns: element.speakCheckInsToggle.checked });
+});
+element.stepBrain.addEventListener("click", () => setActivePage("setup"));
+element.stepTalk.addEventListener("click", () => setActivePage("home"));
+element.stepAutomate.addEventListener("click", () => setActivePage("plans"));
+
+element.checkInNowButton.addEventListener("click", () => {
+  element.checkInNowButton.textContent = "writing…";
+  void window.ustaad.runCheckInNow().then(() => {
+    element.checkInNowButton.textContent = "check in now";
+  });
+});
+
 element.auditClearButton.addEventListener("click", () => {
-  window.clickaa.clearAuditLog();
+  window.ustaad.clearAuditLog();
 });
 element.wakeWordToggle.addEventListener("change", () => {
   void saveSettings({
     abilities: {
       ...(latestState?.config.abilities ?? {}),
       wakeWord: element.wakeWordToggle.checked,
-    } as ClickaaUserConfig["abilities"],
+    } as UstaadUserConfig["abilities"],
   });
 });
 element.wakeWordProvider.addEventListener("change", () => {
-  void saveSettings({ wakeWordProvider: element.wakeWordProvider.value as ClickaaUserConfig["wakeWordProvider"] });
+  void saveSettings({ wakeWordProvider: element.wakeWordProvider.value as UstaadUserConfig["wakeWordProvider"] });
 });
 element.islandAlwaysToggle.addEventListener("change", () => {
   void saveSettings({ islandAlwaysVisible: element.islandAlwaysToggle.checked });
@@ -906,7 +1297,7 @@ element.islandClipboardToggle.addEventListener("change", () => {
 element.pushToTalkButton.addEventListener("pointerdown", (pointerEvent) => {
   pointerEvent.preventDefault();
   panelPushToTalkIsPressed = true;
-  window.clickaa.pushToTalkPressed();
+  window.ustaad.pushToTalkPressed();
   renderPanelPressedState();
 });
 element.pushToTalkButton.addEventListener("pointerup", stopPanelPushToTalk);
@@ -916,7 +1307,7 @@ element.pushToTalkButton.addEventListener("keydown", (keyboardEvent) => {
   if ((keyboardEvent.key === " " || keyboardEvent.key === "Enter") && !keyboardEvent.repeat) {
     keyboardEvent.preventDefault();
     panelPushToTalkIsPressed = true;
-    window.clickaa.pushToTalkPressed();
+    window.ustaad.pushToTalkPressed();
     renderPanelPressedState();
   }
 });
@@ -939,15 +1330,15 @@ function stopPanelPushToTalk(): void {
     return;
   }
   panelPushToTalkIsPressed = false;
-  window.clickaa.pushToTalkReleased();
+  window.ustaad.pushToTalkReleased();
   renderPanelPressedState();
 }
 
-setIconButton(element.closeButton, "close", "Hide Clickaa", 14);
-element.talkMicrophone.replaceChildren(createClickaaIcon("microphone", 19));
+setIconButton(element.closeButton, "close", "Hide Ustaad", 14);
+element.talkMicrophone.replaceChildren(createUstaadIcon("microphone", 19));
 
-element.setupVideoButton.addEventListener("click", () => window.clickaa.openSetupVideo());
-element.closeButton.addEventListener("click", () => window.clickaa.hidePanel());
+element.setupVideoButton.addEventListener("click", () => window.ustaad.openSetupVideo());
+element.closeButton.addEventListener("click", () => window.ustaad.hidePanel());
 document.addEventListener("contextmenu", (event) => event.preventDefault());
 window.addEventListener("blur", () => {
   if (panelPushToTalkIsPressed) {
@@ -957,15 +1348,15 @@ window.addEventListener("blur", () => {
 
 /* Bridge wiring ---------------------------------------------------------- */
 
-window.clickaa.onState(renderState);
-window.clickaa.onOpenPanelPage((page) => setActivePage(page));
-window.clickaa.onAudioCaptureStart(({ interactionId }) => void microphoneCapture.start(interactionId));
-window.clickaa.onAudioCaptureStop(({ interactionId }) => void microphoneCapture.stop(interactionId));
-window.clickaa.onAudioPlayback((payload) => void companionAudioPlayback.playAudio(payload));
-window.clickaa.onFallbackSpeech((payload) => {
+window.ustaad.onState(renderState);
+window.ustaad.onOpenPanelPage((page) => setActivePage(page));
+window.ustaad.onAudioCaptureStart(({ interactionId }) => void microphoneCapture.start(interactionId));
+window.ustaad.onAudioCaptureStop(({ interactionId }) => void microphoneCapture.stop(interactionId));
+window.ustaad.onAudioPlayback((payload) => void companionAudioPlayback.playAudio(payload));
+window.ustaad.onFallbackSpeech((payload) => {
   companionAudioPlayback.speakWithWindowsVoice(payload, latestState?.config.soul.windowsSpeechRate);
 });
-window.clickaa.onStopAudioPlayback(() => companionAudioPlayback.stop());
+window.ustaad.onStopAudioPlayback(() => companionAudioPlayback.stop());
 
-void window.clickaa.getState().then(renderState).catch(showTransientError);
+void window.ustaad.getState().then(renderState).catch(showTransientError);
 void refreshIslandLists();

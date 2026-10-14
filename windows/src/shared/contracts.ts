@@ -1,5 +1,5 @@
 /**
- * Shared contracts between the Clickaa main process, preload bridge, and renderers.
+ * Shared contracts between the Ustaad main process, preload bridge, and renderers.
  *
  * This file is compiled for both the main process (CommonJS) and the renderers
  * (browser ES modules), so it must never import from Node or Electron.
@@ -16,7 +16,11 @@ export type CompanionVoiceState = "idle" | "listening" | "processing" | "respond
  * Google AI Studio key stored on this PC. "worker" keeps the original Cloudflare
  * Worker proxy that hides a shared Claude / AssemblyAI / ElevenLabs key set.
  */
-export const brainProviderIds = ["gemini", "worker"] as const;
+export const brainProviderIds = ["gemini", "worker", "local"] as const;
+
+/** Where the local brain talks to: ollama, LM Studio, Jan and llama.cpp all answer here. */
+export const defaultLocalBrainBaseUrl = "http://127.0.0.1:11434";
+export const defaultLocalBrainModel = "llama3.2";
 export type BrainProviderId = (typeof brainProviderIds)[number];
 
 export const geminiChatModels = ["gemini-2.5-flash", "gemini-2.5-pro"] as const;
@@ -69,6 +73,7 @@ export const abilityIds = [
   "dictation",
   "circleToAsk",
   "webSearch",
+  "imageGeneration",
   "systemControl",
   "scheduling",
   "toDoList",
@@ -78,12 +83,14 @@ export const abilityIds = [
   "wakeWord",
   "systemAccessTier1",
   "systemAccessTier2",
+  "presence",
+  "phoneWindow",
 ] as const;
 export type AbilityId = (typeof abilityIds)[number];
 export type AbilitySettings = Record<AbilityId, boolean>;
 
 /**
- * Where Clickaa listens for its name. "offline" uses the speech recognizer
+ * Where Ustaad listens for its name. "offline" uses the speech recognizer
  * Windows already ships, so no audio leaves the machine. "cloud" keeps a local
  * loudness gate and only sends the clip that followed speech.
  */
@@ -205,7 +212,7 @@ export interface RoutineAddAction {
   name: string;
   timeOfDay: string;
   repeat: ScheduleRepeat;
-  actions: ClickaaAction[];
+  actions: UstaadAction[];
 }
 
 export interface RememberAction {
@@ -278,7 +285,7 @@ export interface ClickAtAction {
 export interface RunCommandAction {
   type: "run_command";
   command: string;
-  /** Why Clickaa wants to run it, shown on the confirmation card. */
+  /** Why Ustaad wants to run it, shown on the confirmation card. */
   reason: string;
 }
 
@@ -289,6 +296,35 @@ export interface ManageFileAction {
   path: string;
   /** Only for a write. */
   content: string;
+}
+
+/** "draw me a red panda on a skateboard" — one picture, on the user's own key. */
+export interface CreateImageAction {
+  type: "create_image";
+  prompt: string;
+  /** What to call the file. Null means "name it after the prompt". */
+  name: string | null;
+}
+
+/** "look up how vat works in pakistan and show me where you read it". */
+export interface ResearchAction {
+  type: "research";
+  question: string;
+}
+
+/** One page that an answer came from. */
+export interface ResearchSource {
+  title: string;
+  url: string;
+}
+
+/** An answer Ustaad looked up, with the pages it came from. */
+export interface ResearchCard {
+  id: string;
+  question: string;
+  answerText: string;
+  sources: ResearchSource[];
+  lookedUpAtIso: string;
 }
 
 /** "do my morning videos" — runs a task the user saved by name. */
@@ -320,7 +356,7 @@ export interface OpenPanelAction {
   page: string;
 }
 
-export type ClickaaAction =
+export type UstaadAction =
   | OpenAppAction
   | OpenUrlAction
   | SearchWebAction
@@ -352,9 +388,13 @@ export type ClickaaAction =
   | RunCommandAction
   | ManageFileAction
   | ReadRegistryAction
+  | CreateImageAction
+  | ResearchAction
   | RunSkillAction;
 
-export type ClickaaActionType =
+export type UstaadActionType =
+  | "create_image"
+  | "research"
   | "open_app"
   | "open_url"
   | "search_web"
@@ -389,7 +429,7 @@ export type ClickaaActionType =
   | "run_skill";
 
 /** Canonical action list, kept in the shared contracts so both sides agree. */
-export const clickaaActionTypes: readonly ClickaaActionType[] = [
+export const ustaadActionTypes: readonly UstaadActionType[] = [
   "open_app",
   "open_url",
   "search_web",
@@ -421,6 +461,8 @@ export const clickaaActionTypes: readonly ClickaaActionType[] = [
   "run_command",
   "manage_file",
   "read_registry",
+  "create_image",
+  "research",
   "run_skill",
 ];
 
@@ -430,16 +472,27 @@ export interface ActionExecutionResult {
   status: "completed" | "failed" | "needs_choice";
   message: string;
   undoLabel: string | null;
-  choices: ClickaaAction[];
+  choices: UstaadAction[];
 }
 
 /* -------------------------------------------------------------------------- */
 /* Persistent user data                                                       */
 /* -------------------------------------------------------------------------- */
 
-export interface ClickaaUserConfig {
+export interface UstaadUserConfig {
   workerBaseUrl: string;
   brainProvider: BrainProviderId;
+  /** The address of the model server on this pc, used when the brain is "local". */
+  localBrainBaseUrl: string;
+  localBrainModel: string;
+  /** Whether that model can look at screenshots. Off unless the user says so. */
+  localBrainSeesScreen: boolean;
+  /**
+   * The user's promise that Ustaad itself never reaches the internet: the
+   * brain must be local, and speech, transcription, pictures, the phone window
+   * and the cloud wake word all stop.
+   */
+  offlineMode: boolean;
   geminiApiKey: string;
   geminiChatModel: GeminiChatModel;
   selectedClaudeModel: SupportedClaudeModel;
@@ -448,7 +501,7 @@ export interface ClickaaUserConfig {
   launchAtLogin: boolean;
   automationPaused: boolean;
   confirmationMode: ConfirmationMode;
-  autoApprovedActionTypes: ClickaaActionType[];
+  autoApprovedActionTypes: UstaadActionType[];
 
   dictationShortcut: DictationShortcutId;
   dictationCleanupEnabled: boolean;
@@ -467,6 +520,9 @@ export interface ClickaaUserConfig {
 
   soul: SoulSettings;
   abilities: AbilitySettings;
+
+  /** When Ustaad speaks up on its own, without being asked. */
+  presence: PresenceSettings;
 }
 
 export const dictationShortcutIds = ["ctrl+windows", "ctrl+shift+space", "capslock"] as const;
@@ -481,17 +537,63 @@ export interface TodoItem {
 }
 
 /**
- * A task the user saved by name. The seed actions are a memory aid for Clickaa,
+ * A task the user saved by name. The seed actions are a memory aid for Ustaad,
  * never a permission: every run is checked and confirmed again.
  */
 export interface Skill {
   id: string;
   name: string;
   goal: string;
-  seedActions: ClickaaAction[];
+  seedActions: UstaadAction[];
   createdAtIso: string;
   runCount: number;
   lastRunAtIso: string | null;
+  /** How the most recent run ended, or null before the skill has been run. */
+  lastOutcome: RunOutcome | null;
+  /** The one-line account of that run, kept so a repair can be proposed from it. */
+  lastOutcomeNote: string;
+  /** Runs that did not finish in a row; the first one that finishes resets it. */
+  failureStreak: number;
+  /** The streak a repair was last offered at, so "not now" is not asked twice. */
+  repairOfferedStreak: number;
+  /** How many times the user accepted a new way of doing this skill. */
+  repairCount: number;
+  /** When that new way was accepted, or null if the skill has never been repaired. */
+  repairedAtIso: string | null;
+}
+
+export type QueuedTaskStatus = "waiting" | "running" | "done" | "failed" | "cancelled";
+
+/**
+ * A task waiting its turn. Ustaad has one screen and one pointer, so tasks run
+ * one at a time; the queue is what stops the second request from being lost.
+ */
+export interface QueuedTask {
+  id: string;
+  goal: string;
+  seedActions: UstaadAction[];
+  status: QueuedTaskStatus;
+  createdAtIso: string;
+  finishedAtIso: string | null;
+  note: string;
+}
+
+/**
+ * A saved skill that keeps failing, and the alternative Ustaad worked out for
+ * it. Offered and saved, never applied on its own: the only thing that changes
+ * without the user is `stage`.
+ */
+export interface SkillRepairSurface {
+  stage: "offered" | "working" | "proposed";
+  skillId: string;
+  skillName: string;
+  failureStreak: number;
+  lastOutcomeNote: string;
+  /** Filled in once the model has answered with a new way of doing it. */
+  proposedGoal: string | null;
+  proposedActions: UstaadAction[];
+  /** The model's one line on why this should work better. */
+  explanation: string;
 }
 
 /** The island's "save that as a skill?" card, when it is offered. */
@@ -515,12 +617,45 @@ export interface MemoryFact {
   createdAtIso: string;
 }
 
+/**
+ * One interaction, written down after it finished: what was asked, how it was
+ * answered, whether it got there, and how much work it took. Stored as plain
+ * JSON the user can read, and searched in memory rather than in a database.
+ */
+export type RunOutcome =
+  | "completed"
+  | "gave_up"
+  | "ran_out_of_steps"
+  | "ran_out_of_time"
+  | "stopped"
+  | "failed";
+
+export interface RunHistoryEntry {
+  id: string;
+  createdAtIso: string;
+  request: string;
+  kind: "reply" | "task" | "routine" | "check-in";
+  outcome: RunOutcome;
+  /** The one-line account of where the run ended up. */
+  note: string;
+  stepsTaken: number;
+  response: string;
+}
+
+export interface RunHistorySearchResult {
+  entry: RunHistoryEntry;
+  /** How well the entry matched, higher is better. */
+  score: number;
+  /** The matched words in context, so the list shows why a row is there. */
+  snippet: string;
+}
+
 export interface ScheduledTask {
   id: string;
   name: string;
   kind: "reminder" | "routine";
   prompt: string;
-  actions: ClickaaAction[];
+  actions: UstaadAction[];
   timeOfDay: string | null;
   startAtIso: string | null;
   repeat: ScheduleRepeat;
@@ -537,6 +672,34 @@ export interface ClipboardClip {
 
 export type ActivityKind = "action" | "automation" | "system" | "confirmation";
 
+export const presenceCheckInIds = ["morning", "evening"] as const;
+export type PresenceCheckInKind = (typeof presenceCheckInIds)[number];
+
+/**
+ * When Ustaad wakes up on its own. Times are local "HH:MM" strings so the
+ * panel's time inputs round-trip exactly what the user typed.
+ */
+export interface PresenceSettings {
+  morningBriefEnabled: boolean;
+  morningBriefTime: string;
+  eveningRecapEnabled: boolean;
+  eveningRecapTime: string;
+  speakCheckIns: boolean;
+}
+
+/** The last time Ustaad spoke up unprompted, so the island can show it. */
+export interface PresenceCheckInRecord {
+  kind: PresenceCheckInKind;
+  title: string;
+  summary: string;
+  ranAtIso: string;
+}
+
+export interface PresenceSurfaceState {
+  nextCheckInLabel: string | null;
+  lastCheckIn: PresenceCheckInRecord | null;
+}
+
 export interface ActivityFeedEntry {
   id: string;
   kind: ActivityKind;
@@ -550,7 +713,7 @@ export interface ActivityFeedEntry {
 export interface PendingConfirmation {
   id: string;
   interactionId: number;
-  actions: ClickaaAction[];
+  actions: UstaadAction[];
   reason: string;
   createdAtIso: string;
 }
@@ -578,7 +741,7 @@ export type InteractionKind = "talk" | "dictation" | "circle" | "scheduled";
 
 export type DictationStage = "idle" | "recording" | "cleaning" | "typing";
 
-export interface ClickaaPublicState {
+export interface UstaadPublicState {
   voiceState: CompanionVoiceState;
   interactionKind: InteractionKind | null;
   dictationStage: DictationStage;
@@ -602,13 +765,42 @@ export interface ClickaaPublicState {
   wakeWordState: WakeWordSurfaceState;
   wakeWordMessage: string;
   wakeWordMuted: boolean;
-  config: ClickaaUserConfig;
+  config: UstaadUserConfig;
+  /** How to reach Ustaad from a phone on the same wi-fi, when that is switched on. */
+  phoneBridge: PhoneBridgeInfo;
   /** The last few system-access entries, newest first, for the panel's log. */
   auditLog: AuditLogEntry[];
   auditLogCounts: { allowed: number; refused: number; blocked: number; failed: number; total: number };
 }
 
-/** One line of the record Clickaa keeps of everything it did on this pc. */
+/**
+ * The phone window: what the panel needs to show so the user can open it on
+ * their phone. The token is the whole of the security, which is why the address
+ * is only ever reachable on the local network and never proxied anywhere.
+ */
+export interface PhoneBridgeInfo {
+  isRunning: boolean;
+  /** The address to open on the phone, including the pairing token. */
+  address: string;
+  port: number;
+  /** Whether a request from the phone may only be answered, never acted on. */
+  isReadOnly: boolean;
+  lastErrorMessage: string | null;
+}
+
+/** What the phone page itself is told about the pc it is a window onto. */
+export interface PhoneBridgeStatus {
+  assistantName: string;
+  isConfigured: boolean;
+  voiceState: CompanionVoiceState;
+  lastTranscript: string;
+  responseText: string;
+  openTodos: string[];
+  nextScheduledTasks: string[];
+  pendingConfirmationCount: number;
+}
+
+/** One line of the record Ustaad keeps of everything it did on this pc. */
 export interface AuditLogEntry {
   id: string;
   createdAtIso: string;
@@ -644,6 +836,20 @@ export interface IslandStatusSummary {
  */
 export type IslandPresentation = "hidden" | "revealed" | "open";
 
+/**
+ * A picture Ustaad drew, as the island shows it.
+ *
+ * The preview travels with the state so the island can show the picture without
+ * reading the disk again; it is a small jpeg, never the full-size file.
+ */
+export interface GeneratedPicture {
+  id: string;
+  prompt: string;
+  filePath: string;
+  previewDataUrl: string;
+  drawnAtIso: string;
+}
+
 export interface IslandState {
   isExpanded: boolean;
   isEnabled: boolean;
@@ -662,11 +868,19 @@ export interface IslandState {
   wakeWordMuted: boolean;
   skills: Skill[];
   skillSuggestion: SkillSuggestionPrompt | null;
+  skillRepair: SkillRepairSurface | null;
+  /** Tasks waiting to run, oldest first. */
+  taskQueue: QueuedTask[];
+  /** The last picture Ustaad drew, until the user hides it. */
+  drawnPicture: GeneratedPicture | null;
+  /** The last answer Ustaad looked up, with its sources, until it is hidden. */
+  research: ResearchCard | null;
   /** Why the wake word is in that state, shown as the indicator's tooltip. */
   wakeWordMessage: string;
   todos: TodoItem[];
   scheduledTasks: ScheduledTask[];
   memoryFacts: MemoryFact[];
+  presence: PresenceSurfaceState;
   clipboardClips: ClipboardClip[];
   quickLaunchApps: LaunchableAppView[];
   brainLabel: string;

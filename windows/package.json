@@ -1,10 +1,10 @@
 {
-  "name": "clickaa-windows",
-  "version": "1.1.0",
+  "name": "ustaad-windows",
+  "version": "1.2.0",
   "private": true,
-  "description": "Clickaa, the voice companion that lives on your Windows desktop",
+  "description": "Ustaad, the voice companion that lives on your Windows desktop",
   "main": "dist/src/main/main.js",
-  "author": "Clickaa contributors",
+  "author": "Ustaad contributors",
   "license": "MIT",
   "engines": {
     "node": ">=22.12"
@@ -20,8 +20,8 @@
     "validate:installers": "node scripts/validate-installers.mjs",
     "dev": "npm run build && electron .",
     "start": "electron .",
-    "package:win": "npm run build && electron-builder --win nsis --x64 --arm64",
-    "package:win:dir": "npm run build && electron-builder --win dir --x64 --arm64"
+    "package:win": "npm run build && electron-builder --win nsis --x64 --arm64 --config electron-builder.signing.js",
+    "package:win:dir": "npm run build && electron-builder --win dir --x64 --arm64 --config electron-builder.signing.js"
   },
   "dependencies": {
     "uiohook-napi": "1.5.5",
@@ -35,8 +35,8 @@
     "typescript": "5.9.3"
   },
   "build": {
-    "appId": "com.clickaa.windows",
-    "productName": "Clickaa",
+    "appId": "com.ustaad.windows",
+    "productName": "Ustaad",
     "asar": true,
     "npmRebuild": false,
     "asarUnpack": [
@@ -60,7 +60,10 @@
           ]
         }
       ],
-      "artifactName": "Clickaa-Setup-${version}-${arch}.${ext}"
+      "artifactName": "Ustaad-Setup-${version}-${arch}.${ext}",
+      "signExts": [
+        ".node"
+      ]
     },
     "nsis": {
       "buildUniversalInstaller": false,
@@ -68,7 +71,7 @@
       "allowToChangeInstallationDirectory": true,
       "createDesktopShortcut": true,
       "createStartMenuShortcut": true,
-      "shortcutName": "Clickaa",
+      "shortcutName": "Ustaad",
       "deleteAppDataOnUninstall": false
     }
   }

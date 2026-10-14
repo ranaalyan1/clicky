@@ -2,10 +2,10 @@ import {
   abilityIds,
   AbilityId,
   AbilitySettings,
-  clickaaActionTypes,
+  ustaadActionTypes,
   ConfirmationMode,
   confirmationModes,
-  ClickaaActionType,
+  UstaadActionType,
   geminiVoiceNames,
   GeminiVoiceName,
   PersonalityPresetId,
@@ -31,12 +31,14 @@ export const abilityDefinitions: AbilityDefinition[] = [
   { id: "dictation", label: "dictation", description: "hold the dictation shortcut to talk and have clean text land in the focused app" },
   { id: "circleToAsk", label: "circle to ask", description: "circle anything on screen and ask about it out loud" },
   { id: "webSearch", label: "web search", description: "search Google, YouTube, Amazon and friends in your browser" },
+  { id: "imageGeneration", label: "draw pictures", description: "draw one picture from your description into your Pictures folder — it runs on your google key, so each picture is billed to you" },
   { id: "systemControl", label: "system control", description: "volume, media playback, windows and wallpaper" },
   { id: "scheduling", label: "reminders and routines", description: "run tasks later, by themselves, and tell you what they did" },
   { id: "toDoList", label: "to-do list", description: "keep a spoken to-do list in the island" },
   { id: "memory", label: "memory", description: "remember facts you ask it to keep" },
   { id: "clipboardHistory", label: "clipboard history", description: "keep your recent copies in the island, on this pc only" },
   { id: "island", label: "the island", description: "show the notch at the top of the screen" },
+  { id: "presence", label: "presence", description: "wake up on its own with a morning brief and an evening recap" },
 ];
 
 export const defaultAbilitySettings: AbilitySettings = {
@@ -53,13 +55,23 @@ export const defaultAbilitySettings: AbilitySettings = {
   clipboardHistory: true,
   island: true,
   // Off by default: an always-open microphone is the user's decision to make,
-  // never something Clickaa switches on for them.
+  // never something Ustaad switches on for them.
+  // Off by default: every picture is a call the user pays for on their own key,
+  // and a switch they chose to turn on is how they find that out.
+  imageGeneration: false,
+  // Off by default, and read-only when on: a window onto the pc, not a remote
+  // control for it.
+  phoneWindow: false,
   wakeWord: false,
   // Both system-access tiers start off. Tier 1 is the ordinary one (read-only
   // diagnostics, files in the user's own folders); Tier 2 is arbitrary commands
   // and has to be switched on deliberately, with its own warning.
   systemAccessTier1: false,
   systemAccessTier2: false,
+  // On by default: a companion that only ever speaks when spoken to is a
+  // toolbar, not a presence. Both check-ins are individually switchable in the
+  // panel, and neither of them touches anything on the PC.
+  presence: true,
 };
 
 export interface PersonalityPresetDefinition {
@@ -109,7 +121,7 @@ export const responseLengthInstructions: Record<ResponseLengthId, string> = {
 };
 
 export const defaultSoulSettings: SoulSettings = {
-  assistantName: "clickaa",
+  assistantName: "ustaad",
   personalityPreset: "companion",
   customInstructions: "",
   responseLength: "balanced",
@@ -188,14 +200,14 @@ export function sanitizeConfirmationMode(storedMode: unknown): ConfirmationMode 
     : "risky";
 }
 
-export function sanitizeAutoApprovedActionTypes(storedActionTypes: unknown): ClickaaActionType[] {
+export function sanitizeAutoApprovedActionTypes(storedActionTypes: unknown): UstaadActionType[] {
   if (!Array.isArray(storedActionTypes)) {
     return [];
   }
   const knownActionTypes = storedActionTypes.filter(
-    (storedActionType): storedActionType is ClickaaActionType =>
+    (storedActionType): storedActionType is UstaadActionType =>
       typeof storedActionType === "string"
-      && (clickaaActionTypes as readonly string[]).includes(storedActionType),
+      && (ustaadActionTypes as readonly string[]).includes(storedActionType),
   );
   return [...new Set(knownActionTypes)];
 }

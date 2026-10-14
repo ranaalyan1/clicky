@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { clickaaWakeWordScript } from "../src/main/wake-word-script";
-import { clickaaWindowsBridgeScript } from "../src/main/windows-bridge-script";
+import { ustaadWakeWordScript } from "../src/main/wake-word-script";
+import { ustaadWindowsBridgeScript } from "../src/main/windows-bridge-script";
 
 /**
  * Both helper scripts are written to disk as UTF-8 with a BOM, but Windows
@@ -11,8 +11,8 @@ import { clickaaWindowsBridgeScript } from "../src/main/windows-bridge-script";
  */
 test("the helper scripts stay ASCII-only", () => {
   for (const [scriptName, scriptSource] of [
-    ["the Windows bridge", clickaaWindowsBridgeScript],
-    ["the wake word listener", clickaaWakeWordScript],
+    ["the Windows bridge", ustaadWindowsBridgeScript],
+    ["the wake word listener", ustaadWakeWordScript],
   ] as const) {
     for (const [index, character] of [...scriptSource].entries()) {
       assert.equal(
@@ -29,7 +29,7 @@ test("the wake word listener keeps its four event kinds", () => {
   // so the two files have to agree on all four of them.
   for (const eventMarker of ["'READY'", "'WAKE '", "'UNAVAILABLE '", "'ERROR '"]) {
     assert.equal(
-      clickaaWakeWordScript.includes(eventMarker),
+      ustaadWakeWordScript.includes(eventMarker),
       true,
       `the wake word listener no longer emits ${eventMarker}`,
     );
@@ -38,13 +38,13 @@ test("the wake word listener keeps its four event kinds", () => {
 
 test("the wake grammar only ever hears the wake phrases", () => {
   // The phrases the recognizer is allowed to hear at all.
-  for (const wakePhrase of ["'clickaa'", "'hey clickaa'", "'ok clickaa'"]) {
-    assert.equal(clickaaWakeWordScript.includes(wakePhrase), true, `missing grammar phrase ${wakePhrase}`);
+  for (const wakePhrase of ["'ustaad'", "'hey ustaad'", "'ok ustaad'"]) {
+    assert.equal(ustaadWakeWordScript.includes(wakePhrase), true, `missing grammar phrase ${wakePhrase}`);
   }
 
   // Easily confused phrases need a higher confidence than the wake word itself.
-  const defaultThresholdMatch = /\$defaultThreshold = ([\d.]+)/u.exec(clickaaWakeWordScript);
-  const strictThresholdMatch = /\$strictThreshold = ([\d.]+)/u.exec(clickaaWakeWordScript);
+  const defaultThresholdMatch = /\$defaultThreshold = ([\d.]+)/u.exec(ustaadWakeWordScript);
+  const strictThresholdMatch = /\$strictThreshold = ([\d.]+)/u.exec(ustaadWakeWordScript);
   assert.ok(defaultThresholdMatch, "the listener has lost its default confidence threshold");
   assert.ok(strictThresholdMatch, "the listener has lost its strict confidence threshold");
 
@@ -54,5 +54,5 @@ test("the wake grammar only ever hears the wake phrases", () => {
   assert.equal(strictThreshold > defaultThreshold && strictThreshold < 1, true);
 
   // And the reason the strict list exists: those phrases hide inside typing.
-  assert.equal(clickaaWakeWordScript.includes("$strictPhrases = @('click a', 'click ah')"), true);
+  assert.equal(ustaadWakeWordScript.includes("$strictPhrases = @('click a', 'click ah')"), true);
 });
