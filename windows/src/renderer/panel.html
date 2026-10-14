@@ -327,6 +327,23 @@
           <div id="memory-list" class="list"></div>
         </section>
 
+        <!-- The run history is the answer to "what did you do yesterday?", so it
+             is searchable in place instead of being another file to open. -->
+        <section class="card">
+          <div class="section-heading-row">
+            <div>
+              <p class="eyebrow">what it did</p>
+              <h2>search the run history</h2>
+            </div>
+            <button id="history-clear-button" class="ghost-button" type="button">clear</button>
+          </div>
+          <div class="inline-form">
+            <input id="history-search-input" class="text-field" type="search" spellcheck="false" autocomplete="off" placeholder="receipts from last week">
+          </div>
+          <p id="history-hint" class="field-hint">every reply and every task is written to run-history.json in your user folder. search it here, or open the file yourself.</p>
+          <div id="history-list" class="list"></div>
+        </section>
+
         <section class="card" id="skills-card">
           <div class="section-heading-row">
             <div>

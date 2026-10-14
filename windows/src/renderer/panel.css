@@ -352,6 +352,21 @@ button:disabled { opacity: .5; cursor: default; box-shadow: var(--ustaad-neu-ins
 .step-state { color: var(--faint); font-size: 9px; text-transform: uppercase; letter-spacing: .08em; }
 .step-row.is-done .step-state { color: var(--green); }
 
+/* ---------------------------------------------------------- history ----- */
+
+/* The matched line, quieter than the request it belongs to. */
+.run-snippet {
+  margin-top: 3px;
+  color: var(--ustaad-ink-muted);
+  font-size: 10.5px;
+  line-height: 1.5;
+}
+
+.list-row-meta[data-outcome="failed"],
+.list-row-meta[data-outcome="gave_up"],
+.list-row-meta[data-outcome="ran_out_of_steps"],
+.list-row-meta[data-outcome="ran_out_of_time"] { color: var(--ustaad-caution); }
+
 /* ---------------------------------------------------------- shortcuts ---- */
 
 .shortcut-card { padding: 6px 16px; }

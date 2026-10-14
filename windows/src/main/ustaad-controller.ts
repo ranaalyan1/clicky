@@ -15,6 +15,8 @@ import {
   IslandToggleKey,
   NowPlayingInfo,
   RegionSelectorSelection,
+  RunHistoryEntry,
+  RunHistorySearchResult,
   Skill,
   WakeWordSurfaceState,
 } from "../shared/contracts";
@@ -25,6 +27,7 @@ import {
   parseModelResponse,
 } from "./action-protocol";
 import { ActivityFeed, MemoryStore } from "./memory-store";
+import { RunHistoryStore } from "./run-history-store";
 import { AudioRecordingBuffer } from "./audio-recording-buffer";
 import { BrainRouter } from "./brain-router";
 import {
@@ -123,6 +126,7 @@ export class UstaadController {
   private readonly appIndex: StartMenuAppIndex;
   private readonly todoStore: TodoStore;
   private readonly memoryStore: MemoryStore;
+  private readonly runHistoryStore: RunHistoryStore;
   private readonly scheduleStore: ScheduleStore;
   private readonly presenceStore: PresenceStore;
   private readonly snippetStore: SnippetStore;
@@ -192,6 +196,7 @@ export class UstaadController {
     this.appIndex = new StartMenuAppIndex(this.bridge);
     this.todoStore = new TodoStore(`${userDataDirectory}/todos.json`);
     this.memoryStore = new MemoryStore(`${userDataDirectory}/memory.json`);
+    this.runHistoryStore = new RunHistoryStore(`${userDataDirectory}/run-history.json`);
     this.scheduleStore = new ScheduleStore(`${userDataDirectory}/schedules.json`);
     this.presenceStore = new PresenceStore(`${userDataDirectory}/presence.json`);
     this.snippetStore = new SnippetStore(`${userDataDirectory}/snippets.json`);
@@ -702,6 +707,14 @@ export class UstaadController {
       const spokenText = pointingResult.spokenText || parsedResponse.spokenText;
       this.publicState.responseText = spokenText;
       this.desktopWindows.updateOverlayResponse(spokenText);
+      this.recordRun({
+        request: transcriptText,
+        kind: interactionKind === "scheduled" ? "routine" : "reply",
+        outcome: "completed",
+        note: "",
+        stepsTaken: 0,
+        response: spokenText,
+      });
 
       this.pointAtElement(interactionId, pointingResult, spokenText);
       this.rememberExchange(userPrompt, spokenText);
@@ -1646,6 +1659,29 @@ export class UstaadController {
     this.publishIslandState();
   }
 
+  /**
+   * The run history is a memory of what Ustaad has done, so it follows the same
+   * switch as what it remembers: with memory off, nothing about the user's own
+   * words is written to disk beyond the audit log.
+   */
+  private recordRun(draft: Omit<RunHistoryEntry, "id" | "createdAtIso">): void {
+    if (!this.publicState.config.abilities.memory) {
+      return;
+    }
+    this.runHistoryStore.record(draft);
+  }
+
+  searchRunHistory(query: string): RunHistorySearchResult[] {
+    if (!this.publicState.config.abilities.memory) {
+      return [];
+    }
+    return this.runHistoryStore.search(query);
+  }
+
+  clearRunHistory(): number {
+    return this.runHistoryStore.clear();
+  }
+
   handlePanelMemoryClear(): void {
     const removedFactCount = this.memoryStore.clear();
     if (removedFactCount > 0) {
@@ -1960,6 +1996,14 @@ export class UstaadController {
         false,
       );
       this.publicState.lastActionSummary = taskResult.note;
+      this.recordRun({
+        request: goal,
+        kind: "task",
+        outcome: taskResult.outcome,
+        note: taskResult.note,
+        stepsTaken: taskResult.stepsTaken,
+        response: this.publicState.responseText,
+      });
       if (taskResult.outcome === "completed") {
         this.noteSuccessfulTask(goal, initialActions);
       } else {
@@ -1968,6 +2012,14 @@ export class UstaadController {
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : String(error);
       this.activityFeed.record("system", "that task did not finish", errorMessage, false);
+      this.recordRun({
+        request: goal,
+        kind: "task",
+        outcome: "failed",
+        note: errorMessage,
+        stepsTaken: 0,
+        response: "",
+      });
     } finally {
       this.isAgentTaskRunning = false;
       this.agentTaskCancelled = true;

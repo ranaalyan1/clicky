@@ -2,8 +2,6 @@ import { contextBridge, ipcRenderer } from "electron";
 import {
   AudioPlaybackPayload,
   BrainConnectionTestResult,
-  UstaadPublicState,
-  UstaadUserConfig,
   FallbackSpeechPayload,
   IslandPresentation,
   IslandState,
@@ -11,7 +9,10 @@ import {
   OverlayCursorPayload,
   OverlayModePayload,
   OverlayPointPayload,
+  RunHistorySearchResult,
   SelectionBoundsPayload,
+  UstaadPublicState,
+  UstaadUserConfig,
 } from "../shared/contracts";
 
 function subscribe<T>(channel: string, listener: (payload: T) => void): () => void {
@@ -90,6 +91,10 @@ contextBridge.exposeInMainWorld("ustaad", {
   addMemory: (factText: string): void => ipcRenderer.send("panel:add-memory", factText),
   clearMemory: (): void => ipcRenderer.send("panel:clear-memory"),
   clearAuditLog: (): void => ipcRenderer.send("panel:clear-audit-log"),
+  searchRunHistory: (query: string): Promise<RunHistorySearchResult[]> => {
+    return ipcRenderer.invoke("panel:search-run-history", query);
+  },
+  clearRunHistory: (): void => ipcRenderer.send("panel:clear-run-history"),
 
   /* Cursor overlay ------------------------------------------------------- */
   sendPointingAnimationCompleted: (interactionId: number): void => {

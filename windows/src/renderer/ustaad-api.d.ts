@@ -10,6 +10,7 @@ import type {
   OverlayCursorPayload,
   OverlayModePayload,
   OverlayPointPayload,
+  RunHistorySearchResult,
   SelectionBoundsPayload,
 } from "../shared/contracts";
 
@@ -45,6 +46,8 @@ declare global {
       addMemory(factText: string): void;
       clearMemory(): void;
       clearAuditLog(): void;
+      searchRunHistory(query: string): Promise<RunHistorySearchResult[]>;
+      clearRunHistory(): void;
 
       /* Cursor overlay */
       sendPointingAnimationCompleted(interactionId: number): void;

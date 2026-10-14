@@ -10,6 +10,8 @@ import type {
   GeminiVoiceName,
   PersonalityPresetId,
   ResponseLengthId,
+  RunHistoryEntry,
+  RunHistorySearchResult,
   SpeechProviderId,
 } from "../shared/contracts";
 import { createUstaadIcon, setIconButton } from "./icons.js";
@@ -119,6 +121,9 @@ const element = {
   memoryAddButton: requireElement<HTMLButtonElement>("memory-add-button"),
   memoryClearButton: requireElement<HTMLButtonElement>("memory-clear-button"),
   memoryList: requireElement<HTMLElement>("memory-list"),
+  historySearchInput: requireElement<HTMLInputElement>("history-search-input"),
+  historyList: requireElement<HTMLElement>("history-list"),
+  historyClearButton: requireElement<HTMLButtonElement>("history-clear-button"),
   clipboardList: requireElement<HTMLElement>("clipboard-list"),
   clipboardClearButton: requireElement<HTMLButtonElement>("clipboard-clear-button"),
   brainBadge: requireElement<HTMLElement>("brain-badge"),
@@ -628,7 +633,14 @@ function showTransientError(error: unknown): void {
 /* -------------------------------------------------------------------------- */
 
 function setActivePage(pageName: string): void {
-  for (const tabButton of document.querySelectorAll<HTMLButtonElement>(".tab-button")) {
+  // Searching the history is instant and local, so it runs on every keystroke.
+element.historySearchInput.addEventListener("input", () => void refreshRunHistory());
+element.historyClearButton.addEventListener("click", () => {
+  window.ustaad.clearRunHistory();
+  void refreshRunHistory();
+});
+
+for (const tabButton of document.querySelectorAll<HTMLButtonElement>(".tab-button")) {
     tabButton.classList.toggle("active", tabButton.dataset.page === pageName);
   }
   for (const page of document.querySelectorAll<HTMLElement>(".page")) {
@@ -642,12 +654,98 @@ function setActivePage(pageName: string): void {
   if (pageName === "plans" || pageName === "memory") {
     void refreshIslandLists();
   }
+  if (pageName === "memory") {
+    void refreshRunHistory();
+  }
 }
 
 /**
  * The panel reuses the island's state for the to-do list, schedules, memory and
  * clipboard so there is exactly one source of truth for the user's data.
  */
+const runOutcomeLabels: Record<RunHistoryEntry["outcome"], string> = {
+  completed: "done",
+  gave_up: "gave up",
+  ran_out_of_steps: "ran out of steps",
+  ran_out_of_time: "ran out of time",
+  stopped: "stopped",
+  failed: "failed",
+};
+
+function formatRunMoment(createdAtIso: string): string {
+  const createdAt = new Date(createdAtIso);
+  if (Number.isNaN(createdAt.getTime())) {
+    return "";
+  }
+  return createdAt.toLocaleString(undefined, {
+    month: "short",
+    day: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+  });
+}
+
+/**
+ * Run history rows. The request is the heading and the snippet is the line that
+ * matched, so searching "receipts" shows the run *and* why it is on screen.
+ */
+function renderRunHistory(searchResults: RunHistorySearchResult[], query: string): void {
+  if (!searchResults.length) {
+    element.historyList.replaceChildren(createEmptyRow(query
+      ? "nothing in the history matches that yet."
+      : "no runs recorded yet. ask something and it lands here."));
+    return;
+  }
+
+  element.historyList.replaceChildren(...searchResults.map((searchResult) => {
+    const { entry, snippet } = searchResult;
+
+    const row = document.createElement("div");
+    row.className = "list-row";
+
+    const copy = document.createElement("div");
+    copy.className = "list-row-main";
+
+    const title = document.createElement("div");
+    title.className = "list-row-title";
+    title.textContent = entry.request;
+    copy.append(title);
+
+    if (snippet && snippet !== entry.request) {
+      const snippetLine = document.createElement("div");
+      snippetLine.className = "run-snippet";
+      snippetLine.textContent = snippet;
+      copy.append(snippetLine);
+    }
+
+    const meta = document.createElement("div");
+    meta.className = "list-row-meta";
+    const moment = formatRunMoment(entry.createdAtIso);
+    const stepCount = entry.stepsTaken > 0 ? `${entry.stepsTaken} step${entry.stepsTaken === 1 ? "" : "s"}` : "";
+    meta.textContent = [moment, entry.kind, runOutcomeLabels[entry.outcome], stepCount].filter(Boolean).join(" · ");
+    meta.dataset.outcome = entry.outcome;
+    copy.append(meta);
+
+    row.append(copy);
+    return row;
+  }));
+}
+
+async function refreshRunHistory(): Promise<void> {
+  // With memory switched off the history is not written at all, so say that
+  // rather than showing an empty list that looks like a bug.
+  if (latestState && !latestState.config.abilities.memory) {
+    element.historyList.replaceChildren(createEmptyRow(
+      "the run history follows the memory switch, and memory is off. turn it on in soul and runs start landing here.",
+    ));
+    return;
+  }
+
+  const query = element.historySearchInput.value.trim();
+  const searchResults = await window.ustaad.searchRunHistory(query);
+  renderRunHistory(searchResults, query);
+}
+
 async function refreshIslandLists(): Promise<void> {
   const islandState = await window.ustaad.getIslandState();
 

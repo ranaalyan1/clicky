@@ -519,6 +519,31 @@ export interface MemoryFact {
   createdAtIso: string;
 }
 
+/**
+ * One interaction, written down after it finished: what was asked, how it was
+ * answered, whether it got there, and how much work it took. Stored as plain
+ * JSON the user can read, and searched in memory rather than in a database.
+ */
+export interface RunHistoryEntry {
+  id: string;
+  createdAtIso: string;
+  request: string;
+  kind: "reply" | "task" | "routine" | "check-in";
+  outcome: "completed" | "gave_up" | "ran_out_of_steps" | "ran_out_of_time" | "stopped" | "failed";
+  /** The one-line account of where the run ended up. */
+  note: string;
+  stepsTaken: number;
+  response: string;
+}
+
+export interface RunHistorySearchResult {
+  entry: RunHistoryEntry;
+  /** How well the entry matched, higher is better. */
+  score: number;
+  /** The matched words in context, so the list shows why a row is there. */
+  snippet: string;
+}
+
 export interface ScheduledTask {
   id: string;
   name: string;

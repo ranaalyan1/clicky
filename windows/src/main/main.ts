@@ -292,6 +292,19 @@ function registerIpcHandlers(): void {
     }
   });
 
+  ipcMain.handle("panel:search-run-history", (event, query: string) => {
+    if (!panelSentEvent(event.sender.id)) {
+      throw new Error("IPC request rejected: sender is not the Ustaad panel.");
+    }
+    return ustaadController?.searchRunHistory(String(query)) ?? [];
+  });
+
+  ipcMain.on("panel:clear-run-history", (event) => {
+    if (panelSentEvent(event.sender.id)) {
+      ustaadController?.clearRunHistory();
+    }
+  });
+
   ipcMain.on("panel:clear-memory", (event) => {
     if (panelSentEvent(event.sender.id)) {
       ustaadController?.handlePanelMemoryClear();
