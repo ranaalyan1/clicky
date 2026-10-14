@@ -4,6 +4,7 @@ import type {
   ClickaaPublicState,
   ClickaaUserConfig,
   FallbackSpeechPayload,
+  IslandPresentation,
   IslandState,
   IslandToggleKey,
   OverlayCursorPayload,
@@ -43,6 +44,7 @@ declare global {
       addTodo(todoText: string): void;
       addMemory(factText: string): void;
       clearMemory(): void;
+      clearAuditLog(): void;
 
       /* Cursor overlay */
       sendPointingAnimationCompleted(interactionId: number): void;
@@ -59,9 +61,15 @@ declare global {
       getIslandState(): Promise<IslandState>;
       onIslandState(listener: (state: IslandState) => void): () => void;
       onIslandExpanded(listener: (payload: { isExpanded: boolean }) => void): () => void;
+      onIslandPresentation(listener: (payload: { presentation: IslandPresentation }) => void): () => void;
+      closeIsland(): void;
       setIslandPointerOver(isPointerOverIsland: boolean): void;
       setIslandExpanded(isExpanded: boolean): void;
       resolveConfirmation(confirmationId: string, decision: "approve" | "reject"): Promise<string>;
+      saveSkillSuggestion(): Promise<string>;
+      dismissSkillSuggestion(): Promise<void>;
+      renameSkill(skillId: string, nextName: string): Promise<void>;
+      removeSkill(skillId: string): Promise<void>;
       undoActivity(activityEntryId: string): Promise<boolean>;
       launchApp(appName: string): Promise<void>;
       mediaControl(operation: "play_pause" | "next" | "previous"): Promise<void>;

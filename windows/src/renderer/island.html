@@ -4,6 +4,8 @@
   <meta charset="UTF-8">
   <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data:; media-src 'self' data:; connect-src 'none'; object-src 'none'; base-uri 'none'; form-action 'none'">
   <title>Clickaa island</title>
+  <link rel="stylesheet" href="./tokens.css">
+  <link rel="stylesheet" href="./brand.css">
   <link rel="stylesheet" href="./island.css">
 </head>
 <body data-expanded="false" data-voice-state="idle">
@@ -15,8 +17,10 @@
       <span id="notch-wave" class="notch-wave" aria-hidden="true">
         <i></i><i></i><i></i><i></i><i></i>
       </span>
+      <span id="wake-indicator" class="wake-indicator" hidden></span>
       <span id="notch-track" class="notch-track"></span>
       <span id="notch-badge" class="notch-badge" hidden></span>
+      <button id="close-button" class="notch-close" type="button" aria-label="Close Clickaa"></button>
     </div>
 
     <!-- Expanded shell ------------------------------------------------ -->
@@ -46,10 +50,18 @@
               <p id="music-artist" class="music-artist"></p>
             </div>
             <div class="music-controls">
-              <button class="media-button" type="button" data-media="previous" aria-label="Previous">⏮</button>
-              <button class="media-button primary" type="button" data-media="play_pause" aria-label="Play or pause">▶</button>
-              <button class="media-button" type="button" data-media="next" aria-label="Next">⏭</button>
+              <button class="media-button" type="button" data-media="previous" aria-label="Previous track"></button>
+              <button class="media-button primary" type="button" data-media="play_pause" aria-label="Play or pause"></button>
+              <button class="media-button" type="button" data-media="next" aria-label="Next track"></button>
             </div>
+          </article>
+
+          <article id="timer-card" class="island-card" hidden>
+            <div class="card-heading-row">
+              <h3>timers</h3>
+              <span id="timer-summary" class="count-chip"></span>
+            </div>
+            <div id="timer-list" class="island-list"></div>
           </article>
 
           <article class="island-card">
@@ -89,6 +101,14 @@
               <h3>memory</h3>
             </div>
             <div id="memory-list" class="island-list"></div>
+          </article>
+
+          <article class="island-card">
+            <div class="card-heading-row">
+              <h3>snippets</h3>
+            </div>
+            <p class="island-hint">say "insert my address" and clickaa types it wherever you are.</p>
+            <div id="snippet-list" class="island-list"></div>
           </article>
         </section>
 

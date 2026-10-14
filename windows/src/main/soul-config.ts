@@ -52,6 +52,14 @@ export const defaultAbilitySettings: AbilitySettings = {
   memory: true,
   clipboardHistory: true,
   island: true,
+  // Off by default: an always-open microphone is the user's decision to make,
+  // never something Clickaa switches on for them.
+  wakeWord: false,
+  // Both system-access tiers start off. Tier 1 is the ordinary one (read-only
+  // diagnostics, files in the user's own folders); Tier 2 is arbitrary commands
+  // and has to be switched on deliberately, with its own warning.
+  systemAccessTier1: false,
+  systemAccessTier2: false,
 };
 
 export interface PersonalityPresetDefinition {

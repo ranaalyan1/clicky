@@ -1,0 +1,150 @@
+/*
+ * Clickaa design tokens.
+ *
+ * Every renderer links this file first and reads from it, so type, spacing,
+ * colour and motion can only be changed in one place. The legacy variable names
+ * at the bottom are aliases kept so older rules keep working during the move.
+ */
+:root {
+  color-scheme: dark;
+
+  /* Type ---------------------------------------------------------------- */
+  --clickaa-font-ui: "Segoe UI Variable Text", "Segoe UI", system-ui, sans-serif;
+  --clickaa-font-display: "Segoe UI Variable Display", "Segoe UI", system-ui, sans-serif;
+  --clickaa-font-mono: "Cascadia Mono", "Consolas", "SF Mono", ui-monospace, monospace;
+
+  --clickaa-text-2xs: 8.5px;
+  --clickaa-text-xs: 10px;
+  --clickaa-text-sm: 11.5px;
+  --clickaa-text-base: 13px;
+  --clickaa-text-lg: 17px;
+  --clickaa-text-xl: 22px;
+
+  --clickaa-weight-regular: 400;
+  --clickaa-weight-medium: 600;
+  --clickaa-weight-strong: 650;
+
+  /* Spacing: a 2px-based ladder, used for both padding and gaps. ---------- */
+  --clickaa-space-1: 2px;
+  --clickaa-space-2: 4px;
+  --clickaa-space-3: 6px;
+  --clickaa-space-4: 8px;
+  --clickaa-space-5: 10px;
+  --clickaa-space-6: 12px;
+  --clickaa-space-7: 16px;
+  --clickaa-space-8: 20px;
+  --clickaa-space-9: 28px;
+
+  /* Radii --------------------------------------------------------------- */
+  --clickaa-radius-xs: 4px;
+  --clickaa-radius-sm: 6px;
+  --clickaa-radius-md: 9px;
+  --clickaa-radius-lg: 12px;
+  --clickaa-radius-xl: 16px;
+  --clickaa-radius-pill: 999px;
+
+  /* Colour -------------------------------------------------------------- */
+  --clickaa-canvas: #0c110f;
+  --clickaa-surface: #131a17;
+  --clickaa-surface-raised: #18211d;
+  --clickaa-surface-hover: rgba(255, 255, 255, 0.06);
+  --clickaa-line: rgba(255, 255, 255, 0.075);
+  --clickaa-line-strong: rgba(255, 255, 255, 0.14);
+
+  --clickaa-ink: #f0f5f2;
+  --clickaa-ink-muted: #8e9b94;
+  --clickaa-ink-faint: #627068;
+
+  --clickaa-accent: #4596ff;
+  --clickaa-accent-bright: #72b2ff;
+  --clickaa-accent-soft: rgba(69, 150, 255, 0.16);
+  --clickaa-positive: #65d99a;
+  --clickaa-caution: #ffc56a;
+  --clickaa-danger: #ff8585;
+
+  /* Elevation ----------------------------------------------------------- */
+  --clickaa-shadow-soft: 0 6px 18px rgba(0, 0, 0, 0.28);
+  --clickaa-shadow-raised: 0 12px 30px rgba(0, 0, 0, 0.42);
+  --clickaa-shadow-floating: 0 18px 44px rgba(0, 0, 0, 0.52);
+
+  /* Motion -------------------------------------------------------------- */
+  --clickaa-ease-out: cubic-bezier(0.2, 0.8, 0.3, 1);
+  --clickaa-ease-in-out: cubic-bezier(0.45, 0, 0.55, 1);
+  --clickaa-duration-fast: 140ms;
+  --clickaa-duration-base: 200ms;
+  --clickaa-duration-slow: 320ms;
+
+  /* Focus: one ring for every control, so keyboard use is obvious. ------- */
+  --clickaa-focus-ring: 0 0 0 2px rgba(69, 150, 255, 0.65);
+  --clickaa-focus-shadow: 0 0 0 2px rgba(69, 150, 255, 0.65), 0 0 0 4px rgba(12, 17, 15, 0.9);
+
+  /* --------------------------------------------------------------------- */
+  /* Aliases: the names the older rules already use.                       */
+  /* --------------------------------------------------------------------- */
+  --background: var(--clickaa-canvas);
+  --surface: var(--clickaa-surface);
+  --surface-raised: var(--clickaa-surface-raised);
+  --line: var(--clickaa-line);
+  --text: var(--clickaa-ink);
+  --muted: var(--clickaa-ink-muted);
+  --faint: var(--clickaa-ink-faint);
+  --blue: var(--clickaa-accent);
+  --blue-bright: var(--clickaa-accent-bright);
+  --green: var(--clickaa-positive);
+  --danger: var(--clickaa-danger);
+
+  --island-background: var(--clickaa-canvas);
+  --island-surface: var(--clickaa-surface);
+  --island-line: var(--clickaa-line);
+  --island-text: var(--clickaa-ink);
+  --island-muted: var(--clickaa-ink-muted);
+  --island-faint: var(--clickaa-ink-faint);
+  --island-blue: var(--clickaa-accent-bright);
+  --island-green: var(--clickaa-positive);
+  --island-danger: var(--clickaa-danger);
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  font-family: var(--clickaa-font-ui);
+  -webkit-font-smoothing: antialiased;
+}
+
+/* Inline SVG icons, sized by the component that owns them. */
+.clickaa-icon {
+  display: block;
+  flex: 0 0 auto;
+  width: 16px;
+  height: 16px;
+  color: inherit;
+}
+.clickaa-icon.size-sm { width: 13px; height: 13px; }
+.clickaa-icon.size-lg { width: 20px; height: 20px; }
+
+button:focus-visible,
+input:focus-visible,
+select:focus-visible,
+textarea:focus-visible,
+[tabindex]:focus-visible {
+  outline: none;
+  box-shadow: var(--clickaa-focus-ring);
+}
+
+::selection {
+  background: var(--clickaa-accent-soft);
+}
+
+/* Someone who asked Windows to calm animations down gets a still interface. */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}

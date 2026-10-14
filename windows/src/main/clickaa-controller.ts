@@ -1,5 +1,9 @@
-import { app, clipboard } from "electron";
+import { randomUUID } from "node:crypto";
+import { mkdir, writeFile } from "node:fs/promises";
+import { join } from "node:path";
+import { app, clipboard, ClipboardItem } from "electron";
 import {
+  ActiveTimer,
   BrainConnectionTestResult,
   CapturedDisplayImage,
   ClickaaAction,
@@ -7,9 +11,12 @@ import {
   ClickaaUserConfig,
   InteractionKind,
   IslandState,
+  ClipboardTransformOperation,
   IslandToggleKey,
   NowPlayingInfo,
   RegionSelectorSelection,
+  Skill,
+  WakeWordSurfaceState,
 } from "../shared/contracts";
 import {
   actionNeedsConfirmation,
@@ -20,7 +27,12 @@ import {
 import { ActivityFeed, MemoryStore } from "./memory-store";
 import { AudioRecordingBuffer } from "./audio-recording-buffer";
 import { BrainRouter } from "./brain-router";
-import { ClickaaActionExecutor } from "./system-actions";
+import {
+  ActionExecutionOutcome,
+  completedActionOutcome,
+  ClickaaActionExecutor,
+  failedActionOutcome,
+} from "./system-actions";
 import { ClipboardHistoryStore } from "./clipboard-history-store";
 import { ConfirmationQueue, interpretConfirmationAnswer } from "./confirmation-queue";
 import { ClickaaConfigStore } from "./config-store";
@@ -30,12 +42,34 @@ import {
   shouldSkipDictationCleanup,
   stripDictationCleanupWrappers,
 } from "./dictation-prompts";
-import { formatFriendlyDateTime } from "./local-time";
+import { formatClockTime, formatFriendlyDateTime, formatLocalIso } from "./local-time";
+import { captureWindowsDesktopRegionPng } from "./screen-capture";
+import { WakeWordDetection, WakeWordListener, WakeWordListenerState } from "./wake-word-listener";
+import {
+  AgentLoopLookResult,
+  buildAgentLookPrompt,
+  ClickaaAgentLoop,
+  defaultAgentLoopBudget,
+  parseAgentLookResponse,
+} from "./agent-loop";
+import { ShortcutId } from "./shortcut-registry";
 import { mapImageCoordinateToWindowsDesktop, parsePointingTag, selectPointingDisplay } from "./pointing";
 import { ScheduleStore } from "./schedule-store";
+import { AuditLogStore } from "./audit-log-store";
+import { JsonFileStore } from "./json-file-store";
+import { SkillStore } from "./skill-store";
+import { SnippetStore } from "./snippet-store";
+import {
+  SkillSuggestion,
+  suggestSkill,
+  taskSignature,
+  TaskHistoryEntry,
+  trimTaskHistory,
+} from "./skill-suggestions";
+import { SystemAccessRunner } from "./system-access-runner";
 import { captureAllWindowsDisplays, captureWindowsDesktopRegion } from "./screen-capture";
 import { describeScheduledTask } from "./schedule-time";
-import { dictationShortcutLabels } from "./shortcut-registry";
+import { dictationShortcutLabels, shortcutLabels } from "./shortcut-registry";
 import { StartMenuAppIndex } from "./start-menu-app-index";
 import { buildSystemPrompt } from "./system-prompt";
 import { TodoStore } from "./todo-store";
@@ -47,6 +81,24 @@ const schedulerTickMilliseconds = 20_000;
 const clipboardPollMilliseconds = 900;
 const nowPlayingPollMilliseconds = 3_000;
 const confirmationTimeoutMilliseconds = 45_000;
+
+/**
+ * How long the listening window after the wake word stays open. The first
+ * number is generous enough for "Clickaa ..." pauses, and the last two stop
+ * Clickaa from holding the microphone open when the name was a false start.
+ */
+/** What Clickaa remembers between runs in order to offer skills at the right time. */
+interface SkillSuggestionMemory {
+  history: TaskHistoryEntry[];
+  declinedSignatures: Record<string, number>;
+}
+
+const wakeFollowUpSilenceWindows = {
+  speechLevel: 0.08,
+  afterSpeech: 1_800,
+  noSpeech: 4_000,
+  maximum: 15_000,
+};
 
 interface UndoableAction {
   label: string;
@@ -65,6 +117,10 @@ export class ClickaaController {
   private readonly todoStore: TodoStore;
   private readonly memoryStore: MemoryStore;
   private readonly scheduleStore: ScheduleStore;
+  private readonly snippetStore: SnippetStore;
+  private readonly auditLogStore: AuditLogStore;
+  private readonly skillStore: SkillStore;
+  private readonly systemAccessRunner: SystemAccessRunner;
   private readonly clipboardHistoryStore: ClipboardHistoryStore;
   private readonly activityFeed = new ActivityFeed();
   private readonly confirmationQueue = new ConfirmationQueue();
@@ -94,6 +150,28 @@ export class ClickaaController {
   private clipboardPollTimer: NodeJS.Timeout | null = null;
   private nowPlayingTimer: NodeJS.Timeout | null = null;
   private lastClipboardText = "";
+  private activeTimers: ActiveTimer[] = [];
+  private isSnipInFlight = false;
+  /** Successful tasks, so Clickaa can notice when the user keeps asking for one. */
+  private taskHistory: TaskHistoryEntry[] = [];
+  /** Signatures the user said no to, and how often the task had succeeded then. */
+  private readonly declinedSkillSignatures = new Map<string, number>();
+  private currentSkillSuggestion: SkillSuggestion | null = null;
+  private skillSuggestionHistoryStore: JsonFileStore<SkillSuggestionMemory> | null = null;
+  private readonly wakeWordListener: WakeWordListener;
+  private wakeWordState: WakeWordSurfaceState = "off";
+  private wakeWordMessage = "";
+  /** Runtime mute: the tray switch that silences the microphone without losing the setting. */
+  private wakeWordMuted = false;
+  private wakeFollowUpTimer: NodeJS.Timeout | null = null;
+  private wakeFollowUpStartedAtMs = 0;
+  private wakeFollowUpHeardSpeechAtMs = 0;
+  private readonly agentLoop: ClickaaAgentLoop;
+  /** Task goals waiting on the user's yes, keyed by confirmation id. */
+  private readonly pendingTaskGoals = new Map<string, string>();
+  private isAgentTaskRunning = false;
+  private agentTaskCancelled = true;
+  private timerTickTimer: NodeJS.Timeout | null = null;
   private latestNowPlaying: NowPlayingInfo | null = null;
   private readonly runningScheduledTaskIds = new Set<string>();
 
@@ -107,6 +185,24 @@ export class ClickaaController {
     this.todoStore = new TodoStore(`${userDataDirectory}/todos.json`);
     this.memoryStore = new MemoryStore(`${userDataDirectory}/memory.json`);
     this.scheduleStore = new ScheduleStore(`${userDataDirectory}/schedules.json`);
+    this.snippetStore = new SnippetStore(`${userDataDirectory}/snippets.json`);
+    this.auditLogStore = new AuditLogStore(`${userDataDirectory}/audit-log.json`);
+    this.skillStore = new SkillStore(`${userDataDirectory}/skills.json`);
+    this.skillSuggestionHistoryStore = new JsonFileStore<SkillSuggestionMemory>(
+      `${userDataDirectory}/skill-suggestions.json`,
+      (storedValue) => {
+        const source = storedValue && typeof storedValue === "object"
+          ? storedValue as Partial<SkillSuggestionMemory>
+          : {};
+        return {
+          history: Array.isArray(source.history) ? source.history.slice(-200) : [],
+          declinedSignatures: source.declinedSignatures && typeof source.declinedSignatures === "object"
+            ? source.declinedSignatures
+            : {},
+        };
+      },
+    );
+    this.systemAccessRunner = new SystemAccessRunner();
     this.clipboardHistoryStore = new ClipboardHistoryStore(
       `${userDataDirectory}/clipboard-history.json`,
     );
@@ -116,6 +212,10 @@ export class ClickaaController {
       todoStore: this.todoStore,
       memoryStore: this.memoryStore,
       scheduleStore: this.scheduleStore,
+      snippetStore: this.snippetStore,
+      auditLogStore: this.auditLogStore,
+      systemAccessRunner: this.systemAccessRunner,
+      readAbilities: () => this.configStore.getConfig().abilities,
       openExternalUrl: async (url) => {
         const { shell } = await import("electron");
         await shell.openExternal(url);
@@ -123,6 +223,26 @@ export class ClickaaController {
       showNotification: (title, body) => this.desktopWindows.showNotification(title, body),
       showPanel: (page) => this.desktopWindows.showPanel(page),
       now: () => new Date(),
+    });
+
+    this.agentLoop = new ClickaaAgentLoop({
+      runActions: (actions) => this.runAgentStepActions(actions),
+      look: (lookRequest) => this.lookAtScreenForTask(lookRequest),
+      readNowPlaying: async () => {
+        try {
+          return await this.bridge.readNowPlaying();
+        } catch {
+          return null;
+        }
+      },
+      shouldStop: () => this.agentTaskCancelled || this.configStore.getConfig().automationPaused,
+      wait: (milliseconds) => new Promise((resolve) => setTimeout(resolve, milliseconds)),
+      onProgress: (progressEvent) => this.handleAgentProgress(progressEvent),
+    }, defaultAgentLoopBudget);
+
+    this.wakeWordListener = new WakeWordListener(userDataDirectory, {
+      onStateChanged: (state, message) => this.handleWakeWordListenerState(state, message),
+      onWakeWordDetected: (detection) => this.handleWakeWordDetected(detection),
     });
 
     const config = configStore.getConfig();
@@ -136,7 +256,7 @@ export class ClickaaController {
       shortcutAvailable: true,
       shortcutLabel: "Ctrl + Alt",
       dictationShortcutLabel: dictationShortcutLabels[config.dictationShortcut],
-      circleShortcutLabel: "Ctrl + Shift",
+      circleShortcutLabel: shortcutLabels.circle,
       lastTranscript: "",
       partialTranscript: "",
       responseText: "",
@@ -147,6 +267,11 @@ export class ClickaaController {
       automationPaused: config.automationPaused,
       islandEnabled: config.islandEnabled,
       clipboardHistoryEnabled: config.clipboardHistoryEnabled,
+      wakeWordState: "off",
+      wakeWordMessage: "",
+      wakeWordMuted: false,
+      auditLog: [],
+      auditLogCounts: { allowed: 0, refused: 0, blocked: 0, failed: 0, total: 0 },
       config,
     };
   }
@@ -177,9 +302,13 @@ export class ClickaaController {
       console.warn("Clickaa could not start its Windows helper:", error);
     });
     void this.refreshAppIndex();
+    this.synchronizeWakeWordListener();
+    this.loadSkillSuggestionMemory();
   }
 
   stop(): void {
+    this.endWakeFollowUp();
+    this.wakeWordListener.stop();
     this.cancelActiveWork();
     this.clearTransientOverlayHideTimer();
     this.stopTimers();
@@ -187,7 +316,20 @@ export class ClickaaController {
   }
 
   getPublicState(): ClickaaPublicState {
-    return { ...this.publicState, config: this.configStore.getConfig() };
+    return {
+      ...this.publicState,
+      config: this.configStore.getConfig(),
+      auditLog: this.auditLogStore.list(50),
+      auditLogCounts: this.auditLogStore.summarizeCounts(),
+    };
+  }
+
+  /** Wipes the audit log, at the user's request, and says so in the log itself. */
+  clearAuditLog(): void {
+    this.auditLogStore.clear();
+    this.publishState();
+    this.activityFeed.record("system", "cleared the activity log", "the record of what ran on this pc is now empty", false);
+    this.publishIslandState();
   }
 
   getIslandState(): IslandState {
@@ -198,14 +340,31 @@ export class ClickaaController {
   /* Interaction lifecycle                                                  */
   /* ---------------------------------------------------------------------- */
 
-  handleShortcutPressed(shortcutId: "talk" | "dictation" | "circle"): void {
+  handleShortcutPressed(shortcutId: ShortcutId): void {
+    if (shortcutId === "panic") {
+      this.handlePanicHotkey();
+      return;
+    }
+    if (shortcutId === "snip") {
+      this.beginSnip();
+      return;
+    }
     if (this.heldShortcutIds.has(shortcutId)) {
       return;
     }
     void this.beginInteraction(shortcutId);
   }
 
-  handleShortcutReleased(shortcutId: "talk" | "dictation" | "circle"): void {
+  handleShortcutReleased(shortcutId: ShortcutId): void {
+    if (shortcutId === "panic") {
+      // Lifting the Q changes nothing: the panic already did its work.
+      return;
+    }
+    if (shortcutId === "snip") {
+      // Lifting the S leaves the overlay up: the drag finishes the snip, and
+      // Escape or a bare click walks away from it.
+      return;
+    }
     if (!this.heldShortcutIds.has(shortcutId)) {
       return;
     }
@@ -225,8 +384,47 @@ export class ClickaaController {
     this.handleShortcutReleased("talk");
   }
 
-  handleEscapePressed(): void {
+  /**
+   * The panic hotkey. Whatever is happening — a task clicking through a website,
+   * a spoken answer, a pending confirmation, a snip waiting for a drag — it all
+   * stops here, and Clickaa says so out loud so the user is not left wondering.
+   */
+  handlePanicHotkey(): void {
+    const wasWorkingOnSomething = this.isAgentTaskRunning
+      || this.activeInteractionKind !== null
+      || this.confirmationQueue.list().length > 0
+      || this.isSnipInFlight;
+
+    this.endWakeFollowUp();
+    this.cancelAgentTask();
+    this.pendingTaskGoals.clear();
+    this.confirmationQueue.clear();
+    this.isSnipInFlight = false;
+    this.cancelActiveWork();
     this.desktopWindows.hideRegionSelector();
+    this.desktopWindows.updateOverlayMode({ interactionKind: null, hint: "", typedText: "" });
+    this.publicState.voiceState = "idle";
+    this.publicState.interactionKind = null;
+    this.publicState.errorMessage = null;
+    this.publishState();
+    this.publishIslandState();
+
+    const panicMessage = wasWorkingOnSomething
+      ? "everything stopped. nothing else will run until you ask again."
+      : "nothing was running, so there was nothing to stop.";
+    this.activityFeed.record("system", "panic hotkey", panicMessage, false);
+    this.desktopWindows.showNotification("Clickaa stopped", panicMessage);
+    this.desktopWindows.revealIsland();
+    this.publishIslandState();
+  }
+
+  handleEscapePressed(): void {
+    this.cancelAgentTask();
+    this.pendingTaskGoals.clear();
+    this.confirmationQueue.clear();
+    this.isSnipInFlight = false;
+    this.desktopWindows.hideRegionSelector();
+    this.desktopWindows.closeIsland();
     this.cancelActiveWork();
     this.publicState.voiceState = "idle";
     this.publicState.interactionKind = null;
@@ -503,11 +701,22 @@ export class ClickaaController {
         console.warn("Clickaa skipped some requested actions:", parsedResponse.problems.join("; "));
       }
 
-      this.publicState.lastActionSummary = await this.runModelActions(
-        interactionId,
-        parsedResponse.actions,
-        interactionKind === "scheduled",
-      );
+      if (parsedResponse.taskGoal && interactionKind !== "scheduled") {
+        // The model asked Clickaa to keep working until the goal is met, so the
+        // loop runs the first step itself instead of running it here.
+        this.publicState.lastActionSummary = await this.beginModelTask(
+          interactionId,
+          parsedResponse.taskGoal,
+          parsedResponse.actions,
+          this.configStore.getConfig(),
+        );
+      } else {
+        this.publicState.lastActionSummary = await this.runModelActions(
+          interactionId,
+          parsedResponse.actions,
+          interactionKind === "scheduled",
+        );
+      }
       this.publishState();
       this.publishIslandState();
 
@@ -537,11 +746,13 @@ export class ClickaaController {
         height: circleRegion.height,
       });
       this.lastPointingTargets = [capturedRegion];
+      this.actionExecutor.setClickCoordinateSpace([capturedRegion]);
       return [capturedRegion];
     }
 
     const capturedDisplays = await captureAllWindowsDisplays();
     this.lastPointingTargets = capturedDisplays;
+    this.actionExecutor.setClickCoordinateSpace(capturedDisplays);
     return capturedDisplays;
   }
 
@@ -559,6 +770,8 @@ export class ClickaaController {
       openTodoItems: config.abilities.toDoList ? this.todoStore.summarizeOpenItems(8) : [],
       upcomingSchedules: config.abilities.scheduling ? this.scheduleStore.listNextRunsDescription(5) : [],
       clipboardPreview: this.buildClipboardPreview(config),
+      savedSnippetNames: config.abilities.automation ? this.snippetStore.summarizeSnippetNames(12) : [],
+      savedSkills: config.abilities.automation ? this.skillStore.summarizeNames(12) : [],
       hasScreenshots,
       isCircledRegion: interactionKind === "circle",
       isScheduledTask: interactionKind === "scheduled",
@@ -712,8 +925,7 @@ export class ClickaaController {
         `${describeActions(actionsToConfirm)} — say yes, or press run in the island`,
         false,
       );
-      this.desktopWindows.setIslandVisible(true);
-      this.desktopWindows.setIslandExpanded(true);
+      this.desktopWindows.openIsland();
       if (isScheduledTask) {
         this.desktopWindows.showNotification(
           "Clickaa needs a yes",
@@ -730,7 +942,23 @@ export class ClickaaController {
   private async executeAndRecordAction(action: ClickaaAction): Promise<string> {
     let outcome;
     try {
-      outcome = await this.actionExecutor.execute(action);
+      // Timers and clipboard rewrites need controller state (the clock and the
+      // user's brain), so they are answered here rather than in the executor.
+      if (action.type === "timer_start" || action.type === "timer_cancel") {
+        outcome = await this.runTimerAction(action);
+      } else if (action.type === "clipboard_transform") {
+        outcome = await this.runClipboardTransform(action.operation, action.targetLanguage);
+      } else if (action.type === "run_skill") {
+        outcome = await this.runSavedSkill(action.name);
+      } else if (action.type === "screenshot_region") {
+        this.beginSnip();
+        outcome = completedActionOutcome(
+          "ready to snip",
+          "drag over the part of the screen you want and it lands on your clipboard",
+        );
+      } else {
+        outcome = await this.actionExecutor.execute(action);
+      }
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : String(error);
       this.activityFeed.record(
@@ -750,8 +978,7 @@ export class ClickaaController {
         outcome.message,
       );
       this.activityFeed.record("confirmation", "which one?", outcome.message, false);
-      this.desktopWindows.setIslandVisible(true);
-      this.desktopWindows.setIslandExpanded(true);
+      this.desktopWindows.openIsland();
       this.publishIslandState();
       return "";
     }
@@ -773,6 +1000,194 @@ export class ClickaaController {
     return outcome.status === "completed" ? outcome.message : "";
   }
 
+  /* ---------------------------------------------------------------------- */
+  /* Timers                                                                 */
+  /* ---------------------------------------------------------------------- */
+
+  private async runTimerAction(
+    action: Extract<ClickaaAction, { type: "timer_start" | "timer_cancel" }>,
+  ): Promise<ActionExecutionOutcome> {
+    if (action.type === "timer_start") {
+      const timerId = randomUUID();
+      const durationMilliseconds = action.durationMinutes * 60_000;
+      const endsAt = new Date(Date.now() + durationMilliseconds);
+      const createdTimer: ActiveTimer = {
+        id: timerId,
+        label: action.label,
+        endsAtIso: formatLocalIso(endsAt),
+        remainingSeconds: action.durationMinutes * 60,
+      };
+
+      this.activeTimers.push(createdTimer);
+      this.startTimerTicking();
+      this.publishIslandState();
+
+      const durationDescription = action.durationMinutes >= 60
+        ? `${Math.floor(action.durationMinutes / 60)} hour${action.durationMinutes >= 120 ? "s" : ""}${action.durationMinutes % 60 ? ` and ${action.durationMinutes % 60} minutes` : ""}`
+        : `${action.durationMinutes} minute${action.durationMinutes === 1 ? "" : "s"}`;
+
+      return {
+        status: "completed",
+        message: `started a ${durationDescription} ${action.label} timer`,
+        detail: `ends at ${formatClockTime(endsAt)}`,
+        undoLabel: "stop the timer",
+        undo: () => {
+          this.removeTimer(timerId);
+          this.publishIslandState();
+        },
+        choices: [],
+      };
+    }
+
+    const normalizedQuery = (action.query ?? "").trim().toLowerCase();
+    const timersToStop = normalizedQuery
+      ? this.activeTimers.filter((timer) => timer.label.toLowerCase().includes(normalizedQuery))
+      : [...this.activeTimers];
+
+    if (!timersToStop.length) {
+      return failedActionOutcome(
+        normalizedQuery
+          ? `there is no "${action.query}" timer running.`
+          : "no timers are running.",
+      );
+    }
+
+    for (const timerToStop of timersToStop) {
+      this.removeTimer(timerToStop.id);
+    }
+    this.publishIslandState();
+
+    return completedActionOutcome(
+      timersToStop.length === 1
+        ? `stopped the ${timersToStop[0]!.label} timer`
+        : `stopped ${timersToStop.length} timers`,
+    );
+  }
+
+  private removeTimer(timerId: string): void {
+    this.activeTimers = this.activeTimers.filter((timer) => timer.id !== timerId);
+    if (!this.activeTimers.length && this.timerTickTimer) {
+      clearInterval(this.timerTickTimer);
+      this.timerTickTimer = null;
+    }
+  }
+
+  /** One tick per second only while a timer is running. */
+  private startTimerTicking(): void {
+    if (this.timerTickTimer) {
+      return;
+    }
+
+    this.timerTickTimer = setInterval(() => {
+      const now = Date.now();
+      const finishedTimers: ActiveTimer[] = [];
+      const runningTimers: ActiveTimer[] = [];
+
+      for (const timer of this.activeTimers) {
+        const remainingSeconds = Math.max(
+          0,
+          Math.round((Date.parse(timer.endsAtIso) - now) / 1_000),
+        );
+        if (remainingSeconds <= 0) {
+          finishedTimers.push({ ...timer, remainingSeconds: 0 });
+        } else {
+          runningTimers.push({ ...timer, remainingSeconds });
+        }
+      }
+
+      this.activeTimers = runningTimers;
+      if (!this.activeTimers.length && this.timerTickTimer) {
+        clearInterval(this.timerTickTimer);
+        this.timerTickTimer = null;
+      }
+
+      for (const finishedTimer of finishedTimers) {
+        void this.finishTimer(finishedTimer);
+      }
+
+      this.publishIslandState();
+    }, 1_000);
+  }
+
+  private async finishTimer(finishedTimer: ActiveTimer): Promise<void> {
+    const announcement = `your ${finishedTimer.label} timer is done.`;
+    this.activityFeed.record("system", announcement, `started at ${finishedTimer.endsAtIso}`, false);
+    this.desktopWindows.showNotification("Clickaa timer", announcement);
+    this.desktopWindows.revealIsland();
+    this.publishIslandState();
+    await this.speakResponse(this.activeInteractionId, announcement);
+  }
+
+  /* ---------------------------------------------------------------------- */
+  /* Clipboard intelligence                                                 */
+  /* ---------------------------------------------------------------------- */
+
+  /**
+   * Rewrites whatever is on the clipboard and puts the result back, so the user
+   * can paste it straight away. The previous text is kept for undo.
+   */
+  private async runClipboardTransform(
+    operation: ClipboardTransformOperation,
+    targetLanguage: string | null,
+  ): Promise<ActionExecutionOutcome> {
+    const config = this.configStore.getConfig();
+    if (!this.brainRouter.isConfigured(config)) {
+      return failedActionOutcome(this.brainRouter.configurationHint(config));
+    }
+    if (config.automationPaused) {
+      return failedActionOutcome("actions are paused, so I did not rewrite the clipboard.");
+    }
+
+    const originalText = (await clipboard.readText()).trim();
+    if (!originalText) {
+      return failedActionOutcome("there is nothing on the clipboard to work with.");
+    }
+
+    const instructionLines: Record<ClipboardTransformOperation, string> = {
+      summarize: "Summarise the text the user gives you. Keep every fact, drop the padding. Reply with the summary only.",
+      fix_grammar: "Fix the spelling, grammar and punctuation of the text the user gives you. Keep the wording, tone and line breaks. Reply with the corrected text only.",
+      shorten: "Rewrite the text the user gives you so it says the same thing in noticeably fewer words. Reply with the rewritten text only.",
+      translate: `Translate the text the user gives you into ${targetLanguage ?? "English"}. Keep the tone and formatting. Reply with the translation only.`,
+    };
+
+    const responseText = await this.brainRouter.streamResponse(config, {
+      systemPrompt: `${instructionLines[operation]} never add a preamble, never explain what you did, never wrap the answer in quotes or a code block.`,
+      userPrompt: originalText,
+      images: [],
+      conversationHistory: [],
+      signal: new AbortController().signal,
+      onTextUpdate: () => undefined,
+    });
+
+    const transformedText = responseText.trim();
+    if (!transformedText) {
+      return failedActionOutcome("the model came back empty, so I left your clipboard alone.");
+    }
+
+    await clipboard.writeText(transformedText);
+    this.clipboardHistoryStore.pushText(transformedText);
+    this.lastClipboardText = transformedText;
+
+    const operationMessages: Record<ClipboardTransformOperation, string> = {
+      summarize: "summarised your clipboard",
+      fix_grammar: "fixed the grammar on your clipboard",
+      shorten: "shortened your clipboard",
+      translate: `translated your clipboard into ${targetLanguage ?? "English"}`,
+    };
+
+    return {
+      status: "completed",
+      message: operationMessages[operation],
+      detail: transformedText.replace(/\s+/gu, " ").slice(0, 160),
+      undoLabel: "put the old text back",
+      undo: async () => {
+        await clipboard.writeText(originalText);
+        this.lastClipboardText = originalText;
+      },
+      choices: [],
+    };
+  }
+
   /** Applies a yes/no, either from the island's buttons or from the user's voice. */
   async runConfirmationDecision(
     confirmationId: string,
@@ -784,10 +1199,29 @@ export class ClickaaController {
     }
 
     if (decision === "reject") {
+      const rejectedTaskGoal = this.pendingTaskGoals.get(confirmationId);
+      if (rejectedTaskGoal) {
+        this.pendingTaskGoals.delete(confirmationId);
+        this.activityFeed.record("confirmation", "skipped it", rejectedTaskGoal, false);
+        this.desktopWindows.setIslandExpanded(false);
+        this.publishIslandState();
+        return "skipped that.";
+      }
       this.activityFeed.record("confirmation", "skipped it", describeActions(pendingConfirmation.actions), false);
       this.desktopWindows.setIslandExpanded(false);
       this.publishIslandState();
       return "skipped that.";
+    }
+
+    const approvedTaskGoal = this.pendingTaskGoals.get(confirmationId) ?? null;
+    if (approvedTaskGoal) {
+      // A task approval runs nothing here: the loop runs the first step, which
+      // keeps one code path for stepping, looking and reporting.
+      this.pendingTaskGoals.delete(confirmationId);
+      this.desktopWindows.setIslandExpanded(false);
+      this.publishIslandState();
+      void this.runAgentTask(approvedTaskGoal, pendingConfirmation.actions);
+      return `working on: ${approvedTaskGoal}`;
     }
 
     const completedMessages: string[] = [];
@@ -961,6 +1395,14 @@ export class ClickaaController {
       return;
     }
     this.publicState.audioPowerLevel = Math.max(0, Math.min(audioPowerLevel, 1));
+
+    if (
+      this.isWakeFollowUpActive()
+      && this.publicState.audioPowerLevel >= wakeFollowUpSilenceWindows.speechLevel
+    ) {
+      this.wakeFollowUpHeardSpeechAtMs = Date.now();
+    }
+
     this.publishState();
     this.desktopWindows.publishIslandState(this.buildIslandState());
   }
@@ -1053,6 +1495,14 @@ export class ClickaaController {
       if (updatedConfig.islandShowNowPlaying) {
         this.startNowPlayingWatcher();
       }
+    }
+
+    if (
+      previousConfig.abilities.wakeWord !== updatedConfig.abilities.wakeWord
+      || previousConfig.automationPaused !== updatedConfig.automationPaused
+      || previousConfig.wakeWordProvider !== updatedConfig.wakeWordProvider
+    ) {
+      this.synchronizeWakeWordListener();
     }
 
     this.publishState();
@@ -1235,6 +1685,13 @@ export class ClickaaController {
     this.desktopWindows.showPanel(pageName || "home");
   }
 
+  /** The island's own close button, or Escape sent by the renderer. */
+  handleIslandClosedByUser(): void {
+    this.isIslandCurrentlyExpanded = false;
+    this.desktopWindows.closeIsland();
+    this.publishIslandState();
+  }
+
   handleIslandExpandedChanged(isExpanded: boolean): void {
     this.isIslandCurrentlyExpanded = isExpanded;
     this.desktopWindows.setIslandExpanded(isExpanded);
@@ -1242,8 +1699,648 @@ export class ClickaaController {
   }
 
   /* ---------------------------------------------------------------------- */
+  /* Multi-step tasks                                                       */
+  /* ---------------------------------------------------------------------- */
+
+  /**
+   * Enters the agent loop for a reply that described a goal instead of a single
+   * action. One approval covers the whole task — the user sees the goal, not a
+   * click-by-click script — and every step is still logged and undoable, with
+   * Escape stopping everything immediately.
+   */
+  private async beginModelTask(
+    interactionId: number,
+    goal: string,
+    initialActions: ClickaaAction[],
+    config: ClickaaUserConfig,
+  ): Promise<string> {
+    if (config.automationPaused) {
+      this.activityFeed.record(
+        "system",
+        "actions are paused",
+        `Clickaa would have worked on: ${goal}`,
+        false,
+      );
+      this.publishIslandState();
+      return "actions are paused";
+    }
+
+    if (!config.abilities.screenVision) {
+      // Without eyes, a task cannot be checked and must not be attempted blind.
+      this.activityFeed.record(
+        "system",
+        "I need to see the screen for that",
+        "switch screen vision back on in the soul tab and ask me again",
+        false,
+      );
+      this.publishIslandState();
+      return "I need screen vision for that";
+    }
+
+    const { allowedActions, blockedActions } = filterActionsByAbilities(initialActions, config.abilities);
+    for (const blockedAction of blockedActions) {
+      this.activityFeed.record(
+        "system",
+        "skipped an action",
+        `${blockedAction.action.type.replace(/_/gu, " ")} needs the "${blockedAction.ability}" ability, which is switched off`,
+        false,
+      );
+    }
+
+    const actionsNeedingApproval = allowedActions.filter((action) =>
+      actionNeedsConfirmation(action, config.confirmationMode, config.autoApprovedActionTypes));
+
+    if (actionsNeedingApproval.length) {
+      const pendingConfirmation = this.confirmationQueue.enqueue(
+        interactionId,
+        allowedActions,
+        `work on: ${goal}`,
+      );
+      this.pendingTaskGoals.set(pendingConfirmation.id, goal);
+      this.activityFeed.record(
+        "confirmation",
+        "waiting for your yes",
+        `${goal} — Clickaa will click and type on this pc until that is done, or press Esc to stop`,
+        false,
+      );
+      this.desktopWindows.openIsland();
+      this.publishIslandState();
+      return `waiting for your yes to work on: ${goal}`;
+    }
+
+    void this.runAgentTask(goal, allowedActions);
+    return `working on: ${goal}`;
+  }
+
+  /* ---------------------------------------------------------------------- */
+  /* Skills: tasks the user saved by name                                   */
+  /* ---------------------------------------------------------------------- */
+
+  private loadSkillSuggestionMemory(): void {
+    const memory = this.skillSuggestionHistoryStore?.read();
+    if (!memory) {
+      return;
+    }
+    this.taskHistory = trimTaskHistory(memory.history);
+    for (const [signature, declineCount] of Object.entries(memory.declinedSignatures)) {
+      this.declinedSkillSignatures.set(signature, declineCount);
+    }
+  }
+
+  private persistSkillSuggestionMemory(): void {
+    this.skillSuggestionHistoryStore?.write({
+      history: trimTaskHistory(this.taskHistory),
+      declinedSignatures: Object.fromEntries(this.declinedSkillSignatures),
+    });
+  }
+
+  /**
+   * Called after a task finishes well. Clickaa counts repeats in the background
+   * and, once the same task has worked a few times, offers to save it — it never
+   * saves anything by itself.
+   */
+  private noteSuccessfulTask(goal: string, seedActions: ClickaaAction[]): void {
+    if (!this.configStore.getConfig().abilities.automation) {
+      return;
+    }
+
+    const signature = taskSignature(goal);
+    if (!signature) {
+      return;
+    }
+
+    this.taskHistory = trimTaskHistory([
+      ...this.taskHistory,
+      {
+        id: randomUUID(),
+        goal,
+        signature,
+        seedActions: seedActions.slice(0, 12),
+        succeededAtIso: new Date().toISOString(),
+      },
+    ]);
+    this.persistSkillSuggestionMemory();
+
+    const savedSignatures = new Set(this.skillStore.list().map((skill) => taskSignature(skill.goal)));
+    const suggestion = suggestSkill({
+      history: this.taskHistory,
+      savedSignatures,
+      declinedSignatures: Object.fromEntries(this.declinedSkillSignatures),
+    });
+
+    if (!suggestion) {
+      return;
+    }
+    if (this.currentSkillSuggestion?.signature === suggestion.signature) {
+      return;
+    }
+
+    this.currentSkillSuggestion = suggestion;
+    this.activityFeed.record(
+      "system",
+      `that worked ${suggestion.successCount} times`,
+      `save it as "${suggestion.proposedName}" so you can just ask for it?`,
+      false,
+    );
+    this.desktopWindows.openIsland();
+    this.publishIslandState();
+  }
+
+  /** The island's "save it" button. Only ever runs because the user pressed it. */
+  saveSuggestedSkill(): Skill | null {
+    const suggestion = this.currentSkillSuggestion;
+    if (!suggestion) {
+      return null;
+    }
+
+    const savedSkill = this.skillStore.save({
+      name: suggestion.proposedName,
+      goal: suggestion.goal,
+      seedActions: suggestion.seedActions,
+    });
+
+    this.currentSkillSuggestion = null;
+    this.declinedSkillSignatures.delete(suggestion.signature);
+    this.persistSkillSuggestionMemory();
+
+    this.activityFeed.record(
+      "system",
+      `saved the "${savedSkill.name}" skill`,
+      `say "do ${savedSkill.name}" any time, or rename it in the plans tab`,
+      false,
+    );
+    this.publishState();
+    this.publishIslandState();
+    return savedSkill;
+  }
+
+  dismissSuggestedSkill(): void {
+    const suggestion = this.currentSkillSuggestion;
+    if (!suggestion) {
+      return;
+    }
+
+    // Remembering the count at refusal is what makes "no" stick for a while,
+    // instead of asking again the very next time the user does the thing.
+    this.declinedSkillSignatures.set(suggestion.signature, suggestion.successCount);
+    this.currentSkillSuggestion = null;
+    this.persistSkillSuggestionMemory();
+
+    this.activityFeed.record("system", "no skill saved", "I will not ask again for a while", false);
+    this.publishIslandState();
+  }
+
+  renameSkill(skillId: string, nextName: string): ClickaaPublicState | void {
+    const renamedSkill = this.skillStore.rename(skillId, nextName);
+    if (!renamedSkill) {
+      return;
+    }
+    this.publishIslandState();
+    this.publishState();
+  }
+
+  removeSkill(skillId: string): void {
+    const skill = this.skillStore.findById(skillId);
+    if (!this.skillStore.remove(skillId)) {
+      return;
+    }
+    this.activityFeed.record("system", `removed the "${skill?.name ?? "saved"}" skill`, "", false);
+    this.publishIslandState();
+    this.publishState();
+  }
+
+  /**
+   * Runs a saved skill. It goes through beginModelTask like any other task, so
+   * the ability checks, the task approval and the agent loop all still apply —
+   * a skill can never do something the user would not have agreed to out loud.
+   */
+  private async runSavedSkill(skillName: string): Promise<ActionExecutionOutcome> {
+    const skill = this.skillStore.findByName(skillName);
+    if (!skill) {
+      const availableNames = this.skillStore.summarizeNames(3).map((candidate) => `"${candidate.name}"`);
+      return failedActionOutcome(
+        availableNames.length
+          ? `I do not have a "${skillName}" skill. I do have ${availableNames.join(", ")}.`
+          : `I do not have a "${skillName}" skill yet.`,
+      );
+    }
+
+    this.skillStore.noteRun(skill.id);
+    void this.runAgentTask(skill.goal, skill.seedActions);
+    return completedActionOutcome(`starting ${skill.name}`, skill.goal);
+  }
+
+  /** Runs the loop and reports where it ended up. */
+  private async runAgentTask(goal: string, initialActions: ClickaaAction[]): Promise<void> {
+    if (this.isAgentTaskRunning) {
+      return;
+    }
+
+    this.isAgentTaskRunning = true;
+    this.agentTaskCancelled = false;
+    this.activityFeed.record("system", `working on: ${goal}`, "step by step, checking the screen as it goes", false);
+    this.desktopWindows.openIsland();
+    this.publishIslandState();
+
+    try {
+      const taskResult = await this.agentLoop.run(goal, initialActions);
+      this.activityFeed.record(
+        taskResult.outcome === "completed" ? "system" : "system",
+        taskResult.outcome === "completed" ? "finished" : "stopped",
+        `${goal} — ${taskResult.note}`,
+        false,
+      );
+      this.publicState.lastActionSummary = taskResult.note;
+      if (taskResult.outcome === "completed") {
+        this.noteSuccessfulTask(goal, initialActions);
+      } else {
+        this.desktopWindows.showNotification("Clickaa", `${goal}: ${taskResult.note}`);
+      }
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      this.activityFeed.record("system", "that task did not finish", errorMessage, false);
+    } finally {
+      this.isAgentTaskRunning = false;
+      this.agentTaskCancelled = true;
+      this.publishState();
+      this.publishIslandState();
+    }
+  }
+
+  /** One step of a task: the ordinary action path, minus the per-step prompts. */
+  private async runAgentStepActions(actions: ClickaaAction[]): Promise<string> {
+    const stepMessages: string[] = [];
+    for (const action of actions) {
+      if (this.agentTaskCancelled) {
+        break;
+      }
+      const completedMessage = await this.executeAndRecordAction(action);
+      if (completedMessage) {
+        stepMessages.push(completedMessage);
+      }
+    }
+    this.publishIslandState();
+    return stepMessages.join("; ");
+  }
+
+  /**
+   * Looks at the screen and asks the model whether the goal is met. Clickaa
+   * sends the same multi-monitor screenshots it uses for answering, so clicks
+   * the model proposes are expressed in a space Clickaa can map back.
+   */
+  private async lookAtScreenForTask(lookRequest: {
+    goal: string;
+    stepNumber: number;
+    previousSummary: string;
+    previousActions: ClickaaAction[];
+  }): Promise<AgentLoopLookResult> {
+    const config = this.configStore.getConfig();
+    if (this.agentTaskCancelled || config.automationPaused) {
+      return { kind: "give_up", note: "I stopped because you asked me to" };
+    }
+    if (!this.brainRouter.isConfigured(config)) {
+      return { kind: "unavailable", note: this.brainRouter.configurationHint(config) };
+    }
+
+    let capturedDisplays: CapturedDisplayImage[] = [];
+    try {
+      capturedDisplays = await captureAllWindowsDisplays();
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      return { kind: "unavailable", note: `I could not take a screenshot: ${errorMessage}` };
+    }
+
+    // Clicks in the model's next step are in this screenshot's pixel space.
+    this.actionExecutor.setClickCoordinateSpace(capturedDisplays);
+    this.lastPointingTargets = capturedDisplays;
+
+    const abortController = new AbortController();
+    let responseText = "";
+    try {
+      responseText = await this.brainRouter.streamResponse(config, {
+        systemPrompt: buildAgentLookPrompt({
+          goal: lookRequest.goal,
+          stepNumber: lookRequest.stepNumber,
+          previousSummary: lookRequest.previousSummary,
+          hasScreenshots: capturedDisplays.length > 0,
+        }),
+        userPrompt: `step ${lookRequest.stepNumber} just finished. check the goal and answer with DONE, NEXT or GIVE_UP.`,
+        images: capturedDisplays.map(toBrainImage),
+        conversationHistory: [],
+        signal: abortController.signal,
+        onTextUpdate: () => undefined,
+      });
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      return { kind: "unavailable", note: `I could not check the screen: ${errorMessage}` };
+    }
+
+    return parseAgentLookResponse(responseText);
+  }
+
+  private handleAgentProgress(progressEvent: {
+    kind: string;
+    stepNumber: number;
+    note: string;
+    actionSummary: string;
+  }): void {
+    if (progressEvent.kind === "step_started") {
+      this.desktopWindows.updateOverlayResponse(`step ${progressEvent.stepNumber}: ${progressEvent.note}`);
+    } else if (progressEvent.kind === "step_finished") {
+      this.activityFeed.record("action", `step ${progressEvent.stepNumber}`, progressEvent.note, false);
+      this.publishIslandState();
+    }
+  }
+
+  /** Escape, a new request, quitting: everything the task loop must obey. */
+  private cancelAgentTask(): void {
+    this.agentTaskCancelled = true;
+  }
+
+  /* ---------------------------------------------------------------------- */
+  /* Wake word                                                              */
+  /* ---------------------------------------------------------------------- */
+
+  /**
+   * Runs the offline listener exactly when the user has asked for it: switched
+   * on, not muted, and not paused. Every other combination leaves the
+   * microphone closed.
+   */
+  synchronizeWakeWordListener(): void {
+    const config = this.configStore.getConfig();
+    const shouldListen = config.abilities.wakeWord
+      && !this.wakeWordMuted
+      && !config.automationPaused
+      && config.wakeWordProvider === "offline";
+
+    if (!shouldListen) {
+      this.wakeWordListener.stop();
+      this.wakeWordState = "off";
+      this.wakeWordMessage = config.abilities.wakeWord
+        ? this.wakeWordMuted
+          ? "the microphone is muted from the tray"
+          : config.automationPaused
+            ? "listening stops while actions are paused"
+            : config.wakeWordProvider === "cloud"
+              ? "the cloud wake word is not switched on in this build yet"
+              : ""
+        : "";
+      this.publishState();
+      this.publishIslandState();
+      return;
+    }
+
+    this.wakeWordListener.start();
+  }
+
+  /** The tray switch: silence the microphone without changing the setting. */
+  toggleWakeWordMuted(): void {
+    this.wakeWordMuted = !this.wakeWordMuted;
+    this.publicState.wakeWordMuted = this.wakeWordMuted;
+    this.activityFeed.record(
+      "system",
+      this.wakeWordMuted ? "wake word muted" : "wake word listening again",
+      this.wakeWordMuted
+        ? "Clickaa is not listening for its name until you unmute it"
+        : "say \"clickaa\" to summon the island",
+      false,
+    );
+    this.synchronizeWakeWordListener();
+    this.publishState();
+    this.publishIslandState();
+  }
+
+  isWakeWordMuted(): boolean {
+    return this.wakeWordMuted;
+  }
+
+  private handleWakeWordListenerState(state: WakeWordListenerState, message: string): void {
+    this.wakeWordState = state === "stopped" ? "off" : state;
+    this.wakeWordMessage = message;
+    this.publicState.wakeWordState = this.wakeWordState;
+    this.publicState.wakeWordMessage = message;
+    this.publishState();
+    this.publishIslandState();
+  }
+
+  /**
+   * "Clickaa" on its own summons the island and opens the microphone for one
+   * follow-up: the user can keep talking, and Clickaa submits by itself once
+   * they stop.
+   */
+  private handleWakeWordDetected(detection: WakeWordDetection): void {
+    if (this.wakeWordMuted || this.activeInteractionKind !== null || this.isSnipInFlight) {
+      return;
+    }
+    if (this.publicState.voiceState !== "idle") {
+      return;
+    }
+
+    this.activityFeed.record(
+      "system",
+      `heard "${detection.phrase}"`,
+      `${detection.confidence}% confidence, on this pc`,
+      false,
+    );
+    this.desktopWindows.revealIsland();
+    this.desktopWindows.openIsland();
+    this.publishIslandState();
+    void this.beginWakeFollowUp();
+  }
+
+  /**
+   * One listening window after the wake word. It ends on silence, and it ends
+   * quietly when the user said the wake word and then said nothing else.
+   */
+  private async beginWakeFollowUp(): Promise<void> {
+    await this.beginInteraction("talk");
+    if (this.activeInteractionKind !== "talk") {
+      return;
+    }
+
+    this.wakeFollowUpStartedAtMs = Date.now();
+    this.wakeFollowUpHeardSpeechAtMs = 0;
+    this.startWakeFollowUpWatchdog();
+  }
+
+  private startWakeFollowUpWatchdog(): void {
+    this.clearWakeFollowUpWatchdog();
+    this.wakeFollowUpTimer = setInterval(() => {
+      const now = Date.now();
+      const elapsedMilliseconds = now - this.wakeFollowUpStartedAtMs;
+
+      if (!this.wakeFollowUpHeardSpeechAtMs) {
+        if (elapsedMilliseconds > wakeFollowUpSilenceWindows.noSpeech) {
+          this.endWakeFollowUp({ submit: false });
+        }
+        return;
+      }
+
+      if (now - this.wakeFollowUpHeardSpeechAtMs > wakeFollowUpSilenceWindows.afterSpeech) {
+        this.endWakeFollowUp({ submit: true });
+        return;
+      }
+
+      if (elapsedMilliseconds > wakeFollowUpSilenceWindows.maximum) {
+        this.endWakeFollowUp({ submit: true });
+      }
+    }, 150);
+  }
+
+  private clearWakeFollowUpWatchdog(): void {
+    if (this.wakeFollowUpTimer) {
+      clearInterval(this.wakeFollowUpTimer);
+      this.wakeFollowUpTimer = null;
+    }
+  }
+
+  private endWakeFollowUp(options: { submit: boolean } = { submit: false }): void {
+    const wasActive = this.wakeFollowUpStartedAtMs > 0;
+    this.clearWakeFollowUpWatchdog();
+    this.wakeFollowUpStartedAtMs = 0;
+    this.wakeFollowUpHeardSpeechAtMs = 0;
+
+    if (!wasActive || this.activeInteractionKind !== "talk") {
+      return;
+    }
+
+    if (options.submit) {
+      void this.finishListening();
+      return;
+    }
+
+    // The user called Clickaa's name and stopped there. Close the microphone
+    // without sending anything anywhere, and leave the island open.
+    this.cancelActiveWork();
+    this.publicState.voiceState = "idle";
+    this.publicState.interactionKind = null;
+    this.desktopWindows.updateOverlayMode({ interactionKind: null, hint: "", typedText: "" });
+    this.publishState();
+    this.publishIslandState();
+  }
+
+  private isWakeFollowUpActive(): boolean {
+    return this.wakeFollowUpStartedAtMs > 0;
+  }
+
+  /* ---------------------------------------------------------------------- */
   /* Circle selection                                                       */
   /* ---------------------------------------------------------------------- */
+
+  /* ---------------------------------------------------------------------- */
+  /* Snips: drag a region, land it on the clipboard                         */
+  /* ---------------------------------------------------------------------- */
+
+  /**
+   * Starts a snip. Not a conversation: nothing is recorded and nothing is sent
+   * anywhere, the overlay just waits for a drag.
+   */
+  beginSnip(): void {
+    const config = this.configStore.getConfig();
+    if (!config.abilities.screenVision) {
+      this.publicState.errorMessage = "screen vision is switched off, so Clickaa cannot take a snip. turn it back on in the soul tab.";
+      this.desktopWindows.showPanel("soul");
+      this.publishState();
+      return;
+    }
+    if (config.automationPaused) {
+      this.publicState.errorMessage = "actions are paused, so Clickaa did not start a snip.";
+      this.publishState();
+      return;
+    }
+
+    // The Ctrl+Alt half of the chord may already have started talking.
+    this.cancelActiveWork();
+    this.publicState.errorMessage = null;
+    this.publicState.voiceState = "idle";
+    this.publicState.interactionKind = null;
+    this.isSnipInFlight = true;
+    this.desktopWindows.updateOverlayMode({ interactionKind: null, hint: "", typedText: "" });
+    this.desktopWindows.updateOverlayResponse("");
+    this.desktopWindows.closeIsland();
+    this.desktopWindows.showRegionSelector(
+      "drag over the part you want, then let go to copy it",
+      "snip",
+    );
+    this.publishState();
+    this.publishIslandState();
+  }
+
+  isSnipActive(): boolean {
+    return this.isSnipInFlight;
+  }
+
+  async handleSnipRegionSelected(selection: RegionSelectorSelection): Promise<void> {
+    if (!this.isSnipInFlight) {
+      return;
+    }
+    this.isSnipInFlight = false;
+
+    let capturedSnip: { pngBuffer: Buffer; width: number; height: number };
+    try {
+      capturedSnip = await captureWindowsDesktopRegionPng(selection);
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      this.activityFeed.record("action", "could not take that snip", errorMessage, false);
+      this.desktopWindows.showNotification("Clickaa snip", "I could not capture that region.");
+      this.publishIslandState();
+      return;
+    }
+
+    const savedFilePath = await this.saveSnipFile(capturedSnip.pngBuffer);
+
+    let copiedToClipboard = true;
+    try {
+      await clipboard.write([
+        new ClipboardItem({
+          "image/png": new Blob([new Uint8Array(capturedSnip.pngBuffer)], { type: "image/png" }),
+        }),
+      ]);
+    } catch {
+      // The pixels still exist on disk, so the path is the next best thing.
+      copiedToClipboard = false;
+      if (savedFilePath) {
+        await clipboard.writeText(savedFilePath);
+      }
+    }
+
+    const sizeDescription = `${capturedSnip.width} × ${capturedSnip.height}`;
+    const destinationDescription = savedFilePath
+      ? `saved to ${savedFilePath}`
+      : "not saved to disk";
+    const message = copiedToClipboard
+      ? `copied a ${sizeDescription} snip to your clipboard`
+      : `saved a ${sizeDescription} snip but could not reach the clipboard`;
+
+    this.activityFeed.record("action", message, destinationDescription, false);
+    this.desktopWindows.showNotification("Clickaa snip", copiedToClipboard
+      ? `${sizeDescription} pixels are on your clipboard. Paste anywhere.`
+      : `${sizeDescription} pixels are saved in Pictures.`);
+    this.desktopWindows.revealIsland();
+    this.publishIslandState();
+  }
+
+  handleSnipCancelled(): void {
+    if (!this.isSnipInFlight) {
+      return;
+    }
+    this.isSnipInFlight = false;
+    this.publishIslandState();
+  }
+
+  /** Saves every snip so a copy that gets overwritten is never lost. */
+  private async saveSnipFile(pngBuffer: Buffer): Promise<string | null> {
+    try {
+      const snipDirectory = join(app.getPath("pictures"), "Clickaa Snips");
+      await mkdir(snipDirectory, { recursive: true });
+      const timestamp = new Date().toISOString().replace(/[:.]/gu, "-").slice(0, 19);
+      const snipFilePath = join(snipDirectory, `Clickaa snip ${timestamp}.png`);
+      await writeFile(snipFilePath, pngBuffer);
+      return snipFilePath;
+    } catch {
+      return null;
+    }
+  }
 
   handleCircleRegionSelected(selection: RegionSelectorSelection): void {
     if (this.activeInteractionKind !== "circle") {
@@ -1297,6 +2394,9 @@ export class ClickaaController {
     }
 
     this.scheduleStore.recordRun(scheduledTask.id, new Date());
+    // A routine that fires while the user is doing something else has to be
+    // visible, so the mark slides in even though nobody touched the top edge.
+    this.desktopWindows.revealIsland();
     this.publishIslandState();
 
     if (scheduledTask.kind === "routine") {
@@ -1479,7 +2579,9 @@ export class ClickaaController {
 
   private updateIslandVisibility(): void {
     const config = this.configStore.getConfig();
-    this.desktopWindows.setIslandVisible(config.islandEnabled && config.abilities.island);
+    this.desktopWindows.setIslandEnabled(config.islandEnabled && config.abilities.island);
+    this.desktopWindows.setIslandSummonEnabled(config.islandSummonEnabled);
+    this.desktopWindows.setIslandAlwaysVisible(config.islandAlwaysVisible);
   }
 
   private buildIslandState(): IslandState {
@@ -1499,6 +2601,14 @@ export class ClickaaController {
     return {
       isExpanded: this.isIslandCurrentlyExpanded,
       isEnabled: config.islandEnabled && config.abilities.island,
+      presentation: this.desktopWindows.getIslandPresentation(),
+      activeTimers: this.activeTimers,
+      snippets: this.snippetStore.list().slice(0, 20),
+      wakeWordState: this.wakeWordState,
+      wakeWordMuted: this.wakeWordMuted,
+      wakeWordMessage: this.wakeWordMessage,
+      skills: this.skillStore.list(),
+      skillSuggestion: this.currentSkillSuggestion,
       cursorEnabled: config.cursorEnabled,
       automationPaused: config.automationPaused,
       status: {
@@ -1525,9 +2635,11 @@ export class ClickaaController {
       quickLaunchApps: config.abilities.automation ? this.appIndex.quickLaunchApps(8) : [],
       brainLabel: this.brainRouter.getBrainLabel(config),
       shortcuts: [
-        { label: this.publicState.shortcutLabel, description: "hold to talk about your screen" },
-        { label: this.publicState.dictationShortcutLabel, description: "hold to dictate clean text anywhere" },
-        { label: this.publicState.circleShortcutLabel, description: "hold, circle anything, ask about it" },
+        { label: this.publicState.shortcutLabel, description: "hold to talk about your screen", hint: "hold" },
+        { label: this.publicState.dictationShortcutLabel, description: "hold to dictate clean text anywhere", hint: "hold" },
+        { label: this.publicState.circleShortcutLabel, description: "hold, circle anything, ask about it", hint: "hold" },
+        { label: shortcutLabels.snip, description: "drag over any part of the screen to copy it", hint: "press" },
+        { label: shortcutLabels.panic, description: "stop everything clickaa is doing, instantly", hint: "press" },
       ],
     };
   }
@@ -1561,6 +2673,8 @@ export class ClickaaController {
   /* ---------------------------------------------------------------------- */
 
   private cancelActiveWork(): void {
+    // Escape, a new request and quitting all have to stop a running task too.
+    this.cancelAgentTask();
     this.interactionAbortController?.abort();
     this.interactionAbortController = null;
     this.responseAbortController?.abort();

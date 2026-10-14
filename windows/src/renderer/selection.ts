@@ -17,7 +17,11 @@ const selectionRect = requireElement<HTMLElement>("selection-rect");
 const selectionSizeLabel = requireElement<HTMLElement>("selection-size-label");
 const hintText = requireElement<HTMLElement>("hint-text");
 
-hintText.textContent = queryParameters.get("hint") || "drag around anything, then let go";
+const selectionPurpose = queryParameters.get("purpose") === "snip" ? "snip" : "circle";
+document.body.dataset.purpose = selectionPurpose;
+document.title = selectionPurpose === "snip" ? "Snip a region" : "Circle to ask";
+hintText.textContent = queryParameters.get("hint")
+  || (selectionPurpose === "snip" ? "drag over the part you want, then let go to copy it" : "drag around anything, then let go");
 
 let dragStartPoint: { x: number; y: number } | null = null;
 let hasCompletedSelection = false;

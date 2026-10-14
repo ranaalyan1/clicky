@@ -5,6 +5,7 @@ import {
   ClickaaPublicState,
   ClickaaUserConfig,
   FallbackSpeechPayload,
+  IslandPresentation,
   IslandState,
   IslandToggleKey,
   OverlayCursorPayload,
@@ -88,6 +89,7 @@ contextBridge.exposeInMainWorld("clickaa", {
   addTodo: (todoText: string): void => ipcRenderer.send("panel:add-todo", todoText),
   addMemory: (factText: string): void => ipcRenderer.send("panel:add-memory", factText),
   clearMemory: (): void => ipcRenderer.send("panel:clear-memory"),
+  clearAuditLog: (): void => ipcRenderer.send("panel:clear-audit-log"),
 
   /* Cursor overlay ------------------------------------------------------- */
   sendPointingAnimationCompleted: (interactionId: number): void => {
@@ -118,6 +120,10 @@ contextBridge.exposeInMainWorld("clickaa", {
   onIslandExpanded: (listener: (payload: { isExpanded: boolean }) => void): (() => void) => {
     return subscribe("island:expanded", listener);
   },
+  onIslandPresentation: (listener: (payload: { presentation: IslandPresentation }) => void): (() => void) => {
+    return subscribe("island:presentation", listener);
+  },
+  closeIsland: (): void => ipcRenderer.send("island:close"),
   setIslandPointerOver: (isPointerOverIsland: boolean): void => {
     ipcRenderer.send("island:pointer-over", isPointerOverIsland);
   },
@@ -127,6 +133,12 @@ contextBridge.exposeInMainWorld("clickaa", {
   resolveConfirmation: (confirmationId: string, decision: "approve" | "reject"): Promise<string> => {
     return ipcRenderer.invoke("island:resolve-confirmation", confirmationId, decision);
   },
+  saveSkillSuggestion: (): Promise<string> => ipcRenderer.invoke("island:save-skill-suggestion"),
+  dismissSkillSuggestion: (): Promise<void> => ipcRenderer.invoke("island:dismiss-skill-suggestion"),
+  renameSkill: (skillId: string, nextName: string): Promise<void> => {
+    return ipcRenderer.invoke("panel:rename-skill", skillId, nextName);
+  },
+  removeSkill: (skillId: string): Promise<void> => ipcRenderer.invoke("panel:remove-skill", skillId),
   undoActivity: (activityEntryId: string): Promise<boolean> => {
     return ipcRenderer.invoke("island:undo-activity", activityEntryId);
   },

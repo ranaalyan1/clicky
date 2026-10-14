@@ -1,7 +1,9 @@
+import { createClickaaIcon, setIconButton, updateIconButton } from "./icons.js";
 import type {
   ActivityFeedEntry,
   IslandToggleKey,
   ClipboardClip,
+  IslandPresentation,
   IslandState,
   LaunchableAppView,
   MemoryFact,
@@ -25,6 +27,7 @@ const wallpaperSwatchColors = [
 let latestIslandState: IslandState | null = null;
 let activeSection = "now";
 let isPointerOverIsland = false;
+let currentPresentation: IslandPresentation = "hidden";
 
 function requireElement<ElementType extends HTMLElement>(elementId: string): ElementType {
   const element = document.getElementById(elementId);
@@ -39,6 +42,7 @@ const element = {
   notchLabel: requireElement<HTMLElement>("notch-label"),
   notchTrack: requireElement<HTMLElement>("notch-track"),
   notchBadge: requireElement<HTMLElement>("notch-badge"),
+  closeButton: requireElement<HTMLButtonElement>("close-button"),
   headerStatus: requireElement<HTMLElement>("header-status"),
   confirmationStack: requireElement<HTMLElement>("confirmation-stack"),
   musicCard: requireElement<HTMLElement>("music-card"),
@@ -46,6 +50,11 @@ const element = {
   musicArtist: requireElement<HTMLElement>("music-artist"),
   activityList: requireElement<HTMLElement>("activity-list"),
   shortcutList: requireElement<HTMLElement>("shortcut-list"),
+  wakeIndicator: requireElement<HTMLElement>("wake-indicator"),
+  timerCard: requireElement<HTMLElement>("timer-card"),
+  timerSummary: requireElement<HTMLElement>("timer-summary"),
+  timerList: requireElement<HTMLElement>("timer-list"),
+  snippetList: requireElement<HTMLElement>("snippet-list"),
   todoCount: requireElement<HTMLElement>("todo-count"),
   todoList: requireElement<HTMLElement>("todo-list"),
   scheduleList: requireElement<HTMLElement>("schedule-list"),
@@ -170,6 +179,49 @@ function renderConfirmations(islandState: IslandState): void {
   }));
 }
 
+/** The "save that as a skill?" offer, which only ever appears after a task has
+    worked a few times and only ever saves when the user presses the button. */
+function renderSkillSuggestion(islandState: IslandState): void {
+  const suggestion = islandState.skillSuggestion;
+  if (!suggestion) {
+    return;
+  }
+
+  const card = document.createElement("div");
+  card.className = "confirmation-card skill-suggestion-card";
+
+  const title = document.createElement("p");
+  title.className = "confirmation-title";
+  title.textContent = `that worked ${suggestion.successCount} times`;
+
+  const reason = document.createElement("p");
+  reason.className = "confirmation-reason";
+  reason.textContent = `save it as "${suggestion.proposedName}"? then you can just ask for it by name.`;
+
+  const buttonRow = document.createElement("div");
+  buttonRow.className = "confirmation-buttons";
+
+  const saveButton = document.createElement("button");
+  saveButton.type = "button";
+  saveButton.className = "confirmation-button approve";
+  saveButton.textContent = "save it";
+  saveButton.addEventListener("click", () => {
+    void window.clickaa.saveSkillSuggestion();
+  });
+
+  const dismissButton = document.createElement("button");
+  dismissButton.type = "button";
+  dismissButton.className = "confirmation-button";
+  dismissButton.textContent = "no thanks";
+  dismissButton.addEventListener("click", () => {
+    void window.clickaa.dismissSkillSuggestion();
+  });
+
+  buttonRow.append(saveButton, dismissButton);
+  card.append(title, reason, buttonRow);
+  element.confirmationStack.append(card);
+}
+
 function renderActivityFeed(activityEntries: ActivityFeedEntry[]): void {
   if (!activityEntries.length) {
     element.activityList.replaceChildren(createEmptyRow("nothing yet. hold ctrl + alt and just talk."));
@@ -189,8 +241,11 @@ function renderActivityFeed(activityEntries: ActivityFeedEntry[]): void {
     if (activityEntry.isUndoable) {
       const undoButton = document.createElement("button");
       undoButton.type = "button";
-      undoButton.className = "undo-chip";
-      undoButton.textContent = activityEntry.isUndone ? "undone" : "undo";
+      undoButton.className = "undo-chip with-icon";
+      undoButton.append(
+        createClickaaIcon(activityEntry.isUndone ? "check" : "undo", 12),
+        document.createTextNode(activityEntry.isUndone ? "undone" : "undo"),
+      );
       undoButton.disabled = activityEntry.isUndone;
       undoButton.addEventListener("click", () => {
         undoButton.disabled = true;
@@ -209,7 +264,7 @@ function renderShortcutList(islandState: IslandState): void {
     copy.append(createTitle(shortcut.label), createMeta(shortcut.description));
     const hint = document.createElement("span");
     hint.className = "island-row-meta";
-    hint.textContent = "hold";
+    hint.textContent = shortcut.hint;
     row.append(hint);
     return row;
   }));
@@ -227,8 +282,88 @@ function renderMusic(nowPlaying: NowPlayingInfo | null, showNowPlaying: boolean)
 
   const playPauseButton = element.musicCard.querySelector<HTMLButtonElement>('[data-media="play_pause"]');
   if (playPauseButton) {
-    playPauseButton.textContent = nowPlaying.isPlaying ? "⏸" : "▶";
+    updateIconButton(
+      playPauseButton,
+      nowPlaying.isPlaying ? "pause" : "play",
+      nowPlaying.isPlaying ? "Pause" : "Play",
+      15,
+    );
   }
+}
+
+/** Turns 754 seconds into "12:34", and anything past an hour into "1:02:03". */
+function formatTimerRemaining(remainingSeconds: number): string {
+  const hours = Math.floor(remainingSeconds / 3_600);
+  const minutes = Math.floor((remainingSeconds % 3_600) / 60);
+  const seconds = remainingSeconds % 60;
+  const paddedSeconds = String(seconds).padStart(2, "0");
+  if (hours > 0) {
+    return `${hours}:${String(minutes).padStart(2, "0")}:${paddedSeconds}`;
+  }
+  return `${minutes}:${paddedSeconds}`;
+}
+
+/**
+ * The microphone light. It only appears when Clickaa is actually listening for
+ * its name, and it is muted-coloured when the tray switch has silenced it, so
+ * the answer to "is it listening to me?" is never a guess.
+ */
+function renderWakeIndicator(islandState: IslandState): void {
+  const isOn = islandState.wakeWordState !== "off"
+    || islandState.wakeWordMuted;
+  element.wakeIndicator.hidden = !isOn;
+  if (!isOn) {
+    return;
+  }
+
+  const stateLabels: Record<IslandState["wakeWordState"], string> = {
+    off: "wake word off",
+    starting: "wake word starting",
+    listening: "listening for clickaa",
+    unavailable: "wake word unavailable",
+    error: "wake word stopped",
+  };
+  const stateLabel = islandState.wakeWordMuted
+    ? "microphone muted"
+    : stateLabels[islandState.wakeWordState];
+
+  element.wakeIndicator.dataset.wakeState = islandState.wakeWordMuted
+    ? "muted"
+    : islandState.wakeWordState;
+  element.wakeIndicator.title = islandState.wakeWordMessage
+    ? `${stateLabel} - ${islandState.wakeWordMessage}`
+    : stateLabel;
+  element.wakeIndicator.setAttribute("aria-label", stateLabel);
+}
+
+function renderTimers(islandState: IslandState): void {
+  const runningTimers = islandState.activeTimers;
+  element.timerCard.hidden = !runningTimers.length;
+  element.timerSummary.textContent = runningTimers.length
+    ? `${runningTimers.length} running`
+    : "";
+
+  element.timerList.replaceChildren(...runningTimers.map((activeTimer) => {
+    const { row, copy } = createListRow();
+    copy.append(
+      createTitle(`${activeTimer.label} · ${formatTimerRemaining(activeTimer.remainingSeconds)}`),
+      createMeta(`ends at ${activeTimer.endsAtIso.slice(11, 16)}`),
+    );
+    return row;
+  }));
+}
+
+function renderSnippets(islandState: IslandState): void {
+  element.snippetList.replaceChildren(...(islandState.snippets.length
+    ? islandState.snippets.map((snippet) => {
+      const { row, copy } = createListRow();
+      copy.append(
+        createTitle(snippet.name),
+        createMeta(snippet.text.replace(/\s+/gu, " ").slice(0, 90)),
+      );
+      return row;
+    })
+    : [createEmptyRow("say \"save this as my address\" and it lands here.")]));
 }
 
 function renderPlans(islandState: IslandState): void {
@@ -267,8 +402,7 @@ function buildTodoRow(todoItem: TodoItem): HTMLElement {
   const removeButton = document.createElement("button");
   removeButton.type = "button";
   removeButton.className = "row-icon-button";
-  removeButton.textContent = "×";
-  removeButton.title = "remove";
+  setIconButton(removeButton, "close", "Remove this to-do", 12);
   removeButton.addEventListener("click", () => window.clickaa.removeTodo(todoItem.id));
 
   row.prepend(checkButton);
@@ -300,8 +434,7 @@ function buildScheduledTaskRow(scheduledTask: ScheduledTask): HTMLElement {
   const removeButton = document.createElement("button");
   removeButton.type = "button";
   removeButton.className = "row-icon-button";
-  removeButton.textContent = "×";
-  removeButton.title = "remove";
+  setIconButton(removeButton, "close", "Remove this reminder", 12);
   removeButton.addEventListener("click", () => window.clickaa.removeSchedule(scheduledTask.id));
 
   row.append(toggleButton, removeButton);
@@ -315,8 +448,7 @@ function buildMemoryRow(memoryFact: MemoryFact): HTMLElement {
   const removeButton = document.createElement("button");
   removeButton.type = "button";
   removeButton.className = "row-icon-button";
-  removeButton.textContent = "×";
-  removeButton.title = "forget this";
+  setIconButton(removeButton, "close", "Forget this", 12);
   removeButton.addEventListener("click", () => window.clickaa.removeMemory(memoryFact.id));
 
   row.append(removeButton);
@@ -331,13 +463,19 @@ function renderClips(clipboardClips: ClipboardClip[]): void {
 
       const copyButton = document.createElement("button");
       copyButton.type = "button";
-      copyButton.className = "undo-chip";
-      copyButton.textContent = "copy";
+      copyButton.className = "undo-chip with-icon";
+      copyButton.append(createClickaaIcon("copy", 12), document.createTextNode("copy"));
       copyButton.addEventListener("click", () => {
-        copyButton.textContent = "copied";
+        copyButton.replaceChildren(
+          createClickaaIcon("check", 12),
+          document.createTextNode("copied"),
+        );
         void window.clickaa.copyClip(clipboardClip.id).then((didCopy) => {
           window.setTimeout(() => {
-            copyButton.textContent = didCopy ? "copy" : "gone";
+            copyButton.replaceChildren(
+              createClickaaIcon("copy", 12),
+              document.createTextNode(didCopy ? "copy" : "gone"),
+            );
           }, 1_200);
         });
       });
@@ -465,9 +603,15 @@ function renderControlToggles(islandState: IslandState): void {
 
 function renderIsland(islandState: IslandState): void {
   latestIslandState = islandState;
+  currentPresentation = islandState.presentation;
+  element.body.dataset.presentation = islandState.presentation;
   element.body.dataset.expanded = String(islandState.isExpanded);
   renderNotch(islandState);
+  renderWakeIndicator(islandState);
   renderConfirmations(islandState);
+  renderSkillSuggestion(islandState);
+  renderTimers(islandState);
+  renderSnippets(islandState);
   renderActivityFeed(islandState.activityFeed);
   renderShortcutList(islandState);
   renderMusic(islandState.nowPlaying, islandState.showNowPlaying);
@@ -485,8 +629,21 @@ function renderIsland(islandState: IslandState): void {
 
 element.body.addEventListener("click", (mouseEvent) => {
   const clickedNotchRow = (mouseEvent.target as HTMLElement).closest(".notch-row");
-  if (clickedNotchRow && latestIslandState) {
-    window.clickaa.setIslandExpanded(!latestIslandState.isExpanded);
+  if (!clickedNotchRow) {
+    return;
+  }
+  if (currentPresentation === "open") {
+    window.clickaa.setIslandExpanded(false);
+    return;
+  }
+  window.clickaa.setIslandExpanded(true);
+});
+
+element.closeButton.addEventListener("click", () => window.clickaa.closeIsland());
+
+document.addEventListener("keydown", (keyboardEvent) => {
+  if (keyboardEvent.key === "Escape") {
+    window.clickaa.closeIsland();
   }
 });
 
@@ -548,6 +705,17 @@ document.addEventListener("wheel", (wheelEvent) => {
     window.clickaa.setIslandExpanded(true);
   }
 }, { passive: false });
+
+setIconButton(element.closeButton, "close", "Close Clickaa", 13);
+
+window.clickaa.onIslandPresentation(({ presentation }) => {
+  currentPresentation = presentation;
+  element.body.dataset.presentation = presentation;
+  if (latestIslandState) {
+    latestIslandState.presentation = presentation;
+    latestIslandState.isExpanded = presentation === "open";
+  }
+});
 
 window.clickaa.onIslandState(renderIsland);
 window.clickaa.onIslandExpanded(({ isExpanded }) => {

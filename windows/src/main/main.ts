@@ -175,6 +175,11 @@ function registerIpcHandlers(): void {
       desktopWindows?.setIslandInteractionEnabled(Boolean(isPointerOverIsland));
     }
   });
+  ipcMain.on("island:close", (event) => {
+    if (islandSentEvent(event.sender.id)) {
+      clickaaController?.handleIslandClosedByUser();
+    }
+  });
   ipcMain.on("island:set-expanded", (event, isExpanded: boolean) => {
     if (islandSentEvent(event.sender.id)) {
       clickaaController?.handleIslandExpandedChanged(Boolean(isExpanded));
@@ -185,6 +190,31 @@ function registerIpcHandlers(): void {
       throw new Error("IPC request rejected: sender is not the Clickaa island.");
     }
     return clickaaController?.runConfirmationDecision(confirmationId, decision);
+  });
+  ipcMain.handle("island:save-skill-suggestion", (event) => {
+    if (!islandSentEvent(event.sender.id)) {
+      throw new Error("IPC request rejected: sender is not the Clickaa island.");
+    }
+    const savedSkill = clickaaController?.saveSuggestedSkill();
+    return savedSkill ? `saved the ${savedSkill.name} skill.` : "there was nothing to save.";
+  });
+  ipcMain.handle("island:dismiss-skill-suggestion", (event) => {
+    if (!islandSentEvent(event.sender.id)) {
+      throw new Error("IPC request rejected: sender is not the Clickaa island.");
+    }
+    clickaaController?.dismissSuggestedSkill();
+  });
+  ipcMain.handle("panel:rename-skill", (event, skillId: string, nextName: string) => {
+    if (!panelSentEvent(event.sender.id)) {
+      throw new Error("IPC request rejected: sender is not the Clickaa panel.");
+    }
+    clickaaController?.renameSkill(String(skillId), String(nextName));
+  });
+  ipcMain.handle("panel:remove-skill", (event, skillId: string) => {
+    if (!panelSentEvent(event.sender.id)) {
+      throw new Error("IPC request rejected: sender is not the Clickaa panel.");
+    }
+    clickaaController?.removeSkill(String(skillId));
   });
   ipcMain.handle("island:undo-activity", (event, activityEntryId: string) => {
     if (!islandSentEvent(event.sender.id)) {
@@ -250,6 +280,12 @@ function registerIpcHandlers(): void {
       clickaaController?.handlePanelMemoryAdd(String(factText));
     }
   });
+  ipcMain.on("panel:clear-audit-log", (event) => {
+    if (panelSentEvent(event.sender.id)) {
+      clickaaController?.clearAuditLog();
+    }
+  });
+
   ipcMain.on("panel:clear-memory", (event) => {
     if (panelSentEvent(event.sender.id)) {
       clickaaController?.handlePanelMemoryClear();
@@ -291,18 +327,29 @@ function registerIpcHandlers(): void {
 
     // The renderer draws in display-relative pixels; the capture needs desktop
     // coordinates, which is what the selector window's own bounds provide.
-    clickaaController?.handleCircleRegionSelected({
+    const desktopRegionSelection = {
       displayId: selectorRecord.displayId,
       x: selectorRecord.bounds.x + selectionBounds.x,
       y: selectorRecord.bounds.y + selectionBounds.y,
       width: selectionBounds.width,
       height: selectionBounds.height,
-    });
+    };
+
     desktopWindows?.hideRegionSelector();
+    if (selectorRecord.purpose === "snip") {
+      void clickaaController?.handleSnipRegionSelected(desktopRegionSelection);
+    } else {
+      clickaaController?.handleCircleRegionSelected(desktopRegionSelection);
+    }
   });
   ipcMain.on("selection:cancelled", (event) => {
-    if (desktopWindows?.isRegionSelectorWebContents(event.sender.id)) {
-      clickaaController?.handleCircleSelectionCancelled();
+    const selectorRecord = desktopWindows?.getRegionSelectorRecord(event.sender.id) ?? null;
+    if (selectorRecord) {
+      if (selectorRecord.purpose === "snip") {
+        clickaaController?.handleSnipCancelled();
+      } else {
+        clickaaController?.handleCircleSelectionCancelled();
+      }
       desktopWindows?.hideRegionSelector();
     }
   });
@@ -319,6 +366,7 @@ async function startClickaa(): Promise<void> {
     onToggleCursor: () => clickaaController?.toggleCursorEnabled(),
     onToggleIsland: () => clickaaController?.toggleIslandEnabled(),
     onToggleAutomationPaused: () => clickaaController?.toggleAutomationPaused(),
+    onToggleWakeWordMuted: () => clickaaController?.toggleWakeWordMuted(),
     onQuit: () => {
       isQuitting = true;
       app.quit();

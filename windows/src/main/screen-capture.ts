@@ -1,6 +1,9 @@
 import { desktopCapturer, screen } from "electron";
 import { CapturedDisplayImage, CapturedImageRegion } from "../shared/contracts";
 
+/** Anything thinner than this is a stray click rather than a real region. */
+const minimumCaptureRegionSide = 24;
+
 export interface DesktopRegion {
   x: number;
   y: number;
@@ -106,9 +109,53 @@ export function getPointerDisplayBounds(): DesktopRegion & { displayId: number }
 export async function captureWindowsDesktopRegion(
   desktopRegion: DesktopRegion & { displayId: number },
 ): Promise<CapturedImageRegion> {
-  const minimumRegionSide = 24;
-  const regionWidth = Math.max(minimumRegionSide, Math.round(desktopRegion.width));
-  const regionHeight = Math.max(minimumRegionSide, Math.round(desktopRegion.height));
+  const regionWidth = Math.max(minimumCaptureRegionSide, Math.round(desktopRegion.width));
+  const regionHeight = Math.max(minimumCaptureRegionSide, Math.round(desktopRegion.height));
+  const croppedImage = await cropDisplayRegionToImage(desktopRegion);
+  const croppedImageSize = croppedImage.getSize();
+
+  return {
+    displayId: desktopRegion.displayId,
+    imageBase64: croppedImage.toJPEG(88).toString("base64"),
+    mediaType: "image/jpeg",
+    label: `the region the user circled (image dimensions: ${croppedImageSize.width}x${croppedImageSize.height} pixels)`,
+    isCursorDisplay: true,
+    imageWidth: croppedImageSize.width,
+    imageHeight: croppedImageSize.height,
+    // The region itself becomes the coordinate space, so a [POINT:x,y] tag from
+    // the model maps back onto the desktop through the normal pointing maths.
+    displayBounds: {
+      x: desktopRegion.x,
+      y: desktopRegion.y,
+      width: regionWidth,
+      height: regionHeight,
+    },
+    isRegion: true,
+  };
+}
+
+/** The snip path wants lossless pixels, ready for the clipboard. */
+export async function captureWindowsDesktopRegionPng(
+  desktopRegion: DesktopRegion & { displayId: number },
+): Promise<{ pngBuffer: Buffer; width: number; height: number }> {
+  const croppedImage = await cropDisplayRegionToImage(desktopRegion);
+  const croppedImageSize = croppedImage.getSize();
+  return {
+    pngBuffer: croppedImage.toPNG(),
+    width: croppedImageSize.width,
+    height: croppedImageSize.height,
+  };
+}
+
+/**
+ * Grabs the pixels behind one desktop region, scaling from the capture
+ * thumbnail back into display coordinates.
+ */
+async function cropDisplayRegionToImage(
+  desktopRegion: DesktopRegion & { displayId: number },
+): Promise<Electron.NativeImage> {
+  const regionWidth = Math.max(minimumCaptureRegionSide, Math.round(desktopRegion.width));
+  const regionHeight = Math.max(minimumCaptureRegionSide, Math.round(desktopRegion.height));
 
   const captureSources = await desktopCapturer.getSources({
     types: ["screen"],
@@ -125,7 +172,7 @@ export async function captureWindowsDesktopRegion(
   ) ?? screen.getDisplayNearestPoint(screen.getCursorScreenPoint());
 
   if (!matchingSource || matchingSource.thumbnail.isEmpty()) {
-    throw new Error("Clickaa could not capture the screen for that circle.");
+    throw new Error("Clickaa could not capture the screen for that region.");
   }
 
   const fullImageSize = matchingSource.thumbnail.getSize();
@@ -148,25 +195,5 @@ export async function captureWindowsDesktopRegion(
     height: Math.max(1, Math.min(cropRectangle.height, fullImageSize.height - cropRectangle.y)),
   };
 
-  const croppedImage = matchingSource.thumbnail.crop(clampedRectangle);
-  const croppedImageSize = croppedImage.getSize();
-
-  return {
-    displayId: desktopRegion.displayId,
-    imageBase64: croppedImage.toJPEG(88).toString("base64"),
-    mediaType: "image/jpeg",
-    label: `the region the user circled (image dimensions: ${croppedImageSize.width}x${croppedImageSize.height} pixels)`,
-    isCursorDisplay: true,
-    imageWidth: croppedImageSize.width,
-    imageHeight: croppedImageSize.height,
-    // The region itself becomes the coordinate space, so a [POINT:x,y] tag from
-    // the model maps back onto the desktop through the normal pointing maths.
-    displayBounds: {
-      x: desktopRegion.x,
-      y: desktopRegion.y,
-      width: regionWidth,
-      height: regionHeight,
-    },
-    isRegion: true,
-  };
+  return matchingSource.thumbnail.crop(clampedRectangle);
 }

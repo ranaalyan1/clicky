@@ -5,6 +5,8 @@
   <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data:; media-src 'self' data: blob:; connect-src 'none'; object-src 'none'; base-uri 'none'; form-action 'none'">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Clickaa</title>
+  <link rel="stylesheet" href="./tokens.css">
+  <link rel="stylesheet" href="./brand.css">
   <link rel="stylesheet" href="./panel.css">
 </head>
 <body>
@@ -15,7 +17,7 @@
         <span class="brand-name">clickaa</span>
         <span class="platform-pill">windows</span>
       </div>
-      <button id="close-button" class="icon-button no-drag" type="button" aria-label="Hide Clickaa">×</button>
+      <button id="close-button" class="icon-button no-drag" type="button" aria-label="Hide Clickaa"></button>
     </header>
 
     <nav class="tab-bar" role="tablist">
@@ -47,7 +49,7 @@
 
         <section class="talk-card">
           <button id="push-to-talk-button" class="push-to-talk-button" type="button">
-            <span class="microphone-icon" aria-hidden="true"></span>
+            <span id="talk-microphone" class="microphone-icon" aria-hidden="true"></span>
             <span class="talk-button-copy">
               <strong>hold to talk</strong>
               <small>or use the shortcut from any app</small>
@@ -243,6 +245,17 @@
           <div id="memory-list" class="list"></div>
         </section>
 
+        <section class="card" id="skills-card">
+          <div class="section-heading-row">
+            <div>
+              <p class="eyebrow">skills</p>
+              <h2>tasks clickaa saved by name</h2>
+            </div>
+          </div>
+          <p class="field-hint">when the same task works a few times, clickaa offers to save it. it only saves when you say yes, and every run still checks the screen and asks before it clicks or types.</p>
+          <div id="skill-list" class="list"></div>
+        </section>
+
         <section class="card">
           <div class="section-heading-row">
             <div>
@@ -253,6 +266,18 @@
           </div>
           <p class="field-hint">clickaa keeps your last copies in the island so you can paste them back in one click. nothing leaves this pc.</p>
           <div id="clipboard-list" class="list"></div>
+        </section>
+
+        <section class="card">
+          <div class="section-heading-row">
+            <div>
+              <p class="eyebrow">system access</p>
+              <h2>what clickaa did on this pc</h2>
+            </div>
+            <button id="audit-clear-button" class="ghost-button" type="button">clear log</button>
+          </div>
+          <p id="audit-summary" class="field-hint">nothing yet. every command, file and registry read shows up here, whether you allowed it or clickaa refused it.</p>
+          <div id="audit-list" class="list"></div>
         </section>
       </section>
 
@@ -338,6 +363,12 @@
           </select>
           <p class="field-hint">windows may open the start menu when you release ctrl + windows. if that bothers you, pick another shortcut.</p>
 
+          <ul class="shortcut-key-list">
+            <li><kbd>Ctrl</kbd> <kbd>Alt</kbd> hold and talk about whatever is on screen</li>
+            <li><kbd>Ctrl</kbd> <kbd>Shift</kbd> hold, circle anything, ask about it</li>
+            <li><kbd>Ctrl</kbd> <kbd>Alt</kbd> <kbd>S</kbd> drag over a region: it lands on your clipboard</li>
+          </ul>
+
           <div class="setting-row">
             <div>
               <strong>clean up dictated text</strong>
@@ -382,6 +413,26 @@
           </div>
           <div class="setting-row">
             <div>
+              <strong>summon from the top edge</strong>
+              <span>slide the mark in when the pointer touches the top of a screen</span>
+            </div>
+            <label class="toggle-control">
+              <input id="island-summon-toggle" type="checkbox">
+              <span></span>
+            </label>
+          </div>
+          <div class="setting-row">
+            <div>
+              <strong>keep it open</strong>
+              <span>leave the full island on screen instead of summoning it</span>
+            </div>
+            <label class="toggle-control">
+              <input id="island-always-toggle" type="checkbox">
+              <span></span>
+            </label>
+          </div>
+          <div class="setting-row">
+            <div>
               <strong>now playing</strong>
               <span>track title and media buttons</span>
             </div>
@@ -400,7 +451,34 @@
               <span></span>
             </label>
           </div>
-          <p class="field-hint">scroll or hover the island to open it. it stays click-through until your pointer is over it.</p>
+          <p class="field-hint">the island lives at the top edge: touch it with the pointer, the mark slides in, click it to open. it stays click-through until your pointer is over it, so it never blocks your work.</p>
+        </section>
+
+        <section class="card">
+          <div class="section-heading-row">
+            <div>
+              <p class="eyebrow">say its name</p>
+              <h2>wake word</h2>
+            </div>
+            <span id="wake-word-state-chip" class="count-chip">off</span>
+          </div>
+          <div class="setting-row">
+            <div>
+              <strong>listen for "clickaa"</strong>
+              <span>say the name and the island comes up, ready for what you say next</span>
+            </div>
+            <label class="toggle-control">
+              <input id="wake-word-toggle" type="checkbox">
+              <span></span>
+            </label>
+          </div>
+          <label class="field-label" for="wake-word-provider">how it listens</label>
+          <select id="wake-word-provider" class="select-field">
+            <option value="offline">on this pc (windows speech, nothing leaves the machine)</option>
+            <option value="cloud">cloud assist (not switched on yet)</option>
+          </select>
+          <p class="field-hint">the offline listener watches for its own name through the recognizer windows already ships. it only ever hears the wake phrases: everything else is discarded before it is checked, and no audio is stored or sent anywhere. mute it any time from the tray.</p>
+          <p id="wake-word-status" class="field-hint"></p>
         </section>
       </section>
     </div>

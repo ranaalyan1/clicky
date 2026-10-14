@@ -75,9 +75,23 @@ export const abilityIds = [
   "memory",
   "clipboardHistory",
   "island",
+  "wakeWord",
+  "systemAccessTier1",
+  "systemAccessTier2",
 ] as const;
 export type AbilityId = (typeof abilityIds)[number];
 export type AbilitySettings = Record<AbilityId, boolean>;
+
+/**
+ * Where Clickaa listens for its name. "offline" uses the speech recognizer
+ * Windows already ships, so no audio leaves the machine. "cloud" keeps a local
+ * loudness gate and only sends the clip that followed speech.
+ */
+export const wakeWordProviderIds = ["offline", "cloud"] as const;
+export type WakeWordProviderId = (typeof wakeWordProviderIds)[number];
+
+/** How the wake word surface reports itself to the island and the panel. */
+export type WakeWordSurfaceState = "off" | "starting" | "listening" | "unavailable" | "error";
 
 export const confirmationModes = ["risky", "all", "never"] as const;
 export type ConfirmationMode = (typeof confirmationModes)[number];
@@ -211,6 +225,96 @@ export interface WallpaperAction {
   color: string | null;
 }
 
+/** "Set a timer for 12 minutes." Timers are in-memory and die with the process. */
+export interface TimerStartAction {
+  type: "timer_start";
+  durationMinutes: number;
+  label: string;
+}
+
+export interface TimerCancelAction {
+  type: "timer_cancel";
+  /** Matching words, or null to drop every running timer. */
+  query: string | null;
+}
+
+/** A phrase the user saves once and inserts anywhere later. */
+export interface SnippetSaveAction {
+  type: "snippet_save";
+  name: string;
+  text: string;
+}
+
+export interface SnippetInsertAction {
+  type: "snippet_insert";
+  name: string;
+}
+
+export type ClipboardTransformOperation = "summarize" | "fix_grammar" | "shorten" | "translate";
+
+/** Rewrites whatever is on the clipboard, in place, using the user's brain. */
+export interface ClipboardTransformAction {
+  type: "clipboard_transform";
+  operation: ClipboardTransformOperation;
+  targetLanguage: string | null;
+}
+
+/**
+ * Clicks a point on screen, given in the pixel space of the screenshot the
+ * model was just shown (the same space as its [POINT:x,y] tags).
+ */
+export interface ClickAtAction {
+  type: "click_at";
+  x: number;
+  y: number;
+  screenNumber: number | null;
+  label: string;
+}
+
+/**
+ * Runs a PowerShell command or script. Whether it may run at all, and how loud
+ * the confirmation is, is decided by system-access.ts — never by this shape.
+ */
+export interface RunCommandAction {
+  type: "run_command";
+  command: string;
+  /** Why Clickaa wants to run it, shown on the confirmation card. */
+  reason: string;
+}
+
+/** Reads or writes one file inside the user's own folders. */
+export interface ManageFileAction {
+  type: "manage_file";
+  operation: "read" | "write" | "list";
+  path: string;
+  /** Only for a write. */
+  content: string;
+}
+
+/** "do my morning videos" — runs a task the user saved by name. */
+export interface RunSkillAction {
+  type: "run_skill";
+  name: string;
+}
+
+/** Reads one registry key, values only, and changes nothing. */
+export interface ReadRegistryAction {
+  type: "read_registry";
+  path: string;
+  valueName: string | null;
+}
+
+/** "wait a second" — used between steps of a task so the screen can catch up. */
+export interface WaitAction {
+  type: "wait";
+  seconds: number;
+}
+
+/** "screenshot this area" — opens the snipping overlay and waits for a drag. */
+export interface ScreenshotRegionAction {
+  type: "screenshot_region";
+}
+
 export interface OpenPanelAction {
   type: "open_panel";
   page: string;
@@ -236,7 +340,19 @@ export type ClickaaAction =
   | RememberAction
   | ForgetAction
   | WallpaperAction
-  | OpenPanelAction;
+  | OpenPanelAction
+  | TimerStartAction
+  | TimerCancelAction
+  | SnippetSaveAction
+  | SnippetInsertAction
+  | ClipboardTransformAction
+  | ScreenshotRegionAction
+  | ClickAtAction
+  | WaitAction
+  | RunCommandAction
+  | ManageFileAction
+  | ReadRegistryAction
+  | RunSkillAction;
 
 export type ClickaaActionType =
   | "open_app"
@@ -258,7 +374,19 @@ export type ClickaaActionType =
   | "remember"
   | "forget"
   | "wallpaper"
-  | "open_panel";
+  | "open_panel"
+  | "timer_start"
+  | "timer_cancel"
+  | "snippet_save"
+  | "snippet_insert"
+  | "clipboard_transform"
+  | "screenshot_region"
+  | "click_at"
+  | "wait"
+  | "run_command"
+  | "manage_file"
+  | "read_registry"
+  | "run_skill";
 
 /** Canonical action list, kept in the shared contracts so both sides agree. */
 export const clickaaActionTypes: readonly ClickaaActionType[] = [
@@ -282,6 +410,18 @@ export const clickaaActionTypes: readonly ClickaaActionType[] = [
   "forget",
   "wallpaper",
   "open_panel",
+  "timer_start",
+  "timer_cancel",
+  "snippet_save",
+  "snippet_insert",
+  "clipboard_transform",
+  "screenshot_region",
+  "click_at",
+  "wait",
+  "run_command",
+  "manage_file",
+  "read_registry",
+  "run_skill",
 ];
 
 export type ActionRisk = "safe" | "confirm";
@@ -315,9 +455,15 @@ export interface ClickaaUserConfig {
   speakScheduledResults: boolean;
 
   islandEnabled: boolean;
+  /** Slide the island in when the pointer touches the top edge of a display. */
+  islandSummonEnabled: boolean;
+  /** Keep the island open all the time instead of summoning it. */
+  islandAlwaysVisible: boolean;
   islandShowNowPlaying: boolean;
   islandShowClipboard: boolean;
   clipboardHistoryEnabled: boolean;
+
+  wakeWordProvider: WakeWordProviderId;
 
   soul: SoulSettings;
   abilities: AbilitySettings;
@@ -331,6 +477,35 @@ export interface TodoItem {
   text: string;
   dueAt: string | null;
   isDone: boolean;
+  createdAtIso: string;
+}
+
+/**
+ * A task the user saved by name. The seed actions are a memory aid for Clickaa,
+ * never a permission: every run is checked and confirmed again.
+ */
+export interface Skill {
+  id: string;
+  name: string;
+  goal: string;
+  seedActions: ClickaaAction[];
+  createdAtIso: string;
+  runCount: number;
+  lastRunAtIso: string | null;
+}
+
+/** The island's "save that as a skill?" card, when it is offered. */
+export interface SkillSuggestionPrompt {
+  signature: string;
+  goal: string;
+  proposedName: string;
+  successCount: number;
+}
+
+export interface Snippet {
+  id: string;
+  name: string;
+  text: string;
   createdAtIso: string;
 }
 
@@ -424,7 +599,31 @@ export interface ClickaaPublicState {
   automationPaused: boolean;
   islandEnabled: boolean;
   clipboardHistoryEnabled: boolean;
+  wakeWordState: WakeWordSurfaceState;
+  wakeWordMessage: string;
+  wakeWordMuted: boolean;
   config: ClickaaUserConfig;
+  /** The last few system-access entries, newest first, for the panel's log. */
+  auditLog: AuditLogEntry[];
+  auditLogCounts: { allowed: number; refused: number; blocked: number; failed: number; total: number };
+}
+
+/** One line of the record Clickaa keeps of everything it did on this pc. */
+export interface AuditLogEntry {
+  id: string;
+  createdAtIso: string;
+  summary: string;
+  detail: string;
+  tier: "tier1" | "tier2" | "blocked";
+  outcome: "allowed" | "refused" | "blocked" | "failed";
+  resultPreview: string;
+}
+
+export interface ActiveTimer {
+  id: string;
+  label: string;
+  endsAtIso: string;
+  remainingSeconds: number;
 }
 
 export interface IslandStatusSummary {
@@ -436,9 +635,19 @@ export interface IslandStatusSummary {
   audioPowerLevel: number;
 }
 
+/**
+ * What the island is doing right now:
+ *
+ * - `hidden`   nothing on screen,
+ * - `revealed` a mark peeking out of the top edge, waiting to be clicked,
+ * - `open`     the full island.
+ */
+export type IslandPresentation = "hidden" | "revealed" | "open";
+
 export interface IslandState {
   isExpanded: boolean;
   isEnabled: boolean;
+  presentation: IslandPresentation;
   cursorEnabled: boolean;
   automationPaused: boolean;
   status: IslandStatusSummary;
@@ -447,13 +656,21 @@ export interface IslandState {
   showClipboard: boolean;
   activityFeed: ActivityFeedEntry[];
   pendingConfirmations: PendingConfirmation[];
+  activeTimers: ActiveTimer[];
+  snippets: Snippet[];
+  wakeWordState: WakeWordSurfaceState;
+  wakeWordMuted: boolean;
+  skills: Skill[];
+  skillSuggestion: SkillSuggestionPrompt | null;
+  /** Why the wake word is in that state, shown as the indicator's tooltip. */
+  wakeWordMessage: string;
   todos: TodoItem[];
   scheduledTasks: ScheduledTask[];
   memoryFacts: MemoryFact[];
   clipboardClips: ClipboardClip[];
   quickLaunchApps: LaunchableAppView[];
   brainLabel: string;
-  shortcuts: { label: string; description: string }[];
+  shortcuts: Array<{ label: string; description: string; hint: string }>;
 }
 
 /* -------------------------------------------------------------------------- */

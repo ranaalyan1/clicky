@@ -2,6 +2,7 @@ import {
   ActionRisk,
   AbilityId,
   AbilitySettings,
+  ClipboardTransformOperation,
   ClickaaAction,
   ClickaaActionType,
   ConfirmationMode,
@@ -25,6 +26,13 @@ import {
  * normalized here before anything is allowed to touch the user's PC.
  */
 
+export const clipboardTransformOperations: readonly ClipboardTransformOperation[] = [
+  "summarize",
+  "fix_grammar",
+  "shorten",
+  "translate",
+];
+
 export const actionBlockOpeningTag = "<actions>";
 export const actionBlockClosingTag = "</actions>";
 
@@ -32,6 +40,12 @@ export interface ParsedModelResponse {
   spokenText: string;
   actions: ClickaaAction[];
   problems: string[];
+  /**
+   * The finished result the user asked for, when the reply expects Clickaa to
+   * keep working (a page to load, a video to start). The agent loop verifies
+   * against this; a reply without it is a one-shot answer.
+   */
+  taskGoal: string | null;
 }
 
 interface ActionDefinition {
@@ -51,6 +65,27 @@ function readRequiredText(rawAction: Record<string, unknown>, key: string): stri
     return null;
   }
   return rawValue.trim();
+}
+
+/** Coordinates arrive as numbers or as strings more often than one would hope. */
+function readCoordinate(rawAction: Record<string, unknown>, key: string): number | null {
+  const rawValue = rawAction[key];
+  const coordinate = typeof rawValue === "number"
+    ? rawValue
+    : Number.parseInt(String(rawValue ?? ""), 10);
+  if (!Number.isFinite(coordinate) || coordinate < 0) {
+    return null;
+  }
+  return Math.round(coordinate);
+}
+
+/** Optional text: missing or blank reads as "the model did not say". */
+function readOptionalText(rawAction: Record<string, unknown>, key: string): string | null {
+  const rawValue = rawAction[key];
+  if (typeof rawValue !== "string" || !rawValue.trim()) {
+    return null;
+  }
+  return rawValue.trim().slice(0, 200);
 }
 
 function normalizeSearchTarget(rawTarget: unknown): SearchTarget {
@@ -383,6 +418,252 @@ const actionDefinitions: Record<ClickaaActionType, ActionDefinition> = {
       return { action: { type: "wallpaper", operation, path, color }, problem: null };
     },
   },
+  timer_start: {
+    type: "timer_start",
+    risk: "safe",
+    requiredAbility: "scheduling",
+    describe: (action) => {
+      const timerAction = action as { durationMinutes: number; label: string };
+      return `start a ${timerAction.durationMinutes} minute ${timerAction.label} timer`;
+    },
+    normalize: (rawAction) => {
+      const rawDuration = rawAction.durationMinutes;
+      const durationMinutes = typeof rawDuration === "number" && Number.isFinite(rawDuration)
+        ? Math.round(rawDuration)
+        : Number.parseInt(String(rawDuration ?? ""), 10);
+      if (!Number.isFinite(durationMinutes) || durationMinutes <= 0) {
+        return { action: null, problem: "timer_start needs a positive durationMinutes" };
+      }
+
+      const label = readOptionalText(rawAction, "label") ?? "timer";
+      return {
+        action: {
+          type: "timer_start",
+          durationMinutes: Math.min(durationMinutes, 24 * 60),
+          label,
+        },
+        problem: null,
+      };
+    },
+  },
+  timer_cancel: {
+    type: "timer_cancel",
+    risk: "safe",
+    requiredAbility: "scheduling",
+    describe: () => "stop the running timer",
+    normalize: (rawAction) => ({
+      action: { type: "timer_cancel", query: readOptionalText(rawAction, "query") },
+      problem: null,
+    }),
+  },
+  snippet_save: {
+    type: "snippet_save",
+    risk: "safe",
+    requiredAbility: "automation",
+    describe: (action) => `save the ${(action as { name: string }).name} snippet`,
+    normalize: (rawAction) => {
+      const name = readRequiredText(rawAction, "name");
+      const text = readRequiredText(rawAction, "text");
+      if (!name || !text) {
+        return { action: null, problem: "snippet_save needs a name and the text to save" };
+      }
+      return { action: { type: "snippet_save", name, text }, problem: null };
+    },
+  },
+  snippet_insert: {
+    type: "snippet_insert",
+    risk: "confirm",
+    requiredAbility: "automation",
+    describe: (action) => `type the ${(action as { name: string }).name} snippet`,
+    normalize: (rawAction) => {
+      const name = readRequiredText(rawAction, "name");
+      return name
+        ? { action: { type: "snippet_insert", name }, problem: null }
+        : { action: null, problem: "snippet_insert needs a name" };
+    },
+  },
+  clipboard_transform: {
+    type: "clipboard_transform",
+    risk: "confirm",
+    requiredAbility: "clipboardHistory",
+    describe: (action) => {
+      const transformAction = action as { operation: string; targetLanguage: string | null };
+      return transformAction.operation === "translate"
+        ? `translate what is on the clipboard into ${transformAction.targetLanguage ?? "english"}`
+        : `${transformAction.operation.replace(/_/gu, " ")} what is on the clipboard`;
+    },
+    normalize: (rawAction) => {
+      const rawOperation = readRequiredText(rawAction, "operation") ?? "";
+      const operation = clipboardTransformOperations.find(
+        (candidateOperation) => candidateOperation === rawOperation,
+      );
+      if (!operation) {
+        return {
+          action: null,
+          problem: `clipboard_transform supports ${clipboardTransformOperations.join(", ")}`,
+        };
+      }
+      return {
+        action: {
+          type: "clipboard_transform",
+          operation,
+          targetLanguage: readOptionalText(rawAction, "targetLanguage")
+            ?? readOptionalText(rawAction, "language"),
+        },
+        problem: null,
+      };
+    },
+  },
+  run_command: {
+    type: "run_command",
+    risk: "confirm",
+    requiredAbility: "systemAccessTier1",
+    describe: (action) => {
+      const commandAction = action as { command: string };
+      return `run ${commandAction.command}`;
+    },
+    normalize: (rawAction) => {
+      const command = readRequiredText(rawAction, "command");
+      if (!command) {
+        return { action: null, problem: "run_command needs the command to run" };
+      }
+      return {
+        action: {
+          type: "run_command",
+          command: command.slice(0, 2_000),
+          reason: readOptionalText(rawAction, "reason") ?? "no reason given",
+        },
+        problem: null,
+      };
+    },
+  },
+  manage_file: {
+    type: "manage_file",
+    risk: "confirm",
+    requiredAbility: "systemAccessTier1",
+    describe: (action) => {
+      const fileAction = action as { operation: string; path: string };
+      const operationWords: Record<string, string> = {
+        read: "read",
+        write: "write",
+        list: "list",
+      };
+      return `${operationWords[fileAction.operation] ?? fileAction.operation} ${fileAction.path}`;
+    },
+    normalize: (rawAction) => {
+      const rawOperation = readRequiredText(rawAction, "operation") ?? "";
+      const operation = (["read", "write", "list"] as const).find(
+        (candidateOperation) => candidateOperation === rawOperation,
+      );
+      const filePath = readRequiredText(rawAction, "path");
+      if (!operation || !filePath) {
+        return { action: null, problem: "manage_file needs operation (read, write or list) and path" };
+      }
+      return {
+        action: {
+          type: "manage_file",
+          operation,
+          path: filePath,
+          content: typeof rawAction.content === "string" ? rawAction.content.slice(0, 100_000) : "",
+        },
+        problem: null,
+      };
+    },
+  },
+  read_registry: {
+    type: "read_registry",
+    risk: "safe",
+    requiredAbility: "systemAccessTier1",
+    describe: (action) => {
+      const registryAction = action as { path: string; valueName: string | null };
+      return registryAction.valueName
+        ? `read ${registryAction.path} ... ${registryAction.valueName}`
+        : `read the ${registryAction.path} registry key`;
+    },
+    normalize: (rawAction) => {
+      const registryPath = readRequiredText(rawAction, "path");
+      if (!registryPath) {
+        return { action: null, problem: "read_registry needs a path" };
+      }
+      return {
+        action: {
+          type: "read_registry",
+          path: registryPath.slice(0, 300),
+          valueName: readOptionalText(rawAction, "valueName") ?? readOptionalText(rawAction, "value"),
+        },
+        problem: null,
+      };
+    },
+  },
+  run_skill: {
+    type: "run_skill",
+    risk: "confirm",
+    requiredAbility: "automation",
+    describe: (action) => `do ${(action as { name: string }).name}`,
+    normalize: (rawAction) => {
+      const skillName = readRequiredText(rawAction, "name");
+      return skillName
+        ? { action: { type: "run_skill", name: skillName.slice(0, 60) }, problem: null }
+        : { action: null, problem: "run_skill needs the skill's name" };
+    },
+  },
+  click_at: {
+    type: "click_at",
+    risk: "confirm",
+    requiredAbility: "automation",
+    describe: (action) => {
+      const clickAction = action as { label: string };
+      return `click ${clickAction.label}`;
+    },
+    normalize: (rawAction) => {
+      const xCoordinate = readCoordinate(rawAction, "x");
+      const yCoordinate = readCoordinate(rawAction, "y");
+      if (xCoordinate === null || yCoordinate === null) {
+        return { action: null, problem: "click_at needs x and y coordinates from the screenshot" };
+      }
+
+      const rawScreenNumber = readCoordinate(rawAction, "screenNumber")
+        ?? readCoordinate(rawAction, "screen");
+      return {
+        action: {
+          type: "click_at",
+          x: xCoordinate,
+          y: yCoordinate,
+          screenNumber: rawScreenNumber !== null && rawScreenNumber >= 1 ? rawScreenNumber : null,
+          label: readOptionalText(rawAction, "label")
+            ?? readOptionalText(rawAction, "target")
+            ?? "that spot",
+        },
+        problem: null,
+      };
+    },
+  },
+  wait: {
+    type: "wait",
+    risk: "safe",
+    requiredAbility: "automation",
+    describe: (action) => `wait ${(action as { seconds: number }).seconds} seconds`,
+    normalize: (rawAction) => {
+      const rawSeconds = rawAction.seconds ?? rawAction.durationSeconds;
+      const seconds = typeof rawSeconds === "number" && Number.isFinite(rawSeconds)
+        ? rawSeconds
+        : Number.parseFloat(String(rawSeconds ?? ""));
+      if (!Number.isFinite(seconds) || seconds <= 0) {
+        return { action: null, problem: "wait needs a positive number of seconds" };
+      }
+      return {
+        action: { type: "wait", seconds: Math.min(seconds, 20) },
+        problem: null,
+      };
+    },
+  },
+  screenshot_region: {
+    type: "screenshot_region",
+    risk: "safe",
+    requiredAbility: "screenVision",
+    describe: () => "open the snip overlay",
+    normalize: () => ({ action: { type: "screenshot_region" }, problem: null }),
+  },
   open_panel: {
     type: "open_panel",
     risk: "safe",
@@ -401,7 +682,9 @@ const actionDefinitions: Record<ClickaaActionType, ActionDefinition> = {
 /** Action types that change something on the user's PC need a confirmation. */
 export function getActionRisk(actionType: ClickaaActionType): ActionRisk {
   return actionDefinitions[actionType].risk;
-}export function getActionRequiredAbility(actionType: ClickaaActionType): AbilityId {
+}
+
+export function getActionRequiredAbility(actionType: ClickaaActionType): AbilityId {
   return actionDefinitions[actionType].requiredAbility;
 }
 
@@ -497,13 +780,43 @@ export function parseClickaaActions(rawPayload: unknown): { actions: ClickaaActi
 }
 
 export function parseModelResponse(modelResponseText: string): ParsedModelResponse {
-  const { spokenText, serializedActions } = splitSpokenTextFromActionBlock(modelResponseText);
+  const { spokenText: textWithoutTask, taskGoal } = splitTaskGoalFromResponse(modelResponseText);
+  const { spokenText, serializedActions } = splitSpokenTextFromActionBlock(textWithoutTask);
   if (serializedActions === null) {
-    return { spokenText, actions: [], problems: [] };
+    return { spokenText, actions: [], problems: [], taskGoal };
   }
 
   const { actions, problems } = parseClickaaActions(serializedActions);
-  return { spokenText, actions, problems };
+  return { spokenText, actions, problems, taskGoal };
+}
+
+/**
+ * Pulls the <task> block (and the optional <plan> block that models sometimes
+ * add for themselves) out of a reply. The goal is capped so a runaway model
+ * cannot turn it into a paragraph the user has to read twice.
+ */
+export function splitTaskGoalFromResponse(modelResponseText: string): {
+  spokenText: string;
+  taskGoal: string | null;
+} {
+  let taskGoal: string | null = null;
+  let remainingText = modelResponseText;
+
+  for (const blockName of ["task", "plan"] as const) {
+    const blockPattern = new RegExp(`<${blockName}>([\\s\\S]*?)</${blockName}>`, "iu");
+    const blockMatch = blockPattern.exec(remainingText);
+    if (!blockMatch) {
+      continue;
+    }
+
+    remainingText = remainingText.replace(blockMatch[0], " ");
+    const blockText = blockMatch[1] ?? "";
+    if (!taskGoal && blockText.trim()) {
+      taskGoal = blockText.trim().slice(0, 300);
+    }
+  }
+
+  return { spokenText: remainingText, taskGoal };
 }
 
 /**
@@ -566,6 +879,8 @@ export function buildActionProtocolInstructions(abilities: AbilitySettings): str
 - clipboard_write: {"type":"clipboard_write","text":"..."} — put text on the clipboard.
 - notify: {"type":"notify","title":"...","body":"..."} — show a Windows notification.
 - scroll: {"type":"scroll","direction":"down","amount":3} — scroll the focused window.
+- snippet_save: {"type":"snippet_save","name":"my address","text":"..."} — save a phrase the user will reuse. use it whenever someone says "save this as ..." or "remember this text as ...".
+- snippet_insert: {"type":"snippet_insert","name":"my address"} — type a saved phrase into the focused window.
 - open_panel: {"type":"open_panel","page":"plans"} — open this app's own panel (pages: home, soul, plans, memory, setup).`);
   }
 
@@ -588,7 +903,39 @@ export function buildActionProtocolInstructions(abilities: AbilitySettings): str
 
   if (abilities.scheduling) {
     sections.push(`- schedule_add: {"type":"schedule_add","name":"Gift wraps","prompt":"search amazon for gift wraps","startAt":"2026-11-10T11:00:00","repeat":"none"} — run a spoken task later on its own. repeat: none, daily, weekdays, weekends.
-- routine_add: {"type":"routine_add","name":"Morning","timeOfDay":"09:00","repeat":"daily","actions":[{"type":"open_app","name":"Unity"}]} — a repeating list of steps.`);
+- routine_add: {"type":"routine_add","name":"Morning","timeOfDay":"09:00","repeat":"daily","actions":[{"type":"open_app","name":"Unity"}]} — a repeating list of steps.
+- timer_start: {"type":"timer_start","durationMinutes":12,"label":"pasta"} — a countdown the island shows and that ends with a notification. use for "set a timer".
+- timer_cancel: {"type":"timer_cancel","query":"pasta"} — stop a running timer; query null stops every one.
+- screenshot_region: {"type":"screenshot_region"} — opens the overlay so the user can drag over part of the screen; the pixels land on their clipboard. use it for "let me screenshot this", "snip this area", "grab that region".
+- click_at: {"type":"click_at","x":420,"y":310,"label":"the first video"} — clicks a real point on screen. x and y are pixels in the screenshot you were shown, exactly like the numbers in [POINT:x,y]. set "screenNumber" when the target is on a different display than the pointer. always name what you are clicking in "label".
+- wait: {"type":"wait","seconds":2} — pause before the next action, for pages that are still loading.`);
+
+  if (abilities.systemAccessTier1) {
+    sections.push(`Working on the user's pc beyond apps and keys:
+
+- read_registry: {"type":"read_registry","path":"HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Run"} — reads one registry key and its values. read-only, never a credential store.
+- manage_file: {"type":"manage_file","operation":"read","path":"C:\\Users\\me\\Documents\\notes.txt"} — reads, lists or writes one file inside the user's own Documents, Downloads, Desktop, Pictures, Videos or Music folder. nothing outside those folders will run, and writes ask first.
+- run_command: {"type":"run_command","command":"Get-Process | Sort-Object CPU -Descending | Select-Object -First 5","reason":"finding what is using the cpu"} — runs one PowerShell command. read-only diagnostics run with the first switch on; anything that changes the pc, reaches the network or installs software needs the separate arbitrary-commands switch, and Clickaa refuses credentials, elevation and anything that weakens windows security whatever is switched on. always include "reason", and prefer the read-only diagnostics: Get-Date, Get-Process, Get-Service, Get-ChildItem, Get-Volume, ipconfig, systeminfo, tasklist, whoami, ping, ping's cousins, and pipes made only of those.
+- never try to read saved passwords, browser login data, .ssh keys or the registry's SAM or SECURITY hives: Clickaa blocks those, and asking wastes the user's time.`);
+  }
+  }
+
+  if (abilities.automation && abilities.screenVision) {
+    sections.push(`Tasks that need several steps:
+
+if the user asks for something that cannot be finished in one action — "go to youtube and play anything", "open my email and reply to the last message", "search amazon for a cable and add the cheapest one to the basket" — first say what you are about to do in one short spoken sentence, then add a <task> block holding the end goal, and put only the FIRST step in <actions>.
+
+<task>play a video on youtube</task><actions>[{"type":"open_url","url":"https://youtube.com"}]</actions>
+
+Clickaa will run that first step, look at the screen, and continue on its own until the goal is met. so:
+- put the goal in <task>, never the whole plan, and never the same thing as the <actions> step
+- prefer one or two actions per step; Clickaa looks in between
+- use click_at with coordinates taken from the screenshot to click real things
+- use wait when a page is clearly still loading
+- the goal in <task> is what the user asked for, phrased as the finished result`);
+  }
+  if (abilities.clipboardHistory) {
+    sections.push(`- clipboard_transform: {"type":"clipboard_transform","operation":"summarize","targetLanguage":null} — rewrite what is on the clipboard using the user's brain. operations: summarize, fix_grammar, shorten, translate. for translate, set targetLanguage. use it for "fix what i copied", "summarize this", "translate my clipboard".`);
   }
 
   if (abilities.memory) {

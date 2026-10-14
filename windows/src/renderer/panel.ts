@@ -6,11 +6,13 @@ import type {
   ConfirmationMode,
   DictationShortcutId,
   GeminiChatModel,
+  IslandState,
   GeminiVoiceName,
   PersonalityPresetId,
   ResponseLengthId,
   SpeechProviderId,
 } from "../shared/contracts";
+import { createClickaaIcon, setIconButton } from "./icons.js";
 import { MicrophoneCapture } from "./audio-capture.js";
 import { CompanionAudioPlayback } from "./audio-playback.js";
 
@@ -31,6 +33,9 @@ const abilityCopy: Array<{ id: AbilityId; label: string; description: string }> 
   { id: "memory", label: "memory", description: "remember facts you ask it to keep" },
   { id: "clipboardHistory", label: "clipboard history", description: "keep your recent copies in the island, on this pc only" },
   { id: "island", label: "the island", description: "show the notch at the top of the screen" },
+  { id: "wakeWord", label: "wake word", description: "listen for \"clickaa\" on this pc, and open the island when you say it" },
+  { id: "systemAccessTier1", label: "system access", description: "read-only diagnostics, registry reads, and files in your own folders — each one asks first" },
+  { id: "systemAccessTier2", label: "arbitrary commands", description: "let clickaa run commands that change your pc. leave this off unless you want that, and read every card it shows" },
 ];
 
 const personalityCopy: Array<{ id: PersonalityPresetId; label: string; description: string }> = [
@@ -132,9 +137,21 @@ const element = {
   dictationCleanupToggle: requireElement<HTMLInputElement>("dictation-cleanup-toggle"),
   speakScheduledToggle: requireElement<HTMLInputElement>("speak-scheduled-toggle"),
   launchToggle: requireElement<HTMLInputElement>("launch-toggle"),
+  islandSummonToggle: requireElement<HTMLInputElement>("island-summon-toggle"),
+  islandAlwaysToggle: requireElement<HTMLInputElement>("island-always-toggle"),
+  wakeWordToggle: requireElement<HTMLInputElement>("wake-word-toggle"),
+  wakeWordProvider: requireElement<HTMLSelectElement>("wake-word-provider"),
+  wakeWordStateChip: requireElement<HTMLElement>("wake-word-state-chip"),
+  wakeWordStatus: requireElement<HTMLElement>("wake-word-status"),
+  auditSummary: requireElement<HTMLElement>("audit-summary"),
+  auditList: requireElement<HTMLElement>("audit-list"),
+  auditClearButton: requireElement<HTMLButtonElement>("audit-clear-button"),
+  skillsCard: requireElement<HTMLElement>("skills-card"),
+  skillList: requireElement<HTMLElement>("skill-list"),
   islandMusicToggle: requireElement<HTMLInputElement>("island-music-toggle"),
   islandClipboardToggle: requireElement<HTMLInputElement>("island-clipboard-toggle"),
   refreshAppsButton: requireElement<HTMLButtonElement>("refresh-apps-button"),
+  talkMicrophone: requireElement<HTMLElement>("talk-microphone"),
   setupVideoButton: requireElement<HTMLButtonElement>("setup-video-button"),
   closeButton: requireElement<HTMLButtonElement>("close-button"),
 };
@@ -344,6 +361,14 @@ function renderSetup(state: ClickaaPublicState): void {
   element.dictationCleanupToggle.checked = config.dictationCleanupEnabled;
   element.speakScheduledToggle.checked = config.speakScheduledResults;
   element.launchToggle.checked = config.launchAtLogin;
+  element.islandSummonToggle.checked = config.islandSummonEnabled;
+  element.islandAlwaysToggle.checked = config.islandAlwaysVisible;
+  element.wakeWordToggle.checked = config.abilities.wakeWord;
+  element.wakeWordProvider.value = config.wakeWordProvider;
+  element.wakeWordStateChip.textContent = describeWakeWordState(state, config);
+  element.wakeWordStatus.textContent = describeWakeWordStatus(state, config);
+  renderAuditLog(state);
+  void window.clickaa.getIslandState().then(renderSkills).catch(() => undefined);
   element.islandMusicToggle.checked = config.islandShowNowPlaying;
   element.islandClipboardToggle.checked = config.islandShowClipboard;
 
@@ -355,6 +380,144 @@ function renderSetup(state: ClickaaPublicState): void {
 /* -------------------------------------------------------------------------- */
 /* Settings writes                                                            */
 /* -------------------------------------------------------------------------- */
+
+function describeWakeWordState(state: ClickaaPublicState, config: ClickaaUserConfig): string {
+  if (!config.abilities.wakeWord) {
+    return "off";
+  }
+  if (state.wakeWordMuted) {
+    return "muted";
+  }
+
+  const stateLabels: Record<ClickaaPublicState["wakeWordState"], string> = {
+    off: "off",
+    starting: "starting",
+    listening: "listening",
+    unavailable: "unavailable",
+    error: "needs attention",
+  };
+  return stateLabels[state.wakeWordState];
+}
+
+function describeWakeWordStatus(state: ClickaaPublicState, config: ClickaaUserConfig): string {
+  if (state.wakeWordMuted) {
+    return "muted from the tray. right-click the tray icon and unmute it to start listening again.";
+  }
+  if (state.wakeWordMessage) {
+    return state.wakeWordMessage;
+  }
+  return config.abilities.wakeWord
+    ? "waiting for you to say the name."
+    : "switched off, so the microphone is closed.";
+}
+
+/** Skills are editable here: rename one inline, or delete it for good. */
+function renderSkills(islandState: IslandState): void {
+  element.skillsCard.hidden = !islandState.skills.length && !islandState.skillSuggestion;
+  const skillRows = islandState.skills.map((skill) => {
+    const row = document.createElement("div");
+    row.className = "list-row";
+
+    const copy = document.createElement("div");
+    copy.className = "list-row-copy";
+
+    const nameInput = document.createElement("input");
+    nameInput.className = "text-field skill-name-field";
+    nameInput.type = "text";
+    nameInput.value = skill.name;
+    nameInput.setAttribute("aria-label", `name of the ${skill.name} skill`);
+    nameInput.addEventListener("change", () => {
+      void window.clickaa.renameSkill(skill.id, nameInput.value);
+    });
+
+    const meta = document.createElement("span");
+    meta.textContent = skill.runCount
+      ? `${skill.goal} · used ${skill.runCount} ${skill.runCount === 1 ? "time" : "times"}`
+      : skill.goal;
+
+    copy.append(nameInput, meta);
+
+    const removeButton = document.createElement("button");
+    removeButton.type = "button";
+    removeButton.className = "ghost-button";
+    removeButton.textContent = "remove";
+    removeButton.addEventListener("click", () => {
+      void window.clickaa.removeSkill(skill.id);
+    });
+
+    row.append(copy, removeButton);
+    return row;
+  });
+
+  if (islandState.skillSuggestion) {
+    const suggestionRow = document.createElement("div");
+    suggestionRow.className = "list-row";
+    const copy = document.createElement("div");
+    copy.className = "list-row-copy";
+    const title = document.createElement("strong");
+    title.textContent = `ready to save: "${islandState.skillSuggestion.proposedName}"`;
+    const meta = document.createElement("span");
+    meta.textContent = `${islandState.skillSuggestion.goal} — offered in the island`;
+    copy.append(title, meta);
+    suggestionRow.append(copy);
+    skillRows.unshift(suggestionRow);
+  }
+
+  element.skillList.replaceChildren(...(skillRows.length
+    ? skillRows
+    : [(() => {
+      const emptyRow = document.createElement("div");
+      emptyRow.className = "list-row";
+      const emptyCopy = document.createElement("div");
+      emptyCopy.className = "list-row-copy";
+      const emptyText = document.createElement("span");
+      emptyText.textContent = "nothing saved yet. do something twice and clickaa will offer to save it.";
+      emptyCopy.append(emptyText);
+      emptyRow.append(emptyCopy);
+      return emptyRow;
+    })()]));
+}
+
+const auditOutcomeLabels: Record<ClickaaPublicState["auditLog"][number]["outcome"], string> = {
+  allowed: "ran",
+  refused: "you said no",
+  blocked: "clickaa blocked it",
+  failed: "failed",
+};
+
+function renderAuditLog(state: ClickaaPublicState): void {
+  const { auditLog, auditLogCounts } = state;
+  element.auditSummary.textContent = auditLogCounts.total
+    ? `${auditLogCounts.total} ${auditLogCounts.total === 1 ? "entry" : "entries"}: ${auditLogCounts.allowed} ran, ${auditLogCounts.refused} refused, ${auditLogCounts.blocked} blocked by clickaa, ${auditLogCounts.failed} failed. newest first.`
+    : "nothing yet. every command, file and registry read shows up here, whether you allowed it or clickaa refused it.";
+
+  element.auditList.replaceChildren(...auditLog.slice(0, 25).map((auditEntry) => {
+    const row = document.createElement("div");
+    row.className = "list-row";
+
+    const copy = document.createElement("div");
+    copy.className = "list-row-copy";
+
+    const title = document.createElement("strong");
+    title.textContent = auditEntry.summary;
+
+    const meta = document.createElement("span");
+    const shownTime = auditEntry.createdAtIso.slice(11, 16);
+    meta.textContent = `${shownTime} · ${auditOutcomeLabels[auditEntry.outcome]}${auditEntry.tier === "tier2" ? " · arbitrary command" : ""}`;
+
+    copy.append(title, meta);
+    row.append(copy);
+
+    if (auditEntry.detail || auditEntry.resultPreview) {
+      const detail = document.createElement("code");
+      detail.className = "audit-detail";
+      detail.textContent = auditEntry.detail || auditEntry.resultPreview;
+      row.append(detail);
+    }
+
+    return row;
+  }));
+}
 
 async function saveSettings(settingsUpdates: Partial<ClickaaUserConfig>): Promise<void> {
   try {
@@ -445,8 +608,7 @@ async function refreshIslandLists(): Promise<void> {
       const removeButton = document.createElement("button");
       removeButton.type = "button";
       removeButton.className = "row-action";
-      removeButton.textContent = "×";
-      removeButton.title = "remove";
+      setIconButton(removeButton, "close", "Remove this to-do", 13);
       removeButton.addEventListener("click", () => {
         window.clickaa.removeTodo(todoItem.id);
         window.setTimeout(() => void refreshIslandLists(), 120);
@@ -488,8 +650,7 @@ async function refreshIslandLists(): Promise<void> {
       const removeButton = document.createElement("button");
       removeButton.type = "button";
       removeButton.className = "row-action";
-      removeButton.textContent = "×";
-      removeButton.title = "remove";
+      setIconButton(removeButton, "close", "Remove this reminder", 13);
       removeButton.addEventListener("click", () => {
         window.clickaa.removeSchedule(scheduledTask.id);
         window.setTimeout(() => void refreshIslandLists(), 120);
@@ -515,8 +676,7 @@ async function refreshIslandLists(): Promise<void> {
       const removeButton = document.createElement("button");
       removeButton.type = "button";
       removeButton.className = "row-action";
-      removeButton.textContent = "×";
-      removeButton.title = "forget";
+      setIconButton(removeButton, "close", "Forget this", 13);
       removeButton.addEventListener("click", () => {
         window.clickaa.removeMemory(memoryFact.id);
         window.setTimeout(() => void refreshIslandLists(), 120);
@@ -542,8 +702,7 @@ async function refreshIslandLists(): Promise<void> {
       const copyButton = document.createElement("button");
       copyButton.type = "button";
       copyButton.className = "row-action neutral";
-      copyButton.textContent = "copy";
-      copyButton.style.fontSize = "10px";
+      setIconButton(copyButton, "copy", "Copy this clip back", 13);
       copyButton.addEventListener("click", () => void window.clickaa.copyClip(clipboardClip.id));
 
       row.append(copy, copyButton);
@@ -717,6 +876,26 @@ element.speakScheduledToggle.addEventListener("change", () => {
   void saveSettings({ speakScheduledResults: element.speakScheduledToggle.checked });
 });
 element.launchToggle.addEventListener("change", () => void saveSettings({ launchAtLogin: element.launchToggle.checked }));
+element.islandSummonToggle.addEventListener("change", () => {
+  void saveSettings({ islandSummonEnabled: element.islandSummonToggle.checked });
+});
+element.auditClearButton.addEventListener("click", () => {
+  window.clickaa.clearAuditLog();
+});
+element.wakeWordToggle.addEventListener("change", () => {
+  void saveSettings({
+    abilities: {
+      ...(latestState?.config.abilities ?? {}),
+      wakeWord: element.wakeWordToggle.checked,
+    } as ClickaaUserConfig["abilities"],
+  });
+});
+element.wakeWordProvider.addEventListener("change", () => {
+  void saveSettings({ wakeWordProvider: element.wakeWordProvider.value as ClickaaUserConfig["wakeWordProvider"] });
+});
+element.islandAlwaysToggle.addEventListener("change", () => {
+  void saveSettings({ islandAlwaysVisible: element.islandAlwaysToggle.checked });
+});
 element.islandMusicToggle.addEventListener("change", () => {
   void saveSettings({ islandShowNowPlaying: element.islandMusicToggle.checked });
 });
@@ -763,6 +942,9 @@ function stopPanelPushToTalk(): void {
   window.clickaa.pushToTalkReleased();
   renderPanelPressedState();
 }
+
+setIconButton(element.closeButton, "close", "Hide Clickaa", 14);
+element.talkMicrophone.replaceChildren(createClickaaIcon("microphone", 19));
 
 element.setupVideoButton.addEventListener("click", () => window.clickaa.openSetupVideo());
 element.closeButton.addEventListener("click", () => window.clickaa.hidePanel());

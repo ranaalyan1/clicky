@@ -1,18 +1,4 @@
-:root {
-  color-scheme: dark;
-  font-family: "Segoe UI Variable", "Segoe UI", system-ui, sans-serif;
-  --background: #0c110f;
-  --surface: #131a17;
-  --surface-raised: #18211d;
-  --line: rgba(255, 255, 255, 0.075);
-  --text: #f0f5f2;
-  --muted: #8e9b94;
-  --faint: #627068;
-  --blue: #4596ff;
-  --blue-bright: #72b2ff;
-  --green: #65d99a;
-  --danger: #ff8585;
-}
+/* Palette, type and motion live in tokens.css. */
 
 * { box-sizing: border-box; }
 
@@ -68,24 +54,31 @@ button { color: inherit; }
 
 .mini-cursor, .hero-cursor {
   display: block;
-  clip-path: polygon(8% 7%, 93% 47%, 53% 62%, 38% 97%);
-  transform: rotate(-9deg);
-  background: linear-gradient(145deg, var(--blue-bright), #2581f4 76%);
-  filter: drop-shadow(0 0 7px rgba(69, 150, 255, .55));
+  background-image: var(--clickaa-mark-image);
+  background-repeat: no-repeat;
+  background-position: center;
+  background-size: contain;
+  filter: drop-shadow(0 0 7px rgba(69, 150, 255, .35));
 }
-.mini-cursor { width: 17px; height: 20px; }
+.mini-cursor { width: 19px; height: 19px; }
+.hero-cursor { width: 30px; height: 30px; }
+
+/* The orb holds the mark, not a second cursor: one identity, one shape. */
+.status-orb[data-state="listening"] .hero-cursor { animation: mark-listen 1.25s ease-in-out infinite; }
+@keyframes mark-listen { 50% { transform: scale(1.1); filter: drop-shadow(0 0 14px rgba(69, 150, 255, .8)); } }
 
 .icon-button {
+  display: grid;
+  place-items: center;
   width: 28px;
   height: 28px;
-  padding: 0 0 2px;
   border: 0;
-  border-radius: 7px;
+  border-radius: var(--clickaa-radius-sm);
   background: transparent;
   color: var(--muted);
-  font-size: 22px;
-  line-height: 1;
   cursor: pointer;
+  transition: background var(--clickaa-duration-fast) var(--clickaa-ease-out),
+    color var(--clickaa-duration-fast) var(--clickaa-ease-out);
 }
 .icon-button:hover { background: rgba(255,255,255,.07); color: var(--text); }
 
@@ -142,13 +135,17 @@ button { color: inherit; }
   border: 1px solid rgba(114,178,255,.18);
   box-shadow: inset 0 1px 1px rgba(255,255,255,.06), 0 10px 30px rgba(0,0,0,.24);
 }
-.hero-cursor { width: 25px; height: 29px; z-index: 2; }
+.hero-cursor { z-index: 2; }
 .orb-ring { position: absolute; inset: -1px; border: 1px solid rgba(69,150,255,.35); border-radius: 50%; opacity: 0; }
 
 .status-orb[data-state="listening"] .orb-ring { animation: pulse-ring 1.25s ease-out infinite; }
 .status-orb[data-state="listening"] .orb-ring-two { animation-delay: .55s; }
 .status-orb[data-state="processing"] .hero-cursor { animation: thinking 1.2s ease-in-out infinite; }
 .status-orb[data-state="responding"] .hero-cursor { animation: speaking .55s ease-in-out infinite alternate; }
+
+@media (prefers-reduced-motion: reduce) {
+  .status-orb .hero-cursor, .status-orb .orb-ring { animation: none !important; }
+}
 
 @keyframes pulse-ring { 0% { transform: scale(.88); opacity: .75; } 100% { transform: scale(1.45); opacity: 0; } }
 @keyframes thinking { 50% { transform: rotate(18deg) scale(.88); filter: drop-shadow(0 0 12px rgba(69,150,255,.9)); } }
@@ -248,6 +245,29 @@ button:disabled { opacity: .5; cursor: default; }
 .shortcut-row span { color: var(--muted); font-size: 10.5px; }
 .shortcut-keys { display: flex; gap: 3px; }
 
+.shortcut-key-list {
+  margin: 10px 0 0;
+  padding: 0;
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  color: var(--muted);
+  font-size: 10.5px;
+  line-height: 1.5;
+}
+
+.shortcut-key-list kbd {
+  display: inline-block;
+  margin-right: 2px;
+  padding: 1px 5px 2px;
+  border: 1px solid var(--clickaa-line-strong);
+  border-radius: 4px;
+  background: var(--clickaa-surface-raised);
+  color: var(--text);
+  font: 600 9.5px var(--clickaa-font-ui);
+}
+
 /* -------------------------------------------------------------- talk ----- */
 
 .talk-card { padding: 10px; }
@@ -269,10 +289,12 @@ button:disabled { opacity: .5; cursor: default; }
 .talk-button-copy strong { font-size: 12.5px; }
 .talk-button-copy small { color: var(--muted); font-size: 10px; }
 .microphone-icon {
-  width: 15px; height: 20px;
-  border-radius: 8px 8px 6px 6px;
-  background: linear-gradient(180deg, #8fc4ff, #4a97f5);
-  box-shadow: 0 0 12px rgba(69,150,255,.5);
+  display: grid;
+  place-items: center;
+  width: 19px;
+  height: 19px;
+  color: #8fc4ff;
+  filter: drop-shadow(0 0 8px rgba(69, 150, 255, 0.45));
 }
 .live-wave { display: flex; align-items: flex-end; gap: 2px; height: 16px; }
 .live-wave i { width: 2.5px; height: 4px; border-radius: 2px; background: var(--blue-bright); opacity: .5; }
@@ -470,3 +492,31 @@ footer {
 .footer-dot-label.unavailable i { background: var(--danger); }
 
 .provider-warning { color: #ffca9b; }
+
+/* The audit log shows the raw command as well as the friendly summary, because
+   "what did it actually run?" is the whole point of keeping a log. */
+.audit-detail {
+  display: block;
+  margin-top: 4px;
+  padding: 6px 8px;
+  border: 1px solid var(--clickaa-line);
+  border-radius: 6px;
+  background: var(--clickaa-canvas);
+  color: var(--clickaa-ink-muted);
+  font: var(--clickaa-text-xs) var(--clickaa-font-mono);
+  line-height: 1.5;
+  white-space: pre-wrap;
+  word-break: break-word;
+  max-height: 96px;
+  overflow: hidden;
+}
+
+/* Skill names are editable in place: the input is the label until you click it. */
+.skill-name-field {
+  width: 100%;
+  max-width: 240px;
+  min-height: 26px;
+  padding: 3px 8px;
+  font-size: 11px;
+  font-weight: 600;
+}
