@@ -25,7 +25,7 @@ const companionAudioPlayback = new CompanionAudioPlayback();
 /** Labels copied from the main process's ability registry, minus the plumbing. */
 const abilityCopy: Array<{ id: AbilityId; label: string; description: string }> = [
   { id: "screenVision", label: "see your screen", description: "look at your screens when you ask, so answers match what you're doing" },
-  { id: "elementPointing", label: "point at things", description: "fly the blue cursor to the button or menu it mentions" },
+  { id: "elementPointing", label: "point at things", description: "send the ember to the button or menu it mentions" },
   { id: "automation", label: "act on your pc", description: "open apps, type, press keys, copy to the clipboard, show notifications" },
   { id: "dictation", label: "dictation", description: "hold the dictation shortcut to talk and have clean text land in the focused app" },
   { id: "circleToAsk", label: "circle to ask", description: "circle anything on screen and ask about it out loud" },
@@ -38,9 +38,9 @@ const abilityCopy: Array<{ id: AbilityId; label: string; description: string }> 
   { id: "clipboardHistory", label: "clipboard history", description: "keep your recent copies in the island, on this pc only" },
   { id: "island", label: "the island", description: "show the notch at the top of the screen" },
   { id: "presence", label: "presence", description: "wake up on its own with a morning brief and an evening recap" },
-  { id: "wakeWord", label: "wake word", description: "listen for \"ustaad\" on this pc, and open the island when you say it" },
+  { id: "wakeWord", label: "wake word", description: "listen for \"hitodama\" on this pc, and open the island when you say it" },
   { id: "systemAccessTier1", label: "system access", description: "read-only diagnostics, registry reads, and files in your own folders — each one asks first" },
-  { id: "systemAccessTier2", label: "arbitrary commands", description: "let ustaad run commands that change your pc. leave this off unless you want that, and read every card it shows" },
+  { id: "systemAccessTier2", label: "arbitrary commands", description: "let hitodama run commands that change your pc. leave this off unless you want that, and read every card it shows" },
 ];
 
 const personalityCopy: Array<{ id: PersonalityPresetId; label: string; description: string }> = [
@@ -69,7 +69,7 @@ const autoApproveCopy: Array<{ type: UstaadActionType; label: string }> = [
 const confirmationModeCopy: Record<ConfirmationMode, string> = {
   risky: "reminders and to-dos happen on their own. opening apps, typing and anything destructive wait for your yes in the island.",
   all: "every action waits for your yes, even adding a to-do.",
-  never: "ustaad acts immediately and reports what it did. only pick this if you trust it fully.",
+  never: "hitodama acts immediately and reports what it did. only pick this if you trust it fully.",
 };
 
 let latestState: UstaadPublicState | null = null;
@@ -88,8 +88,14 @@ const element = {
   statusOrb: requireElement<HTMLElement>("status-orb"),
   statusTitle: requireElement<HTMLElement>("status-title"),
   statusDescription: requireElement<HTMLElement>("status-description"),
+  soulSlotName: requireElement<HTMLElement>("soul-slot-name"),
+  soulSlotPersonality: requireElement<HTMLElement>("soul-slot-personality"),
+  soulSlotVoice: requireElement<HTMLElement>("soul-slot-voice"),
+  soulSlotAbilities: requireElement<HTMLElement>("soul-slot-abilities"),
   shortcutList: requireElement<HTMLElement>("shortcut-list"),
   pushToTalkButton: requireElement<HTMLButtonElement>("push-to-talk-button"),
+  textAskInput: requireElement<HTMLTextAreaElement>("text-ask-input"),
+  textAskButton: requireElement<HTMLButtonElement>("text-ask-button"),
   activityCard: requireElement<HTMLElement>("activity-card"),
   transcriptLabel: requireElement<HTMLElement>("transcript-label"),
   activityText: requireElement<HTMLElement>("activity-text"),
@@ -214,11 +220,11 @@ function renderState(state: UstaadPublicState): void {
 
   const statusMessages: Record<UstaadPublicState["voiceState"], [string, string]> = {
     idle: state.configured
-      ? ["ready when you are", `hold ${state.shortcutLabel} anywhere to talk`]
-      : ["connect a brain", state.configurationHint || "pick gemini or a worker in the setup tab"],
-    listening: ["i'm listening", "release when you're done"],
-    processing: ["thinking", state.interactionKind === "circle" ? "looking at what you circled" : "looking at your screen"],
-    responding: ["here's what i found", "press the shortcut again to interrupt"],
+      ? ["soul is awake", `hold ${state.shortcutLabel} to speak with it`]
+      : ["soul needs a brain", state.configurationHint || "choose a brain in setup, then come back and say hello"],
+    listening: ["soul is listening", "release when your thought is complete"],
+    processing: ["soul is thinking", state.interactionKind === "circle" ? "reading the spark you circled" : "looking at the world on your screen"],
+    responding: ["soul has a thought", "press the shortcut again if you want to interrupt"],
   };
   [element.statusTitle.textContent, element.statusDescription.textContent] = statusMessages[state.voiceState];
 
@@ -232,9 +238,9 @@ function renderState(state: UstaadPublicState): void {
   element.activityCard.hidden = !displayedActivity;
   if (displayedActivity) {
     element.transcriptLabel.textContent = state.responseText
-      ? "ustaad"
+      ? "hitodama"
       : state.partialTranscript
-        ? "hearing"
+        ? "hearing the spark"
         : "you said";
     element.activityText.textContent = displayedActivity;
   }
@@ -281,6 +287,21 @@ function renderShortcuts(state: UstaadPublicState): void {
 }
 
 function renderSoul(config: UstaadUserConfig): void {
+  const personality = personalityCopy.find((item) => item.id === config.soul.personalityPreset);
+  const enabledAbilityCount = Object.values(config.abilities).filter(Boolean).length;
+  const voiceLabel = config.soul.speechProvider === "windows"
+    ? "Windows voice"
+    : config.soul.speechProvider === "gemini"
+      ? `${config.soul.geminiVoiceName} voice`
+      : "your speech provider";
+
+  element.soulSlotName.textContent = config.soul.assistantName.trim() || "Hitodama";
+  element.soulSlotPersonality.textContent = personality?.label ?? "custom spirit";
+  element.soulSlotVoice.textContent = voiceLabel;
+  element.soulSlotAbilities.textContent = enabledAbilityCount > 0
+    ? `${enabledAbilityCount} abilities on`
+    : "quiet for now";
+
   if (!hasInitializedFields || document.activeElement !== element.assistantName) {
     element.assistantName.value = config.soul.assistantName;
   }
@@ -691,7 +712,7 @@ function renderSkills(islandState: IslandState): void {
       const emptyCopy = document.createElement("div");
       emptyCopy.className = "list-row-copy";
       const emptyText = document.createElement("span");
-      emptyText.textContent = "nothing saved yet. do something twice and ustaad will offer to save it.";
+      emptyText.textContent = "nothing saved yet. do something twice and hitodama will offer to save it.";
       emptyCopy.append(emptyText);
       emptyRow.append(emptyCopy);
       return emptyRow;
@@ -701,15 +722,15 @@ function renderSkills(islandState: IslandState): void {
 const auditOutcomeLabels: Record<UstaadPublicState["auditLog"][number]["outcome"], string> = {
   allowed: "ran",
   refused: "you said no",
-  blocked: "ustaad blocked it",
+  blocked: "hitodama blocked it",
   failed: "failed",
 };
 
 function renderAuditLog(state: UstaadPublicState): void {
   const { auditLog, auditLogCounts } = state;
   element.auditSummary.textContent = auditLogCounts.total
-    ? `${auditLogCounts.total} ${auditLogCounts.total === 1 ? "entry" : "entries"}: ${auditLogCounts.allowed} ran, ${auditLogCounts.refused} refused, ${auditLogCounts.blocked} blocked by ustaad, ${auditLogCounts.failed} failed. newest first.`
-    : "nothing yet. every command, file and registry read shows up here, whether you allowed it or ustaad refused it.";
+    ? `${auditLogCounts.total} ${auditLogCounts.total === 1 ? "entry" : "entries"}: ${auditLogCounts.allowed} ran, ${auditLogCounts.refused} refused, ${auditLogCounts.blocked} blocked by hitodama, ${auditLogCounts.failed} failed. newest first.`
+    : "nothing yet. every command, file and registry read shows up here, whether you allowed it or hitodama refused it.";
 
   element.auditList.replaceChildren(...auditLog.slice(0, 25).map((auditEntry) => {
     const row = document.createElement("div");
@@ -1064,6 +1085,10 @@ for (const tabButton of document.querySelectorAll<HTMLButtonElement>(".tab-butto
   tabButton.addEventListener("click", () => setActivePage(tabButton.dataset.page ?? "home"));
 }
 
+for (const soulLink of document.querySelectorAll<HTMLButtonElement>(".soul-slot, .soul-customize")) {
+  soulLink.addEventListener("click", () => setActivePage(soulLink.dataset.page ?? "soul"));
+}
+
 for (const responseLengthButton of document.querySelectorAll<HTMLButtonElement>("[data-response-length]")) {
   responseLengthButton.addEventListener("click", () => {
     if (!latestState) {
@@ -1180,7 +1205,7 @@ element.todoInput.addEventListener("keydown", (keyboardEvent) => {
 // Reminders and routines are set by voice ("search amazon for bags tomorrow at 9"),
 // because the same sentence has to be understood the same way in both places.
 element.scheduleAddButton.addEventListener("click", () => {
-  element.scheduleHint.textContent = "hold the talk shortcut and say it out loud — ustaad will set it up and show it here.";
+  element.scheduleHint.textContent = "hold the talk shortcut and say it out loud — hitodama will set it up and show it here.";
   window.ustaad.showPanel("home");
 });
 
@@ -1334,7 +1359,35 @@ function stopPanelPushToTalk(): void {
   renderPanelPressedState();
 }
 
-setIconButton(element.closeButton, "close", "Hide Ustaad", 14);
+async function submitTypedQuestion(): Promise<void> {
+  const text = element.textAskInput.value.trim();
+  if (!text) {
+    element.textAskInput.focus();
+    return;
+  }
+
+  element.textAskButton.disabled = true;
+  element.textAskButton.textContent = "working…";
+  try {
+    await window.ustaad.submitText(text);
+    element.textAskInput.value = "";
+  } catch (error) {
+    showTransientError(error);
+  } finally {
+    element.textAskButton.disabled = false;
+    element.textAskButton.textContent = "send";
+  }
+}
+
+element.textAskButton.addEventListener("click", () => void submitTypedQuestion());
+element.textAskInput.addEventListener("keydown", (keyboardEvent) => {
+  if (keyboardEvent.key === "Enter" && !keyboardEvent.shiftKey) {
+    keyboardEvent.preventDefault();
+    void submitTypedQuestion();
+  }
+});
+
+setIconButton(element.closeButton, "close", "Hide Hitodama Open", 14);
 element.talkMicrophone.replaceChildren(createUstaadIcon("microphone", 19));
 
 element.setupVideoButton.addEventListener("click", () => window.ustaad.openSetupVideo());

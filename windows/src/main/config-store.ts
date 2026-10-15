@@ -40,7 +40,9 @@ export const defaultUstaadUserConfig: UstaadUserConfig = {
   geminiChatModel: "gemini-2.5-flash",
   selectedClaudeModel: "claude-sonnet-4-6",
   cursorEnabled: true,
-  launchAtLogin: true,
+  // First launch should be boring and predictable. Auto-start and autonomous
+  // check-ins are opt-in in the open-source build, not surprises on install.
+  launchAtLogin: false,
   automationPaused: false,
   confirmationMode: "risky",
   autoApprovedActionTypes: [],
@@ -56,7 +58,13 @@ export const defaultUstaadUserConfig: UstaadUserConfig = {
   wakeWordProvider: "offline",
   soul: { ...defaultSoulSettings },
   abilities: { ...defaultAbilitySettings },
-  presence: { ...defaultPresenceSettings },
+  // Presence is a deliberate opt-in: the companion should not wake a new user
+  // or produce notifications until they ask for that behaviour.
+  presence: {
+    ...defaultPresenceSettings,
+    morningBriefEnabled: false,
+    eveningRecapEnabled: false,
+  },
 };
 
 export function normalizeWorkerBaseUrl(rawWorkerBaseUrl: string): string {

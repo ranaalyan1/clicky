@@ -33,7 +33,7 @@ test("every ability is enabled by default, except the picture switch, and unknow
 });
 
 test("soul settings keep the companion defaults and reject nonsense", () => {
-  assert.equal(defaultSoulSettings.assistantName, "ustaad");
+  assert.equal(defaultSoulSettings.assistantName, "hitodama");
   assert.equal(defaultSoulSettings.personalityPreset, "companion");
   assert.equal(defaultSoulSettings.speechProvider, "auto");
   assert.equal(personalityPresets.some((personalityPreset) => personalityPreset.id === "focused"), true);

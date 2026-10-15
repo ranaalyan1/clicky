@@ -77,6 +77,12 @@ test("the local brain keeps an address on this machine and nothing that points a
   assert.equal(sanitizeStoredConfig({}).localBrainSeesScreen, false);
 });
 
+test("a first launch is quiet and does not schedule autonomous work", () => {
+  assert.equal(defaultUstaadUserConfig.launchAtLogin, false);
+  assert.equal(defaultUstaadUserConfig.presence.morningBriefEnabled, false);
+  assert.equal(defaultUstaadUserConfig.presence.eveningRecapEnabled, false);
+});
+
 test("offline mode is off until the user asks, and only a real boolean turns it on", () => {
   assert.equal(defaultUstaadUserConfig.offlineMode, false);
   assert.equal(sanitizeStoredConfig({}).offlineMode, false);

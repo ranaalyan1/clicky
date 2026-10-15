@@ -1,5 +1,5 @@
 /*
- * Ustaad island: the notch, in the same soft-UI language as the panel.
+ * Hitodama island: the notch, in the same soft-UI language as the panel.
  *
  * Raised = two shadows outward. Pressed = the same two inward. Shape background
  * matches the shell background so depth is shadow-only. Palette, depth and
@@ -51,21 +51,31 @@ body[data-expanded="true"] .island-shell { border-radius: 18px; }
 }
 body[data-expanded="true"] .notch-row { box-shadow: inset 0 -1px 0 var(--island-line); }
 
-.notch-cursor {
-  width: 16px;
-  height: 16px;
-  flex: 0 0 16px;
-  background-image: var(--ustaad-mark-image);
-  background-repeat: no-repeat;
-  background-position: center;
-  background-size: contain;
-  filter: drop-shadow(0 2px 6px rgba(0, 0, 0, 0.45));
+.notch-flame {
+  position: relative;
+  width: 15px;
+  height: 19px;
+  flex: 0 0 15px;
+  border-radius: 58% 42% 55% 45% / 68% 62% 38% 32%;
+  background: linear-gradient(145deg, var(--ustaad-accent-bright), var(--ustaad-accent) 58%, var(--ustaad-accent-deep));
+  transform: rotate(8deg);
+  filter: drop-shadow(0 2px 6px rgba(255, 99, 58, .38));
 }
-body[data-voice-state="listening"] .notch-cursor { animation: notch-pulse 1s ease-in-out infinite; }
-body[data-voice-state="processing"] .notch-cursor { animation: notch-think 1.1s ease-in-out infinite; }
-body[data-voice-state="responding"] .notch-cursor { animation: notch-talk 0.5s ease-in-out infinite alternate; }
+.notch-flame::before {
+  content: "";
+  position: absolute;
+  width: 42%;
+  height: 57%;
+  left: 29%;
+  bottom: 10%;
+  border-radius: 62% 38% 52% 48%;
+  background: #fff2c8;
+}
+body[data-voice-state="listening"] .notch-flame { animation: notch-pulse 1s ease-in-out infinite; }
+body[data-voice-state="processing"] .notch-flame { animation: notch-think 1.1s ease-in-out infinite; }
+body[data-voice-state="responding"] .notch-flame { animation: notch-talk 0.5s ease-in-out infinite alternate; }
 
-@keyframes notch-pulse { 50% { filter: drop-shadow(0 0 13px rgba(182, 232, 0, 0.95)); transform: scale(1.12); } }
+@keyframes notch-pulse { 50% { filter: drop-shadow(0 0 13px rgba(255, 135, 95, .95)); transform: rotate(8deg) scale(1.12); } }
 @keyframes notch-think { 50% { transform: scale(0.9); opacity: 0.75; } }
 @keyframes notch-talk { to { transform: translateY(-1px) scale(1.06); } }
 
@@ -118,10 +128,10 @@ body[data-presentation="revealed"]:hover .notch-row::after {
   opacity: 1;
   transform: none;
 }
-body[data-presentation="revealed"] .notch-cursor { animation: notch-breathe 2.6s ease-in-out infinite; }
+body[data-presentation="revealed"] .notch-flame { animation: notch-breathe 2.6s ease-in-out infinite; }
 @keyframes notch-breathe {
-  0%, 100% { filter: drop-shadow(0 0 6px rgba(182, 232, 0, 0.45)); }
-  50% { filter: drop-shadow(0 0 11px rgba(182, 232, 0, 0.9)); }
+  0%, 100% { filter: drop-shadow(0 0 6px rgba(255, 135, 95, 0.45)); }
+  50% { filter: drop-shadow(0 0 11px rgba(255, 135, 95, 0.9)); }
 }
 
 .notch-close {
@@ -144,7 +154,7 @@ body[data-expanded="true"] .notch-close { display: grid; }
 .notch-close:active { box-shadow: var(--ustaad-neu-inset-sm); }
 
 @media (prefers-reduced-motion: reduce) {
-  body[data-presentation="revealed"] .notch-cursor { animation: none; }
+  body[data-presentation="revealed"] .notch-flame { animation: none; }
 }
 
 .notch-wave { display: flex; align-items: flex-end; gap: 2px; height: 13px; }
@@ -156,7 +166,7 @@ body[data-voice-state="listening"] .notch-wave i:nth-child(4) { animation-delay:
 body[data-voice-state="listening"] .notch-wave i:nth-child(5) { animation-delay: 0.4s; }
 @keyframes notch-wave { 0%, 100% { height: 3px; } 50% { height: 12px; } }
 
-/* The microphone light: a small dot that breathes while Ustaad is listening
+/* The microphone light: a small dot that breathes while Hitodama is listening
    for its name, and goes grey with a slash-coloured ring when muted. */
 .wake-indicator {
   width: 7px;
@@ -164,7 +174,7 @@ body[data-voice-state="listening"] .notch-wave i:nth-child(5) { animation-delay:
   flex: 0 0 7px;
   border-radius: 50%;
   background: var(--ustaad-accent);
-  box-shadow: 0 0 7px rgba(182, 232, 0, 0.7);
+  box-shadow: 0 0 7px rgba(255, 135, 95, 0.7);
 }
 
 .wake-indicator[data-wake-state="starting"] { animation: wake-breathe 1.6s ease-in-out infinite; }
@@ -342,7 +352,7 @@ body[data-media-playing="false"] .music-art span { animation-play-state: paused;
 }
 .media-button:hover { color: var(--island-text); box-shadow: var(--ustaad-neu-raised); }
 .media-button:active { box-shadow: var(--ustaad-neu-inset-sm); }
-.media-button.primary { color: #e6ff9c; box-shadow: var(--ustaad-neu-raised), inset 0 0 0 1px rgba(182,232,0,.25); }
+.media-button.primary { color: #ffe3d6; box-shadow: var(--ustaad-neu-raised), inset 0 0 0 1px rgba(255,135,95,.25); }
 
 /* ------------------------------------------------------ confirmations ---- */
 
@@ -454,8 +464,8 @@ body[data-media-playing="false"] .music-art span { animation-play-state: paused;
   border: 0;
   border-radius: var(--ustaad-radius-pill);
   background: var(--island-surface);
-  box-shadow: var(--ustaad-neu-raised-sm), inset 0 0 0 1px rgba(182,232,0,.22);
-  color: #e6ff9c;
+  box-shadow: var(--ustaad-neu-raised-sm), inset 0 0 0 1px rgba(255,135,95,.22);
+  color: #ffe3d6;
   font-size: 9px;
   font-weight: 620;
   cursor: pointer;
@@ -481,7 +491,7 @@ body[data-media-playing="false"] .music-art span { animation-play-state: paused;
   text-overflow: ellipsis;
   transition: box-shadow var(--ustaad-duration-fast) var(--ustaad-ease-out);
 }
-.app-tile:hover { box-shadow: var(--ustaad-neu-raised), inset 0 0 0 1px rgba(182,232,0,.22); }
+.app-tile:hover { box-shadow: var(--ustaad-neu-raised), inset 0 0 0 1px rgba(255,135,95,.22); }
 .app-tile:active { box-shadow: var(--ustaad-neu-inset-sm); }
 
 /* -------------------------------------------------------- wallpapers ----- */
@@ -495,7 +505,7 @@ body[data-media-playing="false"] .music-art span { animation-play-state: paused;
   cursor: pointer;
   transition: box-shadow var(--ustaad-duration-fast) var(--ustaad-ease-out);
 }
-.wallpaper-swatch:hover { box-shadow: var(--ustaad-neu-raised), 0 0 0 2px rgba(182, 232, 0, 0.45); }
+.wallpaper-swatch:hover { box-shadow: var(--ustaad-neu-raised), 0 0 0 2px rgba(255, 135, 95, 0.45); }
 .wallpaper-swatch:active { box-shadow: var(--ustaad-neu-inset-sm); }
 
 /* --------------------------------------------------------- toggles ------- */
@@ -524,10 +534,10 @@ body[data-media-playing="false"] .music-art span { animation-play-state: paused;
   box-shadow: var(--ustaad-neu-raised-sm);
   transition: transform var(--ustaad-duration-base) var(--ustaad-ease-out);
 }
-.switch-control input:checked + i { box-shadow: var(--ustaad-neu-inset-sm), inset 0 0 0 1px rgba(182,232,0,.32); }
+.switch-control input:checked + i { box-shadow: var(--ustaad-neu-inset-sm), inset 0 0 0 1px rgba(255,135,95,.32); }
 .switch-control input:checked + i::after {
   transform: translateX(16px);
-  background: linear-gradient(160deg, #d8ff4d, #8fb800);
-  box-shadow: var(--ustaad-neu-raised-sm), 0 0 10px rgba(182, 232, 0, 0.4);
+  background: linear-gradient(160deg, #ffc56b, #d6533f);
+  box-shadow: var(--ustaad-neu-raised-sm), 0 0 10px rgba(255, 135, 95, 0.4);
 }
 .switch-control input:focus-visible + i { box-shadow: var(--ustaad-neu-inset-sm), var(--ustaad-focus-ring); }

@@ -38,7 +38,7 @@ test("the wake word listener keeps its four event kinds", () => {
 
 test("the wake grammar only ever hears the wake phrases", () => {
   // The phrases the recognizer is allowed to hear at all.
-  for (const wakePhrase of ["'ustaad'", "'hey ustaad'", "'ok ustaad'"]) {
+  for (const wakePhrase of ["'hitodama'", "'hey hitodama'", "'ok hitodama'"]) {
     assert.equal(ustaadWakeWordScript.includes(wakePhrase), true, `missing grammar phrase ${wakePhrase}`);
   }
 

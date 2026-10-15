@@ -401,6 +401,14 @@ export class UstaadController {
     };
   }
 
+  /** Keeps an unexpected background failure visible without killing the tray app. */
+  reportRuntimeError(error: unknown): void {
+    const message = error instanceof Error ? error.message : String(error);
+    this.publicState.errorMessage = `A background feature stopped safely: ${message}`.slice(0, 800);
+    this.publishState();
+    this.desktopWindows.showNotification("Hitodama Open", "A background feature failed; the app is still running.");
+  }
+
   /** Wipes the audit log, at the user's request, and says so in the log itself. */
   clearAuditLog(): void {
     this.auditLogStore.clear();
@@ -459,6 +467,59 @@ export class UstaadController {
 
   handlePanelPushToTalkReleased(): void {
     this.handleShortcutReleased("talk");
+  }
+
+  /**
+   * Text is the reliable escape hatch for machines where microphone permission,
+   * a native hook, or speech transcription is unavailable. It deliberately
+   * enters the same response/action pipeline as voice so the open-source build
+   * is useful before any optional desktop integration is working.
+   */
+  async handlePanelTextSubmit(rawText: string): Promise<void> {
+    const transcriptText = rawText.replace(/\r\n/gu, "\n").trim().slice(0, 8_000);
+    if (!transcriptText) {
+      return;
+    }
+
+    const config = this.configStore.getConfig();
+    if (!this.brainRouter.isConfigured(config)) {
+      const configurationHint = this.brainRouter.configurationHint(config);
+      this.publicState.errorMessage = configurationHint;
+      this.publishState();
+      this.desktopWindows.showPanel("setup");
+      throw new Error(configurationHint);
+    }
+
+    this.cancelActiveWork();
+    this.clearTransientOverlayHideTimer();
+    this.activeInteractionId += 1;
+    this.activeInteractionKind = "talk";
+    this.selectedCircleRegion = null;
+    this.lastPointingTargets = [];
+    this.desktopWindows.setOverlayVisibility(true);
+    this.desktopWindows.updateOverlayResponse("");
+    this.desktopWindows.updateOverlayMode({
+      interactionKind: "talk",
+      hint: "answering your typed question",
+      typedText: transcriptText,
+    });
+
+    this.publicState.voiceState = "processing";
+    this.publicState.interactionKind = "talk";
+    this.publicState.lastTranscript = transcriptText;
+    this.publicState.partialTranscript = "";
+    this.publicState.responseText = "";
+    this.publicState.audioPowerLevel = 0;
+    this.publicState.errorMessage = null;
+    this.publishState();
+    this.publishIslandState();
+
+    this.interactionAbortController = new AbortController();
+    try {
+      await this.completeInteraction(transcriptText);
+    } catch (error) {
+      this.handleInteractionError(error);
+    }
   }
 
   /**
@@ -593,7 +654,7 @@ export class UstaadController {
 
     const transcriptionSession = new AssemblyAITranscriptionSession({
       workerBaseUrl: config.workerBaseUrl,
-      keyterms: ["Ustaad", "Claude", "Gemini", "Windows", "dictation", "routine"],
+      keyterms: ["Hitodama", "Ustaad", "Claude", "Gemini", "Windows", "dictation", "routine"],
       onTranscriptUpdate: (transcriptText) => {
         if (interactionId !== this.activeInteractionId) {
           return;
@@ -836,10 +897,20 @@ export class UstaadController {
       return [capturedRegion];
     }
 
-    const capturedDisplays = await captureAllWindowsDisplays();
-    this.lastPointingTargets = capturedDisplays;
-    this.actionExecutor.setClickCoordinateSpace(capturedDisplays);
-    return capturedDisplays;
+    try {
+      const capturedDisplays = await captureAllWindowsDisplays();
+      this.lastPointingTargets = capturedDisplays;
+      this.actionExecutor.setClickCoordinateSpace(capturedDisplays);
+      return capturedDisplays;
+    } catch (error) {
+      // Screen awareness is an enhancement, not a reason for typed chat to
+      // disappear. A secure surface, graphics driver, or permission issue lets
+      // the model answer without an image; the prompt tells it that it is blind.
+      console.warn("Hitodama Open could not capture the screen; continuing without screen context:", error);
+      this.lastPointingTargets = [];
+      this.actionExecutor.setClickCoordinateSpace([]);
+      return [];
+    }
   }
 
   private buildPromptForInteraction(

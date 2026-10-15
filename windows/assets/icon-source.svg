@@ -1,0 +1,23 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
+  <defs>
+    <linearGradient id="bg" x1="64" y1="54" x2="450" y2="470" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#27212d"/>
+      <stop offset="1" stop-color="#111017"/>
+    </linearGradient>
+    <linearGradient id="ember" x1="160" y1="92" x2="372" y2="444" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#ffc56b"/>
+      <stop offset="0.52" stop-color="#ff875f"/>
+      <stop offset="1" stop-color="#d6533f"/>
+    </linearGradient>
+    <linearGradient id="core" x1="222" y1="248" x2="285" y2="418" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#fff5cb"/>
+      <stop offset="0.7" stop-color="#ffd28a"/>
+      <stop offset="1" stop-color="#ff9a65"/>
+    </linearGradient>
+  </defs>
+  <rect x="17" y="17" width="478" height="478" rx="92" fill="url(#bg)" stroke="#3c3445" stroke-width="3"/>
+  <circle cx="256" cy="269" r="164" fill="#ff875f" opacity=".06"/>
+  <path d="M256 83 C312 163 384 194 376 296 C368 397 301 456 228 472 C155 449 91 389 84 310 C78 235 132 194 188 132 C184 194 216 221 240 256 C264 209 276 143 256 83Z" fill="url(#ember)"/>
+  <path d="M252 244 C296 300 315 342 293 398 C277 430 246 449 222 452 C182 414 166 373 181 331 C196 300 216 281 228 251 C235 276 247 295 259 307 C272 279 270 260 252 244Z" fill="url(#core)"/>
+  <path d="M234 357 C257 382 261 411 245 435 C237 446 224 454 216 458 C200 438 196 418 204 398 C211 381 223 372 234 357Z" fill="#fff8e6"/>
+</svg>

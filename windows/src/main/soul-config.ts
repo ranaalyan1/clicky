@@ -121,7 +121,7 @@ export const responseLengthInstructions: Record<ResponseLengthId, string> = {
 };
 
 export const defaultSoulSettings: SoulSettings = {
-  assistantName: "ustaad",
+  assistantName: "hitodama",
   personalityPreset: "companion",
   customInstructions: "",
   responseLength: "balanced",

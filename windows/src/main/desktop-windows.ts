@@ -355,16 +355,24 @@ export class UstaadDesktopWindows {
     }
 
     void Promise.all([...this.regionSelectorWindows.values()].map(async (regionSelectorWindowRecord) => {
-      await regionSelectorWindowRecord.browserWindow.loadFile(selectionHtmlPath, {
-        query: {
-          hint: hintText,
-          purpose,
-          displayWidth: String(regionSelectorWindowRecord.bounds.width),
-          displayHeight: String(regionSelectorWindowRecord.bounds.height),
-        },
-      });
-      regionSelectorWindowRecord.browserWindow.showInactive();
-    }));
+      try {
+        await regionSelectorWindowRecord.browserWindow.loadFile(selectionHtmlPath, {
+          query: {
+            hint: hintText,
+            purpose,
+            displayWidth: String(regionSelectorWindowRecord.bounds.width),
+            displayHeight: String(regionSelectorWindowRecord.bounds.height),
+          },
+        });
+        regionSelectorWindowRecord.browserWindow.showInactive();
+      } catch (error) {
+        console.warn("Hitodama Open could not open the region selector:", error);
+        regionSelectorWindowRecord.browserWindow.destroy();
+        this.regionSelectorWindows.delete(regionSelectorWindowRecord.displayId);
+      }
+    })).catch((error: unknown) => {
+      console.warn("Hitodama Open could not prepare the region selector:", error);
+    });
   }
 
   hideRegionSelector(): void {
@@ -383,67 +391,76 @@ export class UstaadDesktopWindows {
     const preloadPath = join(__dirname, "../preload/preload.js");
     const overlayHtmlPath = join(__dirname, "../renderer/overlay.html");
 
-    await Promise.all(screen.getAllDisplays().map(async (display) => {
-      const overlayWindow = new BrowserWindow({
-        x: display.bounds.x,
-        y: display.bounds.y,
-        width: display.bounds.width,
-        height: display.bounds.height,
-        frame: false,
-        transparent: true,
-        backgroundColor: "#00000000",
-        hasShadow: false,
-        show: false,
-        focusable: false,
-        skipTaskbar: true,
-        resizable: false,
-        movable: false,
-        minimizable: false,
-        maximizable: false,
-        fullscreenable: false,
-        webPreferences: {
-          preload: preloadPath,
-          contextIsolation: true,
-          nodeIntegration: false,
-          sandbox: true,
-          backgroundThrottling: false,
-        },
-      });
-
-      overlayWindow.setIgnoreMouseEvents(true, { forward: true });
-      overlayWindow.setAlwaysOnTop(true, "screen-saver");
-      overlayWindow.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: true });
-      overlayWindow.setContentProtection(true);
-      overlayWindow.webContents.setWindowOpenHandler(() => ({ action: "deny" }));
-      overlayWindow.webContents.on("will-navigate", (event) => event.preventDefault());
-
-      const overlayWindowRecord: OverlayWindowRecord = {
-        browserWindow: overlayWindow,
-        displayId: display.id,
-        bounds: { ...display.bounds },
-      };
-      this.overlayWindows.set(display.id, overlayWindowRecord);
-
-      await overlayWindow.loadFile(overlayHtmlPath, {
-        query: {
-          displayId: String(display.id),
-          displayX: String(display.bounds.x),
-          displayY: String(display.bounds.y),
-        },
-      });
-
-      if (this.latestPublicState) {
-        overlayWindow.webContents.send("overlay:state", {
-          voiceState: this.latestPublicState.voiceState,
-          audioPowerLevel: this.latestPublicState.audioPowerLevel,
+    for (const display of screen.getAllDisplays()) {
+      let overlayWindow: BrowserWindow | null = null;
+      try {
+        overlayWindow = new BrowserWindow({
+          x: display.bounds.x,
+          y: display.bounds.y,
+          width: display.bounds.width,
+          height: display.bounds.height,
+          frame: false,
+          transparent: true,
+          backgroundColor: "#00000000",
+          hasShadow: false,
+          show: false,
+          focusable: false,
+          skipTaskbar: true,
+          resizable: false,
+          movable: false,
+          minimizable: false,
+          maximizable: false,
+          fullscreenable: false,
+          webPreferences: {
+            preload: preloadPath,
+            contextIsolation: true,
+            nodeIntegration: false,
+            sandbox: true,
+            backgroundThrottling: false,
+          },
         });
-        overlayWindow.webContents.send("overlay:response", this.latestPublicState.responseText);
-      }
 
-      if (this.overlayWindowsShouldBeVisible) {
-        overlayWindow.showInactive();
+        overlayWindow.setIgnoreMouseEvents(true, { forward: true });
+        overlayWindow.setAlwaysOnTop(true, "screen-saver");
+        overlayWindow.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: true });
+        overlayWindow.setContentProtection(true);
+        overlayWindow.webContents.setWindowOpenHandler(() => ({ action: "deny" }));
+        overlayWindow.webContents.on("will-navigate", (event) => event.preventDefault());
+
+        const overlayWindowRecord: OverlayWindowRecord = {
+          browserWindow: overlayWindow,
+          displayId: display.id,
+          bounds: { ...display.bounds },
+        };
+        this.overlayWindows.set(display.id, overlayWindowRecord);
+
+        await overlayWindow.loadFile(overlayHtmlPath, {
+          query: {
+            displayId: String(display.id),
+            displayX: String(display.bounds.x),
+            displayY: String(display.bounds.y),
+          },
+        });
+
+        if (this.latestPublicState) {
+          overlayWindow.webContents.send("overlay:state", {
+            voiceState: this.latestPublicState.voiceState,
+            audioPowerLevel: this.latestPublicState.audioPowerLevel,
+          });
+          overlayWindow.webContents.send("overlay:response", this.latestPublicState.responseText);
+        }
+
+        if (this.overlayWindowsShouldBeVisible) {
+          overlayWindow.showInactive();
+        }
+      } catch (error) {
+        console.warn(`Hitodama Open could not create the cursor overlay for display ${display.id}:`, error);
+        if (overlayWindow && !overlayWindow.isDestroyed()) {
+          overlayWindow.destroy();
+        }
+        this.overlayWindows.delete(display.id);
       }
-    }));
+    }
   }
 
   destroy(): void {
@@ -542,7 +559,12 @@ export class UstaadDesktopWindows {
     this.islandWindow.setIgnoreMouseEvents(true, { forward: true });
     this.islandWindow.webContents.setWindowOpenHandler(() => ({ action: "deny" }));
     this.islandWindow.webContents.on("will-navigate", (event) => event.preventDefault());
-    void this.islandWindow.loadFile(islandHtmlPath);
+    void this.islandWindow.loadFile(islandHtmlPath).catch((error: unknown) => {
+      // The island is optional chrome. A renderer/static-asset problem must not
+      // prevent the panel and text assistant from starting.
+      console.warn("Hitodama Open could not load its island:", error);
+      this.islandWindow?.hide();
+    });
   }
 
   private calculateIslandBounds(shouldBeExpanded: boolean, displayId?: number): Electron.Rectangle {
@@ -697,7 +719,7 @@ export class UstaadDesktopWindows {
     const trayIconPath = join(__dirname, "../../assets/tray.png");
     const trayIcon = nativeImage.createFromPath(trayIconPath);
     this.tray = new Tray(trayIcon);
-    this.tray.setToolTip("Ustaad — hold Ctrl + Alt to talk, Ctrl + Windows to dictate");
+    this.tray.setToolTip("Hitodama Open — hold Ctrl + Alt to talk, Ctrl + Windows to dictate");
     this.tray.on("click", () => this.togglePanel());
     this.rebuildTrayContextMenu();
   }
@@ -715,7 +737,7 @@ export class UstaadDesktopWindows {
 
     this.tray.setContextMenu(Menu.buildFromTemplate([
       {
-        label: "Open Ustaad",
+        label: "Open Hitodama Open",
         click: () => this.showPanel(),
       },
       { type: "separator" },
@@ -746,7 +768,7 @@ export class UstaadDesktopWindows {
       },
       { type: "separator" },
       {
-        label: "Quit Ustaad",
+        label: "Quit Hitodama Open",
         click: () => this.callbacks.onQuit(),
       },
     ]));

@@ -1,5 +1,5 @@
 /*
- * Ustaad panel: neumorphic soft-UI surface language.
+ * Hitodama panel: neumorphic soft-UI surface language.
  *
  * Two rules keep this coherent, and breaking either one flattens the interface:
  *   1. Shape background == parent surface (so depth is only shadow).
@@ -63,20 +63,44 @@ button { color: inherit; }
   text-transform: uppercase;
 }
 
-.mini-cursor, .hero-cursor {
+/* Hitodama's mark is a living ember rather than a static cursor. The inner
+   lick is separate so the warm core stays visible on the graphite surface. */
+.mini-flame, .soul-flame {
+  position: relative;
   display: block;
-  background-image: var(--ustaad-mark-image);
-  background-repeat: no-repeat;
-  background-position: center;
-  background-size: contain;
-  filter: drop-shadow(0 2px 6px rgba(0, 0, 0, 0.45));
+  flex: 0 0 auto;
+  border-radius: 58% 42% 55% 45% / 68% 62% 38% 32%;
+  background: linear-gradient(145deg, var(--ustaad-accent-bright) 3%, var(--ustaad-accent) 55%, var(--ustaad-accent-deep) 100%);
+  transform: rotate(8deg);
+  filter: drop-shadow(0 2px 6px rgba(255, 99, 58, .38));
 }
-.mini-cursor { width: 19px; height: 19px; }
-.hero-cursor { width: 30px; height: 30px; }
+.mini-flame { width: 18px; height: 21px; }
+.soul-flame { width: 28px; height: 36px; z-index: 2; }
+.mini-flame::before, .soul-flame::before {
+  content: "";
+  position: absolute;
+  width: 42%;
+  height: 58%;
+  left: 29%;
+  bottom: 9%;
+  border-radius: 62% 38% 52% 48% / 70% 65% 35% 30%;
+  background: linear-gradient(155deg, #fff5cb, #ffd28a 55%, #ff9a65);
+  transform: rotate(-8deg);
+}
+.mini-flame i, .soul-flame i {
+  position: absolute;
+  width: 24%;
+  height: 34%;
+  left: 38%;
+  bottom: 10%;
+  border-radius: 60% 40% 50% 50%;
+  background: #fff8e6;
+  z-index: 1;
+}
 
-/* The orb holds the mark, not a second cursor: one identity, one shape. */
-.status-orb[data-state="listening"] .hero-cursor { animation: mark-listen 1.25s ease-in-out infinite; }
-@keyframes mark-listen { 50% { transform: scale(1.1); filter: drop-shadow(0 0 14px rgba(182, 232, 0, .8)); } }
+/* The orb holds the ember, not a second cursor: one identity, one shape. */
+.status-orb[data-state="listening"] .soul-flame { animation: mark-listen 1.25s ease-in-out infinite; }
+@keyframes mark-listen { 50% { transform: rotate(8deg) scale(1.1); filter: drop-shadow(0 0 14px rgba(255,135,95,.8)); } }
 
 /* Soft square button: raised at rest, pressed while held. */
 .icon-button {
@@ -176,20 +200,19 @@ button { color: inherit; }
   border-radius: 50%;
   box-shadow: var(--ustaad-neu-inset-sm);
 }
-.hero-cursor { z-index: 2; }
-.orb-ring { position: absolute; inset: -1px; border: 1px solid rgba(182,232,0,.35); border-radius: 50%; opacity: 0; }
+.orb-ring { position: absolute; inset: -1px; border: 1px solid rgba(255,135,95,.35); border-radius: 50%; opacity: 0; }
 
 .status-orb[data-state="listening"] .orb-ring { animation: pulse-ring 1.25s ease-out infinite; }
 .status-orb[data-state="listening"] .orb-ring-two { animation-delay: .55s; }
-.status-orb[data-state="processing"] .hero-cursor { animation: thinking 1.2s ease-in-out infinite; }
-.status-orb[data-state="responding"] .hero-cursor { animation: speaking .55s ease-in-out infinite alternate; }
+.status-orb[data-state="processing"] .soul-flame { animation: thinking 1.2s ease-in-out infinite; }
+.status-orb[data-state="responding"] .soul-flame { animation: speaking .55s ease-in-out infinite alternate; }
 
 @media (prefers-reduced-motion: reduce) {
-  .status-orb .hero-cursor, .status-orb .orb-ring { animation: none !important; }
+  .status-orb .soul-flame, .status-orb .orb-ring { animation: none !important; }
 }
 
 @keyframes pulse-ring { 0% { transform: scale(.88); opacity: .75; } 100% { transform: scale(1.45); opacity: 0; } }
-@keyframes thinking { 50% { transform: rotate(18deg) scale(.88); filter: drop-shadow(0 0 12px rgba(182,232,0,.9)); } }
+@keyframes thinking { 50% { transform: rotate(18deg) scale(.88); filter: drop-shadow(0 0 12px rgba(255,135,95,.9)); } }
 @keyframes speaking { to { transform: rotate(-5deg) translateY(-2px) scale(1.07); } }
 
 .status-copy { min-width: 0; }
@@ -221,6 +244,93 @@ kbd {
   box-shadow: var(--ustaad-neu-raised-lg);
 }
 .card { padding: 16px; }
+
+/* The home page's identity card is the visual anchor: a warm ember field,
+   four living slots, and a direct invitation to shape the companion. */
+.soul-card {
+  position: relative;
+  overflow: hidden;
+  padding: 16px;
+  background:
+    radial-gradient(circle at 100% 0%, rgba(255, 135, 95, .18), transparent 42%),
+    radial-gradient(circle at 0% 100%, rgba(166, 126, 255, .09), transparent 46%),
+    var(--ustaad-canvas);
+}
+.soul-card::before {
+  content: "";
+  position: absolute;
+  width: 104px;
+  height: 104px;
+  right: -36px;
+  top: -42px;
+  border: 1px solid rgba(255, 197, 107, .25);
+  border-radius: 50%;
+  box-shadow: 0 0 0 11px rgba(255, 135, 95, .045), 0 0 0 22px rgba(255, 135, 95, .025);
+  pointer-events: none;
+}
+.soul-card-heading { position: relative; display: flex; align-items: start; justify-content: space-between; gap: 8px; }
+.soul-card-copy { position: relative; margin: 0 0 13px; color: var(--muted); font-size: 10.5px; line-height: 1.45; }
+.soul-state-dot {
+  width: 9px;
+  height: 9px;
+  margin: 4px 3px 0 0;
+  border-radius: 50%;
+  background: var(--ustaad-accent-bright);
+  box-shadow: 0 0 0 4px rgba(255, 135, 95, .11), 0 0 13px rgba(255, 135, 95, .65);
+}
+.soul-slots { position: relative; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 7px; }
+.soul-slot {
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 9px 8px;
+  border: 0;
+  border-radius: var(--ustaad-radius-md);
+  background: rgba(23, 21, 29, .54);
+  box-shadow: var(--ustaad-neu-inset-sm);
+  color: var(--text);
+  text-align: left;
+  cursor: pointer;
+  transition: transform var(--ustaad-duration-fast) var(--ustaad-ease-out), box-shadow var(--ustaad-duration-fast) var(--ustaad-ease-out);
+}
+.soul-slot:hover { transform: translateY(-1px); box-shadow: var(--ustaad-neu-raised-sm); }
+.soul-slot:active { transform: translateY(0); box-shadow: var(--ustaad-neu-inset-sm); }
+.slot-glyph {
+  flex: 0 0 23px;
+  display: grid;
+  place-items: center;
+  width: 23px;
+  height: 23px;
+  border-radius: 8px;
+  background: rgba(255, 135, 95, .12);
+  color: var(--ustaad-accent-bright);
+  font-size: 12px;
+  line-height: 1;
+}
+.soul-slot-personality .slot-glyph { color: #c7b7ff; background: rgba(166, 126, 255, .13); }
+.soul-slot-voice .slot-glyph { color: #8ee0d0; background: rgba(105, 217, 159, .11); font-size: 9px; letter-spacing: -2px; }
+.soul-slot-abilities .slot-glyph { color: #ffd38e; background: rgba(255, 197, 106, .12); }
+.soul-slot > span:last-child { min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+.soul-slot small { color: var(--faint); font-size: 8px; letter-spacing: .06em; text-transform: uppercase; }
+.soul-slot strong { overflow: hidden; color: var(--text); font-size: 10.5px; font-weight: 650; text-overflow: ellipsis; white-space: nowrap; }
+.soul-customize {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+  margin-top: 11px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--ustaad-accent-bright);
+  font-size: 10.5px;
+  font-weight: 650;
+  cursor: pointer;
+}
+.soul-customize span { font-size: 14px; transition: transform var(--ustaad-duration-fast) var(--ustaad-ease-out); }
+.soul-customize:hover span { transform: translate(2px, -2px); }
 
 .section-heading-row { display: flex; align-items: start; justify-content: space-between; gap: 8px; margin-bottom: 12px; }
 .eyebrow { margin: 0 0 3px; color: var(--ustaad-accent-bright); font-size: 8.5px; font-weight: 750; letter-spacing: .12em; text-transform: uppercase; }
@@ -256,7 +366,7 @@ h2 { margin: 0; font-size: 13px; font-weight: 650; }
 }
 .text-field::placeholder, .text-area::placeholder { color: var(--ustaad-ink-faint); }
 .text-field:focus, .select-field:focus, .text-area:focus {
-  box-shadow: var(--ustaad-neu-inset), 0 0 0 2px rgba(182, 232, 0, 0.5);
+  box-shadow: var(--ustaad-neu-inset), 0 0 0 2px rgba(255, 135, 95, 0.5);
 }
 .text-area { resize: none; line-height: 1.55; font-family: inherit; }
 .select-field { cursor: pointer; }
@@ -281,11 +391,11 @@ h2 { margin: 0; font-size: 13px; font-weight: 650; }
 }
 .primary-button {
   flex: 1;
-  background: linear-gradient(160deg, rgba(182,232,0,.22), rgba(47,122,224,.12));
-  color: #cfe3ff;
+  background: linear-gradient(160deg, rgba(255,135,95,.22), rgba(166,126,255,.12));
+  color: #ffe3d6;
   box-shadow: var(--ustaad-neu-raised);
 }
-.primary-button:hover { color: #e6f0ff; box-shadow: var(--ustaad-neu-raised-lit); }
+.primary-button:hover { color: #fff4ec; box-shadow: var(--ustaad-neu-raised-lit); }
 .primary-button:active { box-shadow: var(--ustaad-neu-inset); transform: translateY(0.5px); }
 .secondary-button { background: var(--ustaad-canvas); color: var(--text); box-shadow: var(--ustaad-neu-raised); }
 .secondary-button:hover { box-shadow: var(--ustaad-neu-raised-lit); }
@@ -414,7 +524,7 @@ button:disabled { opacity: .5; cursor: default; box-shadow: var(--ustaad-neu-ins
   padding: 13px 15px;
   border: 0;
   border-radius: var(--ustaad-radius-md);
-  background: linear-gradient(160deg, rgba(182,232,0,.16), rgba(47,122,224,.07));
+  background: linear-gradient(160deg, rgba(255,135,95,.16), rgba(166,126,255,.07));
   box-shadow: var(--ustaad-neu-raised);
   cursor: pointer;
   text-align: left;
@@ -430,8 +540,8 @@ button:disabled { opacity: .5; cursor: default; box-shadow: var(--ustaad-neu-ins
   place-items: center;
   width: 20px;
   height: 20px;
-  color: #8fc4ff;
-  filter: drop-shadow(0 0 8px rgba(182, 232, 0, 0.45));
+  color: #ffc080;
+  filter: drop-shadow(0 0 8px rgba(255, 135, 95, 0.45));
 }
 .live-wave { display: flex; align-items: flex-end; gap: 2px; height: 16px; }
 .live-wave i { width: 2.5px; height: 4px; border-radius: 2px; background: var(--blue-bright); opacity: .5; }
@@ -440,6 +550,38 @@ button:disabled { opacity: .5; cursor: default; box-shadow: var(--ustaad-neu-ins
 .push-to-talk-button.is-pressed .live-wave i:nth-child(3) { animation-delay: .24s; }
 .push-to-talk-button.is-pressed .live-wave i:nth-child(4) { animation-delay: .36s; }
 @keyframes wave { 0%,100% { height: 4px; } 50% { height: 16px; } }
+
+/* Text is a first-class path, not an emergency-only settings field. It keeps
+   the core assistant usable when a microphone or native global hook is down. */
+.text-ask-card {
+  margin: 0 12px 12px;
+  padding: 12px 14px 11px;
+  border-radius: var(--ustaad-radius-md);
+  background: var(--ustaad-surface);
+  box-shadow: var(--ustaad-neu-inset-sm);
+}
+.text-ask-card .field-label { margin-top: 0; }
+.text-ask-row { display: flex; align-items: flex-end; gap: 8px; }
+.text-ask-input {
+  flex: 1;
+  min-width: 0;
+  min-height: 48px;
+  max-height: 150px;
+  resize: vertical;
+  padding: 9px 10px;
+  border: 0;
+  border-radius: var(--ustaad-radius-sm);
+  background: var(--ustaad-canvas);
+  box-shadow: var(--ustaad-neu-inset-sm);
+  color: var(--text);
+  font-size: 11.5px;
+  line-height: 1.45;
+  user-select: text;
+}
+.text-ask-input::placeholder { color: var(--faint); }
+.text-ask-input:focus { outline: none; box-shadow: var(--ustaad-focus-shadow), var(--ustaad-neu-inset-sm); }
+.text-ask-button { flex: 0 0 auto; min-height: 34px; padding: 8px 13px; }
+.text-ask-card .field-hint { margin-bottom: 0; }
 
 /* ------------------------------------------------------------ activity --- */
 
@@ -500,12 +642,12 @@ button:disabled { opacity: .5; cursor: default; box-shadow: var(--ustaad-neu-ins
   transition: transform var(--ustaad-duration-base) var(--ustaad-ease-out);
 }
 .toggle-control input:checked + span {
-  box-shadow: var(--ustaad-neu-inset), inset 0 0 0 1px rgba(182, 232, 0, 0.35);
+  box-shadow: var(--ustaad-neu-inset), inset 0 0 0 1px rgba(255, 135, 95, 0.35);
 }
 .toggle-control input:checked + span::after {
   transform: translateX(18px);
-  background: linear-gradient(160deg, #d8ff4d, #8fb800);
-  box-shadow: var(--ustaad-neu-raised-sm), 0 0 12px rgba(182, 232, 0, 0.4);
+  background: linear-gradient(160deg, #ffc56b, #d6533f);
+  box-shadow: var(--ustaad-neu-raised-sm), 0 0 12px rgba(255, 135, 95, 0.4);
 }
 .toggle-control input:focus-visible + span { box-shadow: var(--ustaad-neu-inset), var(--ustaad-focus-ring); }
 
@@ -552,7 +694,7 @@ button:disabled { opacity: .5; cursor: default; box-shadow: var(--ustaad-neu-ins
 }
 .chip:hover { color: var(--text); box-shadow: var(--ustaad-neu-raised); }
 .chip.active {
-  box-shadow: var(--ustaad-neu-inset-sm), inset 0 0 0 1px rgba(182,232,0,.3);
+  box-shadow: var(--ustaad-neu-inset-sm), inset 0 0 0 1px rgba(255,135,95,.3);
   color: var(--ustaad-accent-bright);
 }
 
@@ -578,7 +720,7 @@ button:disabled { opacity: .5; cursor: default; box-shadow: var(--ustaad-neu-ins
 .provider-card strong { font-size: 12px; }
 .provider-card span { color: var(--muted); font-size: 10px; line-height: 1.5; }
 .provider-card.active {
-  box-shadow: var(--ustaad-neu-inset-sm), inset 0 0 0 1px rgba(182,232,0,.3);
+  box-shadow: var(--ustaad-neu-inset-sm), inset 0 0 0 1px rgba(255,135,95,.3);
 }
 .provider-card.active strong { color: var(--ustaad-accent-bright); }
 

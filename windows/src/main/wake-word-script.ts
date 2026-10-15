@@ -25,12 +25,15 @@ function Emit([string] $line) {
 # The recognizer only ever hears these phrases; anything else is discarded by
 # the grammar, which is what keeps an always-on microphone cheap and private.
 $wakePhrases = @(
+  'hitodama',
+  'hey hitodama',
+  'ok hitodama',
+  'hi hitodama',
   'ustaad',
-  'click a',
-  'click ah',
   'hey ustaad',
   'ok ustaad',
-  'hi ustaad'
+  'click a',
+  'click ah'
 )
 
 # Easily confused with ordinary speech ("click a button"), so they have to be
