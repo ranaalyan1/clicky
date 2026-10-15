@@ -29,6 +29,7 @@ declare global {
 
       pushToTalkPressed(): void;
       pushToTalkReleased(): void;
+      submitText(text: string): Promise<void>;
       sendAudioCaptureStarted(interactionId: number): void;
       sendAudioChunk(interactionId: number, audioBytes: Uint8Array): void;
       sendAudioPowerLevel(interactionId: number, audioPowerLevel: number): void;

@@ -79,14 +79,14 @@ function renderNotch(islandState: IslandState): void {
   const collapsedLabels: Record<IslandState["status"]["voiceState"], string> = {
     idle: islandState.pendingConfirmations.length
       ? "waiting for your yes"
-      : statusSummary.detail || "ustaad",
+      : statusSummary.detail || "hitodama",
     listening: statusSummary.interactionKind === "dictation" ? "listening for dictation" : "listening…",
     processing: statusSummary.dictationStage === "cleaning"
       ? "cleaning up your words"
       : statusSummary.interactionKind === "circle"
         ? "looking at your circle"
         : "thinking…",
-    responding: statusSummary.label || "ustaad",
+    responding: statusSummary.label || "hitodama",
   };
   element.notchLabel.textContent = collapsedLabels[statusSummary.voiceState];
   element.notchTrack.textContent = islandState.nowPlaying?.isPlaying
@@ -105,7 +105,7 @@ function renderNotch(islandState: IslandState): void {
   element.notchBadge.classList.toggle("alert", pendingConfirmationCount > 0);
 
   element.headerStatus.textContent = islandState.status.label || "ready";
-  element.brainSummary.textContent = `thinking with ${islandState.brainLabel}. these settings live in the ustaad panel.`;
+  element.brainSummary.textContent = `thinking with ${islandState.brainLabel}. these settings live in the hitodama panel.`;
 }
 
 /* -------------------------------------------------------------------------- */
@@ -320,7 +320,7 @@ function renderWakeIndicator(islandState: IslandState): void {
   const stateLabels: Record<IslandState["wakeWordState"], string> = {
     off: "wake word off",
     starting: "wake word starting",
-    listening: "listening for ustaad",
+    listening: "listening for hitodama",
     unavailable: "wake word unavailable",
     error: "wake word stopped",
   };
@@ -379,7 +379,7 @@ function renderPlans(islandState: IslandState): void {
 
   element.memoryList.replaceChildren(...(islandState.memoryFacts.length
     ? islandState.memoryFacts.map(buildMemoryRow)
-    : [createEmptyRow("say \"remember my wifi password is …\" and ustaad keeps it.")]));
+    : [createEmptyRow("say \"remember my wifi password is …\" and hitodama keeps it.")]));
 
   // The whole point of presence is that it is visible before it happens: the
   // chip says when Ustaad will speak up next without the user asking.
@@ -510,7 +510,7 @@ function renderApps(quickLaunchApps: LaunchableAppView[]): void {
       });
       return tile;
     })
-    : [createEmptyRow("ask ustaad to scan your start menu in the panel's setup tab.")]));
+    : [createEmptyRow("ask hitodama to scan your start menu in the panel's setup tab.")]));
 }
 
 function renderWallpaperSwatches(): void {
@@ -570,7 +570,7 @@ function renderControlToggles(islandState: IslandState): void {
     {
       key: "paused",
       label: "pause actions",
-      detail: "ustaad only describes what it would do",
+      detail: "hitodama only describes what it would do",
       isOn: islandState.automationPaused,
     },
   ];
@@ -1019,7 +1019,7 @@ document.addEventListener("wheel", (wheelEvent) => {
   }
 }, { passive: false });
 
-setIconButton(element.closeButton, "close", "Close Ustaad", 13);
+setIconButton(element.closeButton, "close", "Close Hitodama Open", 13);
 
 window.ustaad.onIslandPresentation(({ presentation }) => {
   currentPresentation = presentation;

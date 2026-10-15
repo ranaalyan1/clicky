@@ -1,10 +1,10 @@
 {
-  "name": "ustaad-windows",
-  "version": "1.2.0",
+  "name": "hitodama-open-windows",
+  "version": "0.1.0",
   "private": true,
-  "description": "Ustaad, the voice companion that lives on your Windows desktop",
+  "description": "Hitodama Open, an open-source voice companion for Windows",
   "main": "dist/src/main/main.js",
-  "author": "Ustaad contributors",
+  "author": "Hitodama Open contributors",
   "license": "MIT",
   "engines": {
     "node": ">=22.12"
@@ -35,8 +35,8 @@
     "typescript": "5.9.3"
   },
   "build": {
-    "appId": "com.ustaad.windows",
-    "productName": "Ustaad",
+    "appId": "com.hitodama.open",
+    "productName": "Hitodama Open",
     "asar": true,
     "npmRebuild": false,
     "asarUnpack": [
@@ -49,6 +49,7 @@
     "directories": {
       "output": "release"
     },
+    "executableName": "HitodamaOpen",
     "win": {
       "icon": "assets/icon.ico",
       "target": [
@@ -60,7 +61,7 @@
           ]
         }
       ],
-      "artifactName": "Ustaad-Setup-${version}-${arch}.${ext}",
+      "artifactName": "Hitodama-Open-Setup-${version}-${arch}.${ext}",
       "signExts": [
         ".node"
       ]
@@ -71,7 +72,7 @@
       "allowToChangeInstallationDirectory": true,
       "createDesktopShortcut": true,
       "createStartMenuShortcut": true,
-      "shortcutName": "Ustaad",
+      "shortcutName": "Hitodama Open",
       "deleteAppDataOnUninstall": false
     }
   }

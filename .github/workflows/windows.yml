@@ -76,8 +76,8 @@ jobs:
           # A signature that is merely present is not enough: only a valid,
           # timestamped signature makes Windows trust the file. Check every
           # binary a user or Windows itself will load.
-          $signableFiles = @(Get-ChildItem "windows/release/Ustaad-Setup-*.exe") +
-            @(Get-ChildItem "windows/release/win-unpacked/Ustaad.exe")
+          $signableFiles = @(Get-ChildItem "windows/release/Hitodama-Open-Setup-*.exe") +
+            @(Get-ChildItem "windows/release/win-unpacked/HitodamaOpen.exe")
 
           foreach ($file in $signableFiles) {
             $signature = Get-AuthenticodeSignature -FilePath $file.FullName
@@ -99,7 +99,7 @@ jobs:
         env:
           ELECTRON_ENABLE_LOGGING: "1"
         run: |
-          $applicationPath = Resolve-Path "release/win-unpacked/Ustaad.exe"
+          $applicationPath = Resolve-Path "release/win-unpacked/HitodamaOpen.exe"
           $standardOutputPath = Join-Path $env:RUNNER_TEMP "ustaad-smoke-stdout.log"
           $standardErrorPath = Join-Path $env:RUNNER_TEMP "ustaad-smoke-stderr.log"
           $ustaadProcess = Start-Process `
@@ -127,8 +127,8 @@ jobs:
       - name: Upload Windows installers
         uses: actions/upload-artifact@v7
         with:
-          name: ustaad-windows-installers
-          path: windows/release/Ustaad-Setup-*.exe
+          name: hitodama-open-windows-installers
+          path: windows/release/Hitodama-Open-Setup-*.exe
           if-no-files-found: error
 
       - name: Publish Windows GitHub release
@@ -148,7 +148,7 @@ jobs:
             throw "Release tag must match package version: $expectedReleaseTag"
           }
 
-          $installerPaths = Get-ChildItem "windows/release/Ustaad-Setup-*.exe"
+          $installerPaths = Get-ChildItem "windows/release/Hitodama-Open-Setup-*.exe"
           if ($installerPaths.Count -ne 2) {
             throw "Expected exactly two Windows installers, found $($installerPaths.Count)."
           }
@@ -165,9 +165,9 @@ jobs:
           }
 
           @"
-          Ustaad for Windows $($packageManifest.version).
+          Hitodama Open for Windows $($packageManifest.version).
 
-          This release contains per-user NSIS installers for Windows x64 and ARM64. After installation, open Ustaad from the notification area, then paste either your own Gemini API key or a deployed Cloudflare Worker URL and select **save & test**.
+          This release contains per-user NSIS installers for Windows x64 and ARM64. After installation, open Hitodama Open from the notification area, then paste either your own Gemini API key or a deployed Cloudflare Worker URL and select **save & test**.
 
           $signingNote
           "@ | Set-Content $releaseNotesPath
@@ -175,7 +175,7 @@ jobs:
           $releaseArguments = @(
             "release", "create", $env:RELEASE_TAG,
             "--target", $env:GITHUB_SHA,
-            "--title", "Ustaad for Windows $($packageManifest.version)",
+            "--title", "Hitodama Open for Windows $($packageManifest.version)",
             "--notes-file", $releaseNotesPath
           ) + $installerPaths.FullName
 
@@ -189,5 +189,5 @@ jobs:
         uses: softprops/action-gh-release@v3
         with:
           tag_name: ${{ github.event.release.tag_name }}
-          files: windows/release/Ustaad-Setup-*.exe
+          files: windows/release/Hitodama-Open-Setup-*.exe
           fail_on_unmatched_files: true

@@ -90,6 +90,8 @@ const element = {
   statusDescription: requireElement<HTMLElement>("status-description"),
   shortcutList: requireElement<HTMLElement>("shortcut-list"),
   pushToTalkButton: requireElement<HTMLButtonElement>("push-to-talk-button"),
+  textAskInput: requireElement<HTMLTextAreaElement>("text-ask-input"),
+  textAskButton: requireElement<HTMLButtonElement>("text-ask-button"),
   activityCard: requireElement<HTMLElement>("activity-card"),
   transcriptLabel: requireElement<HTMLElement>("transcript-label"),
   activityText: requireElement<HTMLElement>("activity-text"),
@@ -1334,7 +1336,35 @@ function stopPanelPushToTalk(): void {
   renderPanelPressedState();
 }
 
-setIconButton(element.closeButton, "close", "Hide Ustaad", 14);
+async function submitTypedQuestion(): Promise<void> {
+  const text = element.textAskInput.value.trim();
+  if (!text) {
+    element.textAskInput.focus();
+    return;
+  }
+
+  element.textAskButton.disabled = true;
+  element.textAskButton.textContent = "working…";
+  try {
+    await window.ustaad.submitText(text);
+    element.textAskInput.value = "";
+  } catch (error) {
+    showTransientError(error);
+  } finally {
+    element.textAskButton.disabled = false;
+    element.textAskButton.textContent = "send";
+  }
+}
+
+element.textAskButton.addEventListener("click", () => void submitTypedQuestion());
+element.textAskInput.addEventListener("keydown", (keyboardEvent) => {
+  if (keyboardEvent.key === "Enter" && !keyboardEvent.shiftKey) {
+    keyboardEvent.preventDefault();
+    void submitTypedQuestion();
+  }
+});
+
+setIconButton(element.closeButton, "close", "Hide Hitodama Open", 14);
 element.talkMicrophone.replaceChildren(createUstaadIcon("microphone", 19));
 
 element.setupVideoButton.addEventListener("click", () => window.ustaad.openSetupVideo());

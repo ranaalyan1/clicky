@@ -207,7 +207,7 @@ export class WakeWordListener {
         // A listener that got this far has proven it works, so the restart
         // budget is fresh again.
         this.restartsUsed = 0;
-        this.updateState("listening", "listening for \"ustaad\" on this pc");
+        this.updateState("listening", "listening for \"hitodama\" on this pc");
         return;
       case "wake":
         this.callbacks.onWakeWordDetected(listenerEvent.detection);

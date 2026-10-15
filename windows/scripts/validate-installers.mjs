@@ -8,11 +8,11 @@ const packageManifest = JSON.parse(
 );
 const expectedReleaseTag = `windows-v${packageManifest.version}`;
 const expectedInstallers = [
-  `Ustaad-Setup-${packageManifest.version}-arm64.exe`,
-  `Ustaad-Setup-${packageManifest.version}-x64.exe`,
+  `Hitodama-Open-Setup-${packageManifest.version}-arm64.exe`,
+  `Hitodama-Open-Setup-${packageManifest.version}-x64.exe`,
 ];
 const actualInstallers = readdirSync(resolve(windowsDirectory, "release"))
-  .filter((fileName) => /^Ustaad-Setup-.*\.exe$/u.test(fileName))
+  .filter((fileName) => /^Hitodama-Open-Setup-.*\.exe$/u.test(fileName))
   .sort();
 
 const problems = [];

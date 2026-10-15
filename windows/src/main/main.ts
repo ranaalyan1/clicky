@@ -1,4 +1,5 @@
-import { app, ipcMain, screen, session } from "electron";
+import { app, dialog, ipcMain, screen, session } from "electron";
+import { appendFileSync, mkdirSync } from "node:fs";
 import { join } from "node:path";
 import { UstaadConfigStore } from "./config-store";
 import { UstaadController } from "./ustaad-controller";
@@ -9,8 +10,8 @@ import { UstaadUserConfig, IslandToggleKey } from "../shared/contracts";
 
 app.commandLine.appendSwitch("autoplay-policy", "no-user-gesture-required");
 
-/** The walkthrough Ustaad points people at from the setup tab. */
-const setupVideoUrl = "https://youtu.be/bei_Cc8-CBw";
+/** The project link shown from setup; the open-source build has no hosted funnel. */
+const setupVideoUrl = "https://github.com/ranaalyan1/clicky";
 
 const hasSingleInstanceLock = app.requestSingleInstanceLock();
 if (!hasSingleInstanceLock) {
@@ -21,6 +22,85 @@ let desktopWindows: UstaadDesktopWindows | null = null;
 let ustaadController: UstaadController | null = null;
 let globalShortcutMonitor: GlobalShortcutMonitor | null = null;
 let isQuitting = false;
+let startupFailureWasReported = false;
+
+function describeError(error: unknown): string {
+  return error instanceof Error ? error.stack || error.message : String(error);
+}
+
+function writeFailureLog(kind: "startup" | "runtime", error: unknown): void {
+  try {
+    const userDataDirectory = app.isReady() ? app.getPath("userData") : join(process.cwd(), "logs");
+    mkdirSync(userDataDirectory, { recursive: true });
+    appendFileSync(
+      join(userDataDirectory, "hitodama-open-errors.log"),
+      `[${new Date().toISOString()}] ${kind}\n${describeError(error)}\n\n`,
+      "utf8",
+    );
+  } catch (loggingError) {
+    console.error("Hitodama Open could not write its error log:", loggingError);
+  }
+}
+
+function handleStartupFailure(error: unknown): void {
+  if (startupFailureWasReported) {
+    return;
+  }
+  startupFailureWasReported = true;
+  writeFailureLog("startup", error);
+  console.error("Hitodama Open could not start:", error);
+
+  const message = error instanceof Error ? error.message : String(error);
+  if (app.isReady()) {
+    dialog.showErrorBox(
+      "Hitodama Open could not start",
+      `${message}\n\nThe app saved a diagnostic log in its user-data folder. You can still use the text-only fallback after repairing the installation or native hook.`,
+    );
+  }
+
+  isQuitting = true;
+  try {
+    globalShortcutMonitor?.stop();
+    ustaadController?.stop();
+    desktopWindows?.destroy();
+  } catch (cleanupError) {
+    console.error("Hitodama Open could not clean up after startup failure:", cleanupError);
+  }
+  app.quit();
+}
+
+function handleRuntimeFailure(error: unknown): void {
+  writeFailureLog("runtime", error);
+  console.error("Hitodama Open recovered from an unexpected error:", error);
+  if (isQuitting) {
+    return;
+  }
+  if (ustaadController) {
+    ustaadController.reportRuntimeError(error);
+    return;
+  }
+  if (app.isReady()) {
+    dialog.showErrorBox(
+      "Hitodama Open recovered from an error",
+      "A background feature failed, but the app is still running. Check hitodama-open-errors.log for details.",
+    );
+  }
+}
+
+process.on("uncaughtException", (error) => {
+  if (ustaadController) {
+    handleRuntimeFailure(error);
+  } else {
+    handleStartupFailure(error);
+  }
+});
+process.on("unhandledRejection", (reason) => {
+  if (ustaadController) {
+    handleRuntimeFailure(reason);
+  } else {
+    handleStartupFailure(reason);
+  }
+});
 
 function registerSecureMediaPermissions(): void {
   session.defaultSession.setPermissionCheckHandler((webContents, permission, _origin, details) => {
@@ -97,6 +177,10 @@ function registerIpcHandlers(): void {
     if (panelSentEvent(event.sender.id)) {
       ustaadController?.handlePanelPushToTalkReleased();
     }
+  });
+  ipcMain.handle("panel:submit-text", (event, rawText: unknown) => {
+    requirePanelSender(event.sender.id);
+    return ustaadController?.handlePanelTextSubmit(String(rawText ?? ""));
   });
 
   /* Panel: microphone and playback --------------------------------------- */
@@ -504,13 +588,19 @@ async function startUstaad(): Promise<void> {
     desktopWindows.showPanel("setup");
   }
 
-  screen.on("display-added", () => void desktopWindows?.rebuildOverlayWindows());
-  screen.on("display-removed", () => void desktopWindows?.rebuildOverlayWindows());
-  screen.on("display-metrics-changed", () => void desktopWindows?.rebuildOverlayWindows());
+  screen.on("display-added", () => {
+    void desktopWindows?.rebuildOverlayWindows().catch(handleRuntimeFailure);
+  });
+  screen.on("display-removed", () => {
+    void desktopWindows?.rebuildOverlayWindows().catch(handleRuntimeFailure);
+  });
+  screen.on("display-metrics-changed", () => {
+    void desktopWindows?.rebuildOverlayWindows().catch(handleRuntimeFailure);
+  });
 }
 
 if (hasSingleInstanceLock) {
-  void app.whenReady().then(startUstaad);
+  void app.whenReady().then(startUstaad).catch(handleStartupFailure);
 
   app.on("second-instance", () => {
     desktopWindows?.showPanel();

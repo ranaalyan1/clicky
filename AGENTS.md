@@ -1,11 +1,13 @@
-# Ustaad - Agent Instructions
+# Hitodama Open - Agent Instructions
+
+Hitodama Open is the user-facing product name. `Ustaad*` identifiers and IPC channels are retained as compatibility internals from the earlier Clicky/Ustaad builds; do not rename them casually because existing user data and renderer contracts depend on them.
 
 <!-- This is the single source of truth for all AI coding agents. CLAUDE.md is a symlink to this file. -->
 <!-- AGENTS.md spec: https://github.com/agentsmd/agents.md — supported by Claude Code, Cursor, Copilot, Gemini CLI, and others. -->
 
 ## Overview
 
-Ustaad is a Windows desktop companion written entirely in TypeScript: an Electron system-tray client in `windows/` and a Cloudflare Worker proxy in `worker/`. It lives in the Windows notification area and opens a floating control panel plus a notch ("the island") at the top of every screen. Global push-to-talk captures voice input and sends the transcript plus multi-monitor screenshots to the configured model. The model responds with streamed text and speech, can point at UI elements, and can act on the PC through a typed action protocol.
+Hitodama Open is a Windows desktop companion written entirely in TypeScript: an Electron system-tray client in `windows/` and an optional Cloudflare Worker in `worker/`. It lives in the Windows notification area and opens a floating control panel plus an optional notch ("the island") at the top of every screen. Typed chat is a first-class input; global push-to-talk captures voice input and can send the transcript plus multi-monitor screenshots to the configured model. The model responds with streamed text and speech, can point at UI elements, and can act on the PC through a typed action protocol.
 
 There is **no Swift code and no macOS client** in this repository. The original open-source Clicky macOS client was removed; it remains in this repository's history at commit `629c868` if it is ever needed for reference.
 
@@ -19,8 +21,8 @@ The client can think with **either** a user-supplied Gemini API key stored on th
 - **Framework**: Electron 44 + TypeScript; Chromium renderers for UI, microphone capture, audio playback, and overlay animation
 - **Security Boundary**: sandboxed renderers, context isolation enabled, Node integration disabled, narrow IPC API exposed through `src/preload/preload.ts`
 - **State Management**: `UstaadController` is the main-process state machine and publishes an immutable public state snapshot to the panel, the island, and the overlays
-- **Brain**: `BrainRouter` picks Gemini (user's own key) or the Cloudflare Worker; if the selected provider has no key or URL yet, it uses the other one instead of failing
-- **Global Shortcuts**: `uiohook-napi` tracks physical key-down and key-up. Talk is **Ctrl + Alt** (left Alt only, to avoid Windows AltGr), dictation is **Ctrl + Windows** (configurable: Ctrl + Shift + Space, or Caps Lock), circling is **Ctrl + Shift**, snip is **Ctrl + Alt + S**, panic is **Ctrl + Alt + Q**, and **Escape** cancels circling, closes a snip, and stops a running task
+- **Brain**: `BrainRouter` picks a local model, Gemini (user's own key), or the optional Cloudflare Worker; if the selected provider has no key or URL yet, the panel explains what is missing instead of pretending the app is ready
+- **Typed chat and global shortcuts**: the panel's text composer enters the same pipeline as voice. When available, `uiohook-napi` tracks physical key-down and key-up. Talk is **Ctrl + Alt** (left Alt only, to avoid Windows AltGr), dictation is **Ctrl + Windows** (configurable: Ctrl + Shift + Space, or Caps Lock), circling is **Ctrl + Shift**, snip is **Ctrl + Alt + S**, panic is **Ctrl + Alt + Q**, and **Escape** cancels circling, closes a snip, and stops a running task. The native hook is lazy-loaded so failure leaves typed chat running.
 - **Speech-to-Text**: Gemini (single-shot WAV upload) or the AssemblyAI v3 websocket, fed 16 kHz little-endian PCM by the hidden panel renderer
 - **Screen Capture**: Electron `desktopCapturer`, with the pointer display sorted first and all images constrained to 1280 pixels; circling and snips crop the drawn region instead of the whole display
 - **Element Pointing**: one transparent, click-through, capture-protected `BrowserWindow` per display; Windows uses top-left global desktop coordinates, including negative monitor origins

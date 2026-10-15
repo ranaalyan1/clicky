@@ -64,8 +64,8 @@ describe("electron-builder signing configuration", () => {
   it("keeps the ordinary packaging settings from package.json", () => {
     const signingConfig = loadSigningConfigWith({});
 
-    assert.equal(signingConfig.productName, "Ustaad");
-    assert.equal(signingConfig.nsis.shortcutName, "Ustaad");
+    assert.equal(signingConfig.productName, "Hitodama Open");
+    assert.equal(signingConfig.nsis.shortcutName, "Hitodama Open");
     // The .node extension matters: uiohook-napi's native module is otherwise
     // left unsigned, and a signed app that loads it is refused on its own terms.
     assert.deepEqual(signingConfig.win.signExts, [".node"]);

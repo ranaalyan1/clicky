@@ -50,6 +50,7 @@ contextBridge.exposeInMainWorld("ustaad", {
   /* Panel: push-to-talk and audio --------------------------------------- */
   pushToTalkPressed: (): void => ipcRenderer.send("push-to-talk:pressed"),
   pushToTalkReleased: (): void => ipcRenderer.send("push-to-talk:released"),
+  submitText: (text: string): Promise<void> => ipcRenderer.invoke("panel:submit-text", text),
   sendAudioCaptureStarted: (interactionId: number): void => {
     ipcRenderer.send("audio-capture:started", interactionId);
   },

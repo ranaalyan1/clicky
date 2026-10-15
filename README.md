@@ -1,55 +1,40 @@
-# Ustaad
+# Hitodama Open
 
-Ustaad is the voice companion that lives on your Windows desktop. Hold a key, ask, and it answers out loud, points at things on your screen, and does the work — opening apps, clicking real buttons, typing, reading and writing files, running diagnostics.
+Hitodama Open is an independent, open-source Windows desktop companion inspired by the useful parts of Hitodama: a small voice-first assistant that can see the screen you choose to share, answer out loud, and perform carefully-confirmed desktop actions.
 
-This repository is **TypeScript end to end**: an Electron client in `windows/` and a Cloudflare Worker in `worker/`. There is no Swift code and no macOS client.
+It is **not affiliated with or endorsed by Hitodama's developers**. The project is MIT licensed and is designed to be inspectable, self-hostable, and useful without a proprietary account or hosted backend.
 
-## Ustaad was Clickaa
+## The goal: a small thing that works
 
-Renamed in 1.2, along with the interface: soft, neumorphic surfaces, a three-step start card, and the same engine underneath. Settings, to-do lists, schedules, memory, skills and snippets are imported from the older `%APPDATA%\Clickaa` (and `%APPDATA%\Clicky`) folders on first launch, so nothing is retyped. Uninstall an older Clickaa before installing Ustaad — the installer identity changed with the name.
+The previous build tried to be an entire operating system. Hitodama Open focuses on the loop that matters:
 
-## What it does
+1. Open the tray panel.
+2. Type a question or hold **Ctrl + Alt** and talk.
+3. Optionally let it see your screen.
+4. Get a concise answer, and approve any action before it clicks, types, or changes your PC.
 
-- **Hold Ctrl + Alt** anywhere and talk about whatever is on your screen. Ustaad sees every display, answers in speech, and flies its cursor to the thing it mentions.
-- **Multi-step tasks.** "go to youtube and play anything" is not a search result: Ustaad opens the page, looks at the screen, clicks the right spot, checks whether it worked, and corrects itself when it did not. One approval covers the task, **Escape** stops it.
-- **Wake word.** Say "ustaad" and the island comes up with the microphone already open. It listens with the speech recognizer Windows ships, so no audio leaves the machine. Off until you switch it on.
-- **Skills.** Do the same task a few times and Ustaad offers to save it by name. It only saves when you say yes, and every run still checks the screen and asks before it clicks or types.
-- **Dictation (Ctrl + Windows).** Talk however you like; cleaned, punctuated text lands in the app you are already typing in.
-- **Circle to ask (Ctrl + Shift).** Lasso part of the screen and ask about just that.
-- **Snips (Ctrl + Alt + S).** Drag over any region; those pixels land on your clipboard and in `Pictures\Ustaad Snips`.
-- **Clipboard brain.** "fix what i copied", "summarize this", "translate my clipboard into Urdu" — rewritten in place, with one click to put the old text back.
-- **Timers and snippets.** "set a timer for 12 minutes" ticks in the island and ends with a notification; "insert my address" types a phrase you saved once.
-- **Presence.** It wakes up on its own: a morning brief at the time you pick — today's routines, open and overdue to-dos, what ran overnight — and an evening recap of what it did and what is still open. Written from what is already on your PC, so it works offline; **check in now** in the panel shows you one immediately.
-- **The island**, the notch at the top of every screen: now playing, to-do list, reminders and routines, memory, clipboard clips, launchable apps, wallpapers, timers, snippets and quick switches. It summons itself when your pointer touches the top edge, plays a microphone light while Ustaad is listening, and can be muted from the tray.
-- **System access**, two switches in *soul → abilities*, both off by default: read-only diagnostics, registry reads and files in your own folders; plus a separate opt-in switch for arbitrary commands. Every attempt lands in an audit log, and **Ctrl + Alt + Q** stops everything mid-task.
+Typing is a first-class input, not a fallback hidden behind a microphone permission. If the global keyboard hook, microphone, speech recognizer, or native Windows helper is unavailable, the panel still opens and typed questions still work.
 
-## Install
+### What is included
 
-Download the latest installer from [Releases](https://github.com/ranaalyan1/clicky/releases):
+- **Typed chat and push-to-talk** in the same response pipeline.
+- **Bring-your-own Gemini key**: no Hitodama Open server is required.
+- **Local models** through Ollama, LM Studio, Jan, or another OpenAI-compatible local endpoint.
+- **Optional Cloudflare Worker** for people who want Claude, AssemblyAI, or ElevenLabs behind their own deployment.
+- **Screen context** from one or all displays, only when the screen-vision ability is enabled.
+- **Circle to ask**, dictation, a small top-of-screen island, memory, to-dos, timers, snippets, and reminders.
+- **Desktop actions** such as opening apps, typing, media control, and web searches through a typed action protocol.
+- **Safety controls**: confirmations, ability switches, a panic shortcut, undo where possible, and an audit log.
+- **Offline mode**: use a model running on your own machine and the installed Windows voice. Cloud transcription is disabled in this mode.
+- **No telemetry**: settings, history, memory, and logs stay in the local app-data folder unless a configured model provider receives a request.
 
-- `Ustaad-Setup-<version>-x64.exe` for almost every PC
-- `Ustaad-Setup-<version>-arm64.exe` for Windows on ARM
+Advanced abilities are opt-in where they can surprise you. Auto-start and scheduled presence are off on a fresh install. A model never receives a screenshot unless screen vision is enabled for the request.
 
-The installers are unsigned, and Windows treats that two ways. **SmartScreen** shows "Windows protected your PC" and **More info → Run anyway** clears it. **Smart App Control**, on by default on clean Windows 11 installs, blocks unsigned apps outright and offers no way to allow a single one — if you see "Smart App Control blocked an app that may be unsafe", read [windows/README.md](windows/README.md#troubleshooting) before switching anything off, because on older Windows 11 builds that switch is a one-way trip. Either way, check the download is the file CI built:
+## Quick start
 
-```powershell
-Get-FileHash .\Ustaad-Setup-1.1.0-x64.exe -Algorithm SHA256
-```
+### Option A: run from source
 
-The digest published on the release page must match. Then paste a [Google AI Studio](https://aistudio.google.com/api-keys) Gemini API key into the setup tab; the key is stored on that PC only.
-
-## Two ways to give Ustaad a brain
-
-| Path | What it needs | Where the keys live |
-|---|---|---|
-| **Gemini key** | A Google AI Studio key pasted into the panel | On your PC, in Windows application data |
-| **Cloudflare Worker** | A deployed Worker plus provider keys | In the Worker, never on the device |
-
-The Worker route also brings Claude vision, ElevenLabs speech and AssemblyAI transcription into play. If the selected provider has no key or URL yet, Ustaad uses the other one instead of failing.
-
-Installers are built the same way in both cases: the assets attach to a GitHub release. Run `npm run package:win` on Windows to build them yourself.
-
-## Run from source
+Windows 10 or 11, Node.js 22.12 or newer:
 
 ```powershell
 cd windows
@@ -57,54 +42,126 @@ npm install
 npm run dev
 ```
 
-Paste either the deployed Worker base URL (then **save & test**) or your own Gemini API key into the panel's setup tab. See [`windows/README.md`](windows/README.md) for requirements, architecture, packaging, tests, permissions and troubleshooting.
+The panel opens on first launch. Choose one of these in **setup → brain**:
 
-## The Cloudflare Worker
+- **Your own Gemini key** from [Google AI Studio](https://aistudio.google.com/api-keys). The key is stored on this PC only.
+- **On this PC** with Ollama, LM Studio, Jan, or another compatible local server. The default Ollama address is `http://127.0.0.1:11434`.
+- **Your own Worker** if you want to proxy provider keys away from the desktop.
 
-The Worker is a small proxy that holds long-lived provider keys so they never ship in a client.
+You can use the text box immediately after connecting a brain. The microphone is optional.
+
+### Build an installer
+
+```powershell
+cd windows
+npm ci
+npm test
+npm run package:win
+```
+
+The unsigned installers are written to `windows/release/` as:
+
+- `Hitodama-Open-Setup-<version>-x64.exe`
+- `Hitodama-Open-Setup-<version>-arm64.exe`
+
+Unsigned Windows binaries may trigger SmartScreen or Smart App Control. For personal builds, run from source or use a certificate you control; do not disable Windows security just to run an unknown download.
+
+## Providers
+
+The desktop client never requires our infrastructure:
+
+| Provider | Best for | What leaves the PC |
+| --- | --- | --- |
+| Gemini | The simplest setup and vision, transcription, and speech | The prompt, enabled screenshots, and audio sent to Google |
+| Local model | Privacy and no per-request bill | Nothing to a cloud provider; requests stay on the configured local endpoint |
+| Worker | Your own proxy for Claude, AssemblyAI, and ElevenLabs | The request goes to your Worker, which you operate |
+
+Use **offline mode** when the promise must be strict: Hitodama Open will only use the local brain, Windows speech, and local tools. It will refuse cloud transcription, web research, image generation, the phone window, and cloud wake-word mode instead of quietly falling back online.
+
+The optional Worker is in [`worker/`](worker/). Deploy it with your own secrets:
 
 ```bash
 cd worker
-npm install
+npm ci
 npx wrangler secret put ANTHROPIC_API_KEY
 npx wrangler secret put ASSEMBLYAI_API_KEY
 npx wrangler secret put ELEVENLABS_API_KEY
 npx wrangler deploy
 ```
 
-Set `ELEVENLABS_VOICE_ID` in `wrangler.toml` (it is not sensitive). For local development, `npx wrangler dev` runs the same routes against `http://localhost:8787` with a `worker/.dev.vars` file holding the same three keys.
+No Worker URL is hard-coded into the client.
 
-| Route | Upstream | Purpose |
-|---|---|---|
-| `POST /chat` | `api.anthropic.com/v1/messages` | Claude vision and streaming chat |
-| `POST /tts` | `api.elevenlabs.io/v1/text-to-speech/{voiceId}` | ElevenLabs speech |
-| `POST /transcribe-token` | `streaming.assemblyai.com/v3/token` | A short-lived AssemblyAI websocket token |
+## Controls
 
-## Architecture
+- **Ctrl + Alt**: hold to talk.
+- **Ctrl + Shift**: hold, circle a region, and ask about it.
+- **Ctrl + Windows**: hold to dictate into the focused app; this can be changed in setup.
+- **Ctrl + Alt + S**: make a screen snip.
+- **Ctrl + Alt + Q**: stop listening, speech, queued work, confirmations, and desktop automation.
+- **Escape**: cancel a circle, snip, or running task.
 
-A sandboxed Electron system-tray client. Provider networking, configuration, global shortcuts, screen capture and lifecycle state stay in the main process behind a context-isolated preload bridge (`contextIsolation: true`, `sandbox: true`, `nodeIntegration: false`). The renderers are browser-native ES modules that handle only UI, microphone PCM, audio playback and overlay drawing.
+The panel's **type to ask** box is always available. It uses the same screen context, tools, confirmation queue, and optional spoken reply as voice input.
 
-The controller publishes an immutable state snapshot to the panel, the island and one transparent click-through overlay per display. `action-protocol.ts` parses the model's `<actions>` and `<task>` blocks and decides what needs confirmation; `agent-loop.ts` runs a task step by step (bounded in steps, corrections and time); `system-access.ts` is the whole safety policy for anything that touches the PC; `system-actions.ts` performs the work through a PowerShell/C# bridge. Clicks and keys go through Windows `SendInput`, coordinates are top-left-origin desktop coordinates including negative monitor origins, and every risky action offers an undo.
+## Privacy and safety
+
+The app is local-first, but a provider can only answer by receiving the data needed for the request. The panel shows which brain is active. Screen vision, clipboard history, wake word, system access, and automation can each be switched off.
+
+Desktop actions are parsed from a constrained `<actions>` block. Risky actions wait in the island for approval unless you explicitly change confirmation settings. Commands, file operations, and registry reads are handled by one policy module and written to the audit log. Credentials, elevation, security weakening, and protected credential stores are refused.
+
+## Troubleshooting
+
+### The app disappears at launch
+
+The native global keyboard hook is optional. If it cannot load, Hitodama Open now keeps running with the panel text box and hold-to-talk button. Restarting the app is not supposed to be necessary for ordinary hook failure.
+
+If the Electron client itself cannot create a window, check:
+
+- `hitodama-open-errors.log` in the app's user-data folder;
+- that `windows/dist/src/renderer/` exists after `npm run build`;
+- that the installed architecture matches the machine (`x64` or `arm64`);
+- Windows microphone permission if voice is the only feature that fails.
+
+### The brain is not connected
+
+Open **setup**, select the provider you actually run, and use **save & test**. A local model must be running and its model name must match the name loaded by the server. A Gemini key must be copied without spaces or quotes.
+
+### Global shortcuts do nothing
+
+Use the panel text box first. Then restart the app, check security software that blocks keyboard hooks, and confirm that the app architecture matches the installed `uiohook-napi` binary. The panel reports when global shortcuts are unavailable instead of pretending they are active.
+
+### Voice does not work
+
+Allow desktop apps to use the microphone in **Windows Settings → Privacy & security → Microphone**. Text chat does not need a microphone. Gemini transcription needs a Gemini key; local text models do not automatically provide speech recognition.
 
 ## Project structure
 
+```text
+windows/
+  src/main/       Electron lifecycle, providers, state, tools, safety, storage
+  src/preload/    narrow context-isolated IPC bridge
+  src/renderer/   panel, island, overlays, audio capture and playback
+  src/shared/     contracts shared by main and renderer
+  tests/          platform-neutral Node tests
+worker/           optional Cloudflare Worker proxy
+.github/          Windows validation, packaging, and smoke-test workflow
 ```
-windows/                 # Windows system-tray client (Electron + TypeScript)
-  src/main/                 #   native integrations, state machine, providers, agent loop
-  src/renderer/             #   panel, island, cursor overlays, circle lasso, snip UI
-  src/preload/              #   the typed IPC bridge
-  tests/                    #   144 unit tests for the platform-neutral logic
-  assets/                   #   icon set and installer artwork
-worker/                  # Cloudflare Worker proxy (TypeScript)
-  src/index.ts              #   /chat, /tts, /transcribe-token
-AGENTS.md                # agent instructions and architecture notes
-.github/workflows/       # build, validate, smoke-test and publish Windows releases
+
+The main process owns provider networking, settings, capture, native integration, and action execution. Renderers have no Node integration and receive only the typed preload API. JSON stores use sanitized values and atomic writes so a corrupt or interrupted settings file does not take the app down.
+
+## Development checks
+
+```powershell
+cd windows
+npm run typecheck
+npm test
 ```
+
+`npm test` builds both main and renderer code before running the unit tests. Do not commit `node_modules`, `dist`, `release`, local Worker secrets, or generated user data.
 
 ## Contributing
 
-PRs welcome. Agents should read [`AGENTS.md`](AGENTS.md) first — `CLAUDE.md` is a symlink to it. Run `npm test` and `npm run typecheck` inside `windows/` before proposing a change.
+Small, working changes are preferred over another feature pile. Start with an issue or a focused pull request, include a regression test for platform-neutral behavior, and keep provider keys and screenshots out of commits. See [`AGENTS.md`](AGENTS.md) for the architecture rules.
 
-## Credits
+## License
 
-Ustaad is built on [Clicky](https://github.com/farzaa/clicky) by Farza, whose open-source macOS client started this project. The original Swift client has since been removed in favour of the TypeScript clients in this repository; it remains available in this repository's history at commit `629c868`. MIT licensed.
+MIT. See [`LICENSE`](LICENSE).

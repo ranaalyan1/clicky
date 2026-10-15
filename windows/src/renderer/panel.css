@@ -441,6 +441,38 @@ button:disabled { opacity: .5; cursor: default; box-shadow: var(--ustaad-neu-ins
 .push-to-talk-button.is-pressed .live-wave i:nth-child(4) { animation-delay: .36s; }
 @keyframes wave { 0%,100% { height: 4px; } 50% { height: 16px; } }
 
+/* Text is a first-class path, not an emergency-only settings field. It keeps
+   the core assistant usable when a microphone or native global hook is down. */
+.text-ask-card {
+  margin: 0 12px 12px;
+  padding: 12px 14px 11px;
+  border-radius: var(--ustaad-radius-md);
+  background: var(--ustaad-surface);
+  box-shadow: var(--ustaad-neu-inset-sm);
+}
+.text-ask-card .field-label { margin-top: 0; }
+.text-ask-row { display: flex; align-items: flex-end; gap: 8px; }
+.text-ask-input {
+  flex: 1;
+  min-width: 0;
+  min-height: 48px;
+  max-height: 150px;
+  resize: vertical;
+  padding: 9px 10px;
+  border: 0;
+  border-radius: var(--ustaad-radius-sm);
+  background: var(--ustaad-canvas);
+  box-shadow: var(--ustaad-neu-inset-sm);
+  color: var(--text);
+  font-size: 11.5px;
+  line-height: 1.45;
+  user-select: text;
+}
+.text-ask-input::placeholder { color: var(--faint); }
+.text-ask-input:focus { outline: none; box-shadow: var(--ustaad-focus-shadow), var(--ustaad-neu-inset-sm); }
+.text-ask-button { flex: 0 0 auto; min-height: 34px; padding: 8px 13px; }
+.text-ask-card .field-hint { margin-bottom: 0; }
+
 /* ------------------------------------------------------------ activity --- */
 
 .activity-card { padding: 14px 16px; }
