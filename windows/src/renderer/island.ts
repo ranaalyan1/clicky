@@ -551,8 +551,8 @@ function renderControlToggles(islandState: IslandState): void {
   }> = [
     {
       key: "cursor",
-      label: "cursor buddy",
-      detail: "the blue cursor follows your pointer",
+      label: "ember companion",
+      detail: "the warm ember follows your pointer",
       isOn: islandState.cursorEnabled,
     },
     {

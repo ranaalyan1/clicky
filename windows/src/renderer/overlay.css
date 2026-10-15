@@ -1,5 +1,5 @@
 /*
- * The buddy: Ustaad's pointer, floating on top of whatever the desktop is
+ * The buddy: Hitodama's ember, floating on top of whatever the desktop is
  * showing. Layers that sit over arbitrary content keep a real drop shadow —
  * soft twin shadows only read as depth on a surface of their own — but every
  * control inside the pointer is moulded the same way the panel is.
@@ -22,20 +22,30 @@ html, body { width: 100%; height: 100%; margin: 0; overflow: hidden; background:
 .buddy.visible { opacity: 1; }
 .visual-wrap { position: relative; width: 38px; height: 44px; }
 
-/* The pointer itself: graphite, lit from the top-left, with the blade's lime
-   held in the glow rather than painted on the shape. */
+/* The floating companion is an ember-shaped spirit, not a generic arrow. Its
+   pale core keeps the mark legible over any desktop wallpaper. */
 .cursor-triangle {
   position: absolute;
-  left: 4px;
-  top: 4px;
-  width: 28px;
-  height: 33px;
-  clip-path: polygon(7% 5%, 94% 46%, 55% 61%, 38% 98%);
-  transform: rotate(-8deg);
+  left: 5px;
+  top: 3px;
+  width: 27px;
+  height: 34px;
+  clip-path: polygon(50% 0%, 66% 24%, 65% 10%, 90% 42%, 82% 68%, 68% 87%, 50% 100%, 29% 87%, 15% 67%, 13% 46%, 33% 56%, 29% 32%);
+  transform: rotate(3deg);
   transform-origin: center;
-  background: linear-gradient(150deg, #f2f5f8 0%, #9aa3ae 42%, #4a525c 100%);
-  filter: drop-shadow(0 3px 4px rgba(0,0,0,.45)) drop-shadow(0 0 9px rgba(182,232,0,.55));
+  background: linear-gradient(145deg, #ffc56b 0%, #ff875f 54%, #d6533f 100%);
+  filter: drop-shadow(0 3px 4px rgba(0,0,0,.45)) drop-shadow(0 0 9px rgba(255,135,95,.55));
   z-index: 3;
+}
+.cursor-triangle::after {
+  content: "";
+  position: absolute;
+  width: 31%;
+  height: 49%;
+  left: 35%;
+  bottom: 12%;
+  border-radius: 62% 38% 52% 48%;
+  background: linear-gradient(155deg, #fff5cb, #ffd28a 60%, #ff9a65);
 }
 .glow {
   position: absolute;
@@ -44,7 +54,7 @@ html, body { width: 100%; height: 100%; margin: 0; overflow: hidden; background:
   width: 36px;
   height: 36px;
   border-radius: 50%;
-  background: rgba(182,232,0,.2);
+  background: rgba(255,135,95,.2);
   filter: blur(9px);
   opacity: .55;
 }
@@ -53,14 +63,14 @@ html, body { width: 100%; height: 100%; margin: 0; overflow: hidden; background:
   position: absolute;
   inset: -5px -3px 3px -5px;
   border: 2px solid var(--ustaad-accent-soft);
-  border-color: rgba(182,232,0,.55);
+  border-color: rgba(255,135,95,.55);
   border-radius: 50%;
   opacity: 0;
 }
 .buddy[data-state="listening"] .listening-ring { animation: listening-ring 1s ease-out infinite; }
 .buddy[data-state="listening"] .cursor-triangle { animation: listen-float .55s ease-in-out infinite alternate; }
 @keyframes listening-ring { from { transform: scale(.7); opacity: .9; } to { transform: scale(1.45); opacity: 0; } }
-@keyframes listen-float { to { transform: rotate(-4deg) translateY(-2px) scale(1.05); } }
+@keyframes listen-float { to { transform: rotate(7deg) translateY(-2px) scale(1.05); } }
 
 /* Working: a ring turned out of the surface, spinning its lit edge. */
 .processing-spinner {
@@ -76,7 +86,7 @@ html, body { width: 100%; height: 100%; margin: 0; overflow: hidden; background:
   z-index: 4;
 }
 .buddy[data-state="processing"] .processing-spinner { opacity: 1; animation: spin .72s linear infinite; }
-.buddy[data-state="processing"] .cursor-triangle { opacity: .42; transform: rotate(-8deg) scale(.75); }
+.buddy[data-state="processing"] .cursor-triangle { opacity: .42; transform: rotate(3deg) scale(.75); }
 @keyframes spin { to { transform: rotate(360deg); } }
 
 /* The level meter: a small slab beside the pointer, raised off its own surface. */
@@ -105,7 +115,7 @@ html, body { width: 100%; height: 100%; margin: 0; overflow: hidden; background:
 @keyframes wave { to { height: calc(5px + var(--audio-level) * 11px); } }
 
 .buddy[data-state="responding"] .cursor-triangle { animation: talk-bob .5s ease-in-out infinite alternate; }
-@keyframes talk-bob { to { transform: rotate(-4deg) translateY(-3px) scale(1.04); } }
+@keyframes talk-bob { to { transform: rotate(7deg) translateY(-3px) scale(1.04); } }
 
 .response-stack {
   position: absolute;
@@ -137,7 +147,7 @@ html, body { width: 100%; height: 100%; margin: 0; overflow: hidden; background:
 }
 .response-bubble:not(:empty) { opacity: 1; transform: translateY(0) scale(1); }
 
-/* The label saying what Ustaad is pointing at: a chip pressed into the bubble. */
+/* The label saying what Hitodama is pointing at: a chip pressed into the bubble. */
 .point-label {
   margin-left: 4px;
   padding: 4px 9px 5px;
@@ -153,7 +163,7 @@ html, body { width: 100%; height: 100%; margin: 0; overflow: hidden; background:
 }
 .point-label:not(:empty) { opacity: 1; transform: translateY(0); }
 
-/* Keep bubbles readable when Ustaad is near the right edge. */
+/* Keep bubbles readable when Hitodama is near the right edge. */
 .buddy.flip-bubble .response-stack { left: auto; right: 31px; align-items: flex-end; }
 .buddy.flip-bubble .response-bubble {
   border-radius: var(--ustaad-radius-md) var(--ustaad-radius-md) var(--ustaad-radius-xs) var(--ustaad-radius-md);

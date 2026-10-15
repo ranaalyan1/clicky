@@ -83,6 +83,17 @@ describe("identity assets", () => {
     assert.equal(decoded.readUInt32BE(16), 64);
     assert.equal(decoded.readUInt32BE(20), 64);
   });
+
+  it("keeps Hitodama's four soul slots visible on the home surface", () => {
+    const panel = readFileSync(join(rendererDirectory, "panel.html"), "utf8");
+    assert.match(panel, /class="soul-flame"/u);
+    assert.match(panel, /class="[^"]*\bsoul-card\b/u);
+    for (const slot of ["Soul", "Personality", "Voice", "Abilities"]) {
+      assert.match(panel, new RegExp(`<small>${slot}</small>`, "u"), `missing ${slot} slot`);
+    }
+    assert.match(readStyleSheet("panel.css"), /\.soul-card\s*\{/u);
+    assert.match(readFileSync(join(assetDirectory, "ustaad-mark.svg"), "utf8"), /Hitodama.*ember/isu);
+  });
 });
 
 describe("style sheets", () => {

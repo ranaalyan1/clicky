@@ -13,7 +13,7 @@
   <main class="panel-shell">
     <header class="titlebar">
       <div class="brand-lockup">
-        <span class="mini-cursor" aria-hidden="true"></span>
+        <span class="mini-flame" aria-hidden="true"><i></i></span>
         <span class="brand-name">hitodama</span>
         <span class="platform-pill">windows</span>
       </div>
@@ -33,7 +33,7 @@
       <section class="page active" data-page="home">
         <section class="hero-section">
           <div id="status-orb" class="status-orb" data-state="idle">
-            <span class="hero-cursor"></span>
+            <span class="soul-flame" aria-hidden="true"><i></i></span>
             <span class="orb-ring orb-ring-one"></span>
             <span class="orb-ring orb-ring-two"></span>
           </div>
@@ -41,6 +41,36 @@
             <h1 id="status-title">ready when you are</h1>
             <p id="status-description">hold <kbd>Ctrl</kbd> + <kbd>Alt</kbd> anywhere to talk</p>
           </div>
+        </section>
+
+        <section class="card soul-card" aria-labelledby="soul-card-title">
+          <div class="soul-card-heading">
+            <div>
+              <p class="eyebrow">your little fire</p>
+              <h2 id="soul-card-title">Soul map</h2>
+            </div>
+            <span class="soul-state-dot" aria-hidden="true"></span>
+          </div>
+          <p class="soul-card-copy">A small spirit with four parts you can shape.</p>
+          <div class="soul-slots" aria-label="Hitodama configuration slots">
+            <button class="soul-slot soul-slot-soul" type="button" data-page="soul">
+              <span class="slot-glyph" aria-hidden="true">✦</span>
+              <span><small>Soul</small><strong id="soul-slot-name">Hitodama</strong></span>
+            </button>
+            <button class="soul-slot soul-slot-personality" type="button" data-page="soul">
+              <span class="slot-glyph" aria-hidden="true">◒</span>
+              <span><small>Personality</small><strong id="soul-slot-personality">Gentle guide</strong></span>
+            </button>
+            <button class="soul-slot soul-slot-voice" type="button" data-page="soul">
+              <span class="slot-glyph" aria-hidden="true">)))</span>
+              <span><small>Voice</small><strong id="soul-slot-voice">Adaptive voice</strong></span>
+            </button>
+            <button class="soul-slot soul-slot-abilities" type="button" data-page="soul">
+              <span class="slot-glyph" aria-hidden="true">⌁</span>
+              <span><small>Abilities</small><strong id="soul-slot-abilities">Ready to help</strong></span>
+            </button>
+          </div>
+          <button class="soul-customize" type="button" data-page="soul">Shape your soul <span aria-hidden="true">↗</span></button>
         </section>
 
         <!-- Three steps, each one measurable, and none of them a lecture. The card
@@ -117,8 +147,8 @@
         <section class="settings-section">
           <div class="setting-row">
             <div>
-              <strong>show the cursor buddy</strong>
-              <span>keep the blue cursor beside your pointer</span>
+              <strong>show the ember companion</strong>
+              <span>keep the warm ember beside your pointer</span>
             </div>
             <label class="toggle-control">
               <input id="cursor-toggle" type="checkbox">
@@ -171,11 +201,11 @@
         <section class="card">
           <div class="section-heading-row">
             <div>
-              <p class="eyebrow">identity</p>
-              <h2>name &amp; personality</h2>
+              <p class="eyebrow">soul</p>
+              <h2>name, nature &amp; boundaries</h2>
             </div>
           </div>
-          <label class="field-label" for="assistant-name">what it calls itself</label>
+          <label class="field-label" for="assistant-name">what this soul calls itself</label>
           <input id="assistant-name" class="text-field" type="text" spellcheck="false" autocomplete="off" placeholder="hitodama">
 
           <div id="personality-chips" class="chip-row"></div>
@@ -196,7 +226,7 @@
           <div class="section-heading-row">
             <div>
               <p class="eyebrow">voice</p>
-              <h2>how it sounds</h2>
+              <h2>the voice it carries</h2>
             </div>
           </div>
           <label class="field-label" for="speech-provider">speech engine</label>
@@ -218,7 +248,7 @@
           <div class="section-heading-row">
             <div>
               <p class="eyebrow">abilities</p>
-              <h2>what hitodama may do</h2>
+              <h2>what your ember may do</h2>
             </div>
           </div>
           <div id="ability-list" class="ability-list"></div>
@@ -227,8 +257,8 @@
         <section class="card">
           <div class="section-heading-row">
             <div>
-              <p class="eyebrow">safety</p>
-              <h2>when to ask first</h2>
+              <p class="eyebrow">boundaries</p>
+              <h2>when your ember asks first</h2>
             </div>
           </div>
           <div class="segmented-control" role="group" aria-label="Confirmation mode">
@@ -585,7 +615,7 @@
           <div class="setting-row">
             <div>
               <strong>summon from the top edge</strong>
-              <span>slide the mark in when the pointer touches the top of a screen</span>
+              <span>let the ember appear when the pointer touches the top of a screen</span>
             </div>
             <label class="toggle-control">
               <input id="island-summon-toggle" type="checkbox">
@@ -622,7 +652,7 @@
               <span></span>
             </label>
           </div>
-          <p class="field-hint">the island lives at the top edge: touch it with the pointer, the mark slides in, click it to open. it stays click-through until your pointer is over it, so it never blocks your work.</p>
+          <p class="field-hint">the island lives at the top edge: touch it with the pointer, the ember appears, click it to open. it stays click-through until your pointer is over it, so it never blocks your work.</p>
         </section>
 
         <section class="card">

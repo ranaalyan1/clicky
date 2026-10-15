@@ -1,14 +1,6 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128" width="512" height="512">
-  <!-- The tray is the one place this icon is guaranteed to be 16 pixels on a
-       taskbar that may be light or dark, so it gets a dark hairline to hold the
-       silhouette either way, and a slightly deeper blade so the colour survives
-       being reduced to a handful of pixels. tray.png is rendered from this file. -->
-  <g stroke="#101418" stroke-width="3" stroke-linejoin="round" stroke-linecap="round">
-    <path d="M22 10 L12 20 L12 76 L64 108 L116 76 L116 20 L106 10 L98 10 L98 68 L64 90 L30 68 L30 10 Z" fill="#eef2f6"/>
-    <path d="M98 10 L106 10 L116 20 L116 76 L64 108 L64 90 L98 68 Z" fill="#8b95a1"/>
-    <path d="M116 76 L64 108 L64 90 L98 68 Z" fill="#79828e"/>
-    <path d="M12 76 L64 108 L64 90 L30 68 Z" fill="#ccd4dd"/>
-  </g>
-  <path d="M64 78 L53 26 L64 26 Z" fill="#9dc400"/>
-  <path d="M64 78 L75 26 L64 26 Z" fill="#cbf23a"/>
+  <!-- A warm ember silhouette survives the tiny Windows tray size. -->
+  <path d="M64 8 C78 28 96 36 94 62 C92 88 79 109 57 117 C37 111 21 96 19 75 C17 55 31 45 45 29 C44 45 53 52 60 61 C66 49 69 33 64 8Z" fill="#101418" opacity=".85"/>
+  <path d="M64 12 C76 30 91 39 89 62 C87 84 75 102 57 110 C41 104 27 91 26 74 C25 59 36 48 48 35 C48 50 55 57 61 66 C68 52 70 35 64 12Z" fill="#ffc56b"/>
+  <path d="M62 53 C72 66 76 76 70 90 C67 97 61 102 55 104 C48 97 45 89 48 81 C51 74 56 69 58 62 C59 68 62 73 65 76 C67 69 66 60 62 53Z" fill="#fff0c3"/>
 </svg>

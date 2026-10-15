@@ -1,5 +1,5 @@
 /*
- * Ustaad design tokens.
+ * Hitodama design tokens.
  *
  * Every renderer links this file first and reads from it, so type, spacing,
  * colour and motion can only be changed in one place.
@@ -51,22 +51,22 @@
   --ustaad-radius-pill: 999px;
 
   /* Colour: one neutral graphite, so nothing tints the shadows. ---------- */
-  --ustaad-canvas: #22262b;
+  --ustaad-canvas: #17151d;
   /* Same value as the canvas on purpose: see the note at the top. */
-  --ustaad-surface: #22262b;
-  --ustaad-surface-raised: #262b31;
+  --ustaad-surface: #17151d;
+  --ustaad-surface-raised: #1d1a25;
   --ustaad-surface-hover: rgba(255, 255, 255, 0.04);
   --ustaad-line: rgba(255, 255, 255, 0.06);
   --ustaad-line-strong: rgba(255, 255, 255, 0.12);
 
-  --ustaad-ink: #e8ecf1;
-  --ustaad-ink-muted: #9aa3ae;
-  --ustaad-ink-faint: #6d7681;
+  --ustaad-ink: #f4edf0;
+  --ustaad-ink-muted: #aaa0ad;
+  --ustaad-ink-faint: #756b79;
 
-  --ustaad-accent: #b6e800;
-  --ustaad-accent-bright: #d8ff4d;
-  --ustaad-accent-deep: #8fb800;
-  --ustaad-accent-soft: rgba(182, 232, 0, 0.16);
+  --ustaad-accent: #ff875f;
+  --ustaad-accent-bright: #ffc56b;
+  --ustaad-accent-deep: #d6533f;
+  --ustaad-accent-soft: rgba(255, 135, 95, 0.16);
   --ustaad-positive: #69d99f;
   --ustaad-caution: #ffc56a;
   --ustaad-danger: #ff8a8a;
@@ -113,8 +113,8 @@
 
   /* Focus has to stay visible on a soft surface, so it is a ring *and* a
      glow rather than a colour change alone. */
-  --ustaad-focus-ring: 0 0 0 2px rgba(182, 232, 0, 0.75);
-  --ustaad-focus-shadow: 0 0 0 2px rgba(182, 232, 0, 0.7), 0 0 14px rgba(182, 232, 0, 0.35);
+  --ustaad-focus-ring: 0 0 0 2px rgba(255, 135, 95, 0.75);
+  --ustaad-focus-shadow: 0 0 0 2px rgba(255, 135, 95, 0.7), 0 0 14px rgba(255, 135, 95, 0.35);
 
   /* Elevation, kept for anything that genuinely floats above the panel. */
   --ustaad-shadow-soft: 0 6px 18px rgba(0, 0, 0, 0.28);
